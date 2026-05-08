@@ -5,9 +5,11 @@ import {
   AuthorizeRequest as AuthorizeRequestSchema,
 } from '@credential-broker/shared-types';
 import { Hono } from 'hono';
+import { decisionToAudit } from '../audit/emit.js';
 import type { PolicyCache } from '../cache/policies.js';
 import type { RevocationCache } from '../cache/revocations.js';
 import { getLog } from '../middleware/logger.js';
+import { recordAuthorize } from '../observability/metrics.js';
 
 export interface AuthorizeRouteDeps {
   policyCache: PolicyCache;
@@ -65,6 +67,8 @@ export function createAuthorizeRoutes(deps: AuthorizeRouteDeps): Hono {
     };
 
     const decision = decide(input);
+
+    recordAuthorize(decisionToAudit(decision), decision.reason);
 
     if (deps.emitAudit) {
       await deps.emitAudit({

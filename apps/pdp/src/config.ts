@@ -9,6 +9,11 @@ const Config = z.object({
   REVOCATION_REFRESH_MS: z.coerce.number().int().positive().default(5_000),
   AUDIT_LOG_PATH: z.string().min(1).default('./audit.log'),
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
+  OTEL_EXPORTER_OTLP_ENDPOINT: z.string().url().optional(),
+  OTEL_EXPORTER_OTLP_HEADERS: z.string().optional(),
+  OTEL_SERVICE_NAME: z.string().default('cb-pdp'),
+  SENTRY_DSN: z.string().url().optional(),
+  SENTRY_TRACES_SAMPLE_RATE: z.coerce.number().min(0).max(1).default(0.1),
 });
 
 export type Config = z.infer<typeof Config>;
