@@ -71,6 +71,28 @@ importers:
         specifier: 4.1.5
         version: 4.1.5(@types/node@22.10.5)(@vitest/coverage-v8@4.1.5)(vite@8.0.11(@types/node@22.10.5)(esbuild@0.27.7)(tsx@4.21.0)(yaml@2.8.4))
 
+  packages/ucan:
+    dependencies:
+      '@credential-broker/crypto':
+        specifier: workspace:*
+        version: link:../crypto
+      '@credential-broker/shared-types':
+        specifier: workspace:*
+        version: link:../shared-types
+      zod:
+        specifier: 3.24.1
+        version: 3.24.1
+    devDependencies:
+      '@types/node':
+        specifier: 22.10.5
+        version: 22.10.5
+      typescript:
+        specifier: 5.7.2
+        version: 5.7.2
+      vitest:
+        specifier: 4.1.5
+        version: 4.1.5(@types/node@22.10.5)(@vitest/coverage-v8@4.1.5)(vite@8.0.11(@types/node@22.10.5)(esbuild@0.27.7)(tsx@4.21.0)(yaml@2.8.4))
+
 packages:
 
   '@babel/helper-string-parser@7.27.1':
