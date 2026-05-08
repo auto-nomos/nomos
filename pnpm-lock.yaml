@@ -33,6 +33,28 @@ importers:
         specifier: 4.1.5
         version: 4.1.5(@types/node@22.10.5)(@vitest/coverage-v8@4.1.5)(vite@8.0.11(@types/node@22.10.5)(esbuild@0.27.7)(tsx@4.21.0)(yaml@2.8.4))
 
+  packages/crypto:
+    dependencies:
+      '@noble/curves':
+        specifier: 1.7.0
+        version: 1.7.0
+      '@noble/hashes':
+        specifier: 1.7.0
+        version: 1.7.0
+      multiformats:
+        specifier: 13.3.1
+        version: 13.3.1
+    devDependencies:
+      '@types/node':
+        specifier: 22.10.5
+        version: 22.10.5
+      typescript:
+        specifier: 5.7.2
+        version: 5.7.2
+      vitest:
+        specifier: 4.1.5
+        version: 4.1.5(@types/node@22.10.5)(@vitest/coverage-v8@4.1.5)(vite@8.0.11(@types/node@22.10.5)(esbuild@0.27.7)(tsx@4.21.0)(yaml@2.8.4))
+
   packages/shared-types:
     dependencies:
       zod:
@@ -309,6 +331,18 @@ packages:
     peerDependencies:
       '@emnapi/core': ^1.7.1
       '@emnapi/runtime': ^1.7.1
+
+  '@noble/curves@1.7.0':
+    resolution: {integrity: sha512-UTMhXK9SeDhFJVrHeUJ5uZlI6ajXg10O6Ddocf9S6GjbSBVZsJo88HzKwXznNfGpMTRDyJkqMjNDPYgf0qFWnw==}
+    engines: {node: ^14.21.3 || >=16}
+
+  '@noble/hashes@1.6.0':
+    resolution: {integrity: sha512-YUULf0Uk4/mAA89w+k3+yUYh6NrEvxZa5T6SY3wlMvE2chHkxFUUIDI8/XW1QSC357iA5pSnqt7XEhvFOqmDyQ==}
+    engines: {node: ^14.21.3 || >=16}
+
+  '@noble/hashes@1.7.0':
+    resolution: {integrity: sha512-HXydb0DgzTpDPwbVeDGCG1gIu7X6+AuU6Zl6av/E/KG8LMsvPntvq+w17CHRpKBmN6Ybdrt1eP3k4cj8DJa78w==}
+    engines: {node: ^14.21.3 || >=16}
 
   '@oxc-project/types@0.128.0':
     resolution: {integrity: sha512-huv1Y/LzBJkBVHt3OlC7u0zHBW9qXf1FdD7sGmc1rXc2P1mTwHssYv7jyGx5KAACSCH+9B3Bhn6Z9luHRvf7pQ==}
@@ -713,6 +747,9 @@ packages:
     resolution: {integrity: sha512-VP79XUPxV2CigYP3jWwAUFSku2aKqBH7uTAapFWCBqutsbmDo96KY5o8uh6U+/YSIn5OxJnXp73beVkpqMIGhA==}
     engines: {node: '>=18'}
 
+  multiformats@13.3.1:
+    resolution: {integrity: sha512-QxowxTNwJ3r5RMctoGA5p13w5RbRT2QDkoM+yFlqfLiioBp78nhDjnRLvmSBI9+KAqN4VdgOVWM9c0CHd86m3g==}
+
   nanoid@3.3.12:
     resolution: {integrity: sha512-ZB9RH/39qpq5Vu6Y+NmUaFhQR6pp+M2Xt76XBnEwDaGcVAqhlvxrl3B2bKS5D3NH3QR76v3aSrKaF/Kiy7lEtQ==}
     engines: {node: ^10 || ^12 || ^13.7 || ^14 || >=15.0.1}
@@ -1106,6 +1143,14 @@ snapshots:
       '@tybys/wasm-util': 0.10.2
     optional: true
 
+  '@noble/curves@1.7.0':
+    dependencies:
+      '@noble/hashes': 1.6.0
+
+  '@noble/hashes@1.6.0': {}
+
+  '@noble/hashes@1.7.0': {}
+
   '@oxc-project/types@0.128.0': {}
 
   '@rolldown/binding-android-arm64@1.0.0-rc.18':
@@ -1453,6 +1498,8 @@ snapshots:
       semver: 7.7.4
 
   mimic-function@5.0.1: {}
+
+  multiformats@13.3.1: {}
 
   nanoid@3.3.12: {}
 
