@@ -1,0 +1,58 @@
+{
+  "name": "@credential-broker/shared-types",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./ucan": {
+      "types": "./dist/ucan.d.ts",
+      "import": "./dist/ucan.js"
+    },
+    "./did": {
+      "types": "./dist/did.d.ts",
+      "import": "./dist/did.js"
+    },
+    "./policy": {
+      "types": "./dist/policy.d.ts",
+      "import": "./dist/policy.js"
+    },
+    "./authorize": {
+      "types": "./dist/authorize.d.ts",
+      "import": "./dist/authorize.js"
+    },
+    "./audit": {
+      "types": "./dist/audit.d.ts",
+      "import": "./dist/audit.js"
+    },
+    "./agent": {
+      "types": "./dist/agent.d.ts",
+      "import": "./dist/agent.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "SKILL.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "clean": "rm -rf dist .turbo"
+  },
+  "dependencies": {
+    "zod": "3.24.1"
+  },
+  "devDependencies": {
+    "@types/node": "22.10.5",
+    "typescript": "5.7.2",
+    "vitest": "4.1.5"
+  }
+}
