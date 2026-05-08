@@ -43,5 +43,5 @@ What else was on the table, and why was it rejected?
 ## Index
 
 - [0001 — TypeScript not Rust for Phase 1](./0001-typescript-not-rust-for-phase-1.md)
-- [0002 — @ucanto over rolling our own UCAN library](./0002-ucanto-over-rolling-our-own.md)
+- [0002 — Thin UCAN-v1.0 JWT envelope (not @ucanto in Phase 1)](./0002-thin-ucan-jwt-envelope.md)
 - [0003 — Cedar over OPA Rego](./0003-cedar-over-opa-rego.md)
