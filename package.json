@@ -1,0 +1,38 @@
+{
+  "name": "credential-broker",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Agent Authorization Platform — capability layer for MCP. UCAN + Cedar authorization for AI agents.",
+  "license": "UNLICENSED",
+  "packageManager": "pnpm@11.0.8",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "build": "turbo run build",
+    "test": "turbo run test",
+    "test:watch": "turbo run test -- --watch",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "format": "biome format --write .",
+    "typecheck": "turbo run typecheck",
+    "dev": "turbo run dev",
+    "clean": "turbo run clean && rm -rf node_modules",
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,jsx,json}": [
+      "biome check --write --no-errors-on-unmatched"
+    ]
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.4.14",
+    "@vitest/coverage-v8": "4.1.5",
+    "husky": "9.1.7",
+    "lint-staged": "17.0.2",
+    "tsx": "4.21.0",
+    "turbo": "2.9.10",
+    "typescript": "5.7.2",
+    "vitest": "4.1.5"
+  }
+}
