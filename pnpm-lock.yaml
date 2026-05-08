@@ -49,6 +49,31 @@ importers:
         specifier: 4.1.5
         version: 4.1.5(@types/node@22.10.5)(@vitest/coverage-v8@4.1.5)(vite@8.0.11(@types/node@22.10.5)(esbuild@0.27.7)(tsx@4.21.0)(yaml@2.8.4))
 
+  packages/core:
+    dependencies:
+      '@credential-broker/cedar':
+        specifier: workspace:*
+        version: link:../cedar
+      '@credential-broker/crypto':
+        specifier: workspace:*
+        version: link:../crypto
+      '@credential-broker/shared-types':
+        specifier: workspace:*
+        version: link:../shared-types
+      '@credential-broker/ucan':
+        specifier: workspace:*
+        version: link:../ucan
+    devDependencies:
+      '@types/node':
+        specifier: 22.10.5
+        version: 22.10.5
+      typescript:
+        specifier: 5.7.2
+        version: 5.7.2
+      vitest:
+        specifier: 4.1.5
+        version: 4.1.5(@types/node@22.10.5)(@vitest/coverage-v8@4.1.5)(vite@8.0.11(@types/node@22.10.5)(esbuild@0.27.7)(tsx@4.21.0)(yaml@2.8.4))
+
   packages/crypto:
     dependencies:
       '@noble/curves':
