@@ -34,6 +34,11 @@ const Config = z.object({
   OAUTH_GOOGLE_CLIENT_SECRET: z.string().optional(),
   OAUTH_NOTION_CLIENT_ID: z.string().optional(),
   OAUTH_NOTION_CLIENT_SECRET: z.string().optional(),
+
+  // Sprint 8 — push revocation. Comma-separated PDP webhook URLs the control
+  // plane POSTs to on revoke (e.g. `http://localhost:8787/v1/internal/refresh-revocations`).
+  // Empty = polling-only fallback (PDP still discovers within 5s).
+  PDP_WEBHOOK_URLS: z.string().optional(),
 });
 
 export type Config = z.infer<typeof Config>;

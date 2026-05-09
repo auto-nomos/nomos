@@ -4,6 +4,12 @@ export interface RevocationCache {
   getRevoked(customerId: string): ReadonlySet<string>;
   set(customerId: string, cids: Iterable<string>): void;
   add(customerId: string, cid: string): void;
+  /**
+   * Force a fetch for one customer. Used by Sprint 8 push-revocation route
+   * (control plane POSTs after a revoke; PDP refreshes immediately rather than
+   * waiting for the 5s polling sweep).
+   */
+  refresh(customerId: string): Promise<void>;
   start(): void;
   stop(): void;
 }
@@ -51,6 +57,9 @@ export function createRevocationCache(options: RevocationCacheOptions): Revocati
       } else {
         store.set(customerId, new Set([cid]));
       }
+    },
+    async refresh(customerId) {
+      await refreshOne(customerId);
     },
     start() {
       if (timer) return;

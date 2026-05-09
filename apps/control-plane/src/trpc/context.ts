@@ -3,6 +3,10 @@ import type { Auth } from '../auth/index.js';
 import type { Db } from '../db/index.js';
 import * as schema from '../db/schema.js';
 import type { Logger } from '../logger.js';
+import {
+  noopRevocationPublisher,
+  type RevocationPublisher,
+} from '../services/revocation-publisher.js';
 
 export interface ContextDeps {
   db: Db;
@@ -10,12 +14,15 @@ export interface ContextDeps {
   logger: Logger;
   /** Control-plane signing key, used to sign minted UCANs (Sprint 5.4). */
   signing: { signKey: Uint8Array; signerDid: string };
+  /** Sprint 8 — push revocation. Defaults to noop when unset (tests / dev). */
+  revocationPublisher?: RevocationPublisher;
 }
 
 export interface Context {
   db: Db;
   logger: Logger;
   signing: { signKey: Uint8Array; signerDid: string };
+  revocationPublisher: RevocationPublisher;
   session: {
     user: { id: string; email: string; name: string | null };
     token: string;
@@ -60,6 +67,7 @@ export async function createContext(req: Request, deps: ContextDeps): Promise<Co
     db: deps.db,
     logger: deps.logger,
     signing: deps.signing,
+    revocationPublisher: deps.revocationPublisher ?? noopRevocationPublisher(),
     session: userPayload,
     customerId,
   };

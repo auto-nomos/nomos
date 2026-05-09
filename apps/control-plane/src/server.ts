@@ -10,6 +10,7 @@ import { requestId } from './middleware/request-id.js';
 import { createHealthRoutes } from './routes/health.js';
 import { createInternalRoutes } from './routes/internal.js';
 import { createOAuthRoutes } from './routes/oauth.js';
+import type { RevocationPublisher } from './services/revocation-publisher.js';
 import { handleTrpc } from './trpc/handler.js';
 
 export interface ServerDeps {
@@ -34,6 +35,8 @@ export interface ServerDeps {
     fetch?: typeof fetch;
     now?: () => number;
   };
+  /** Sprint 8 — push revocation. When omitted, ucans.revoke noop-publishes. */
+  revocationPublisher?: RevocationPublisher;
 }
 
 export function createServer(deps: ServerDeps): Hono {
@@ -56,6 +59,7 @@ export function createServer(deps: ServerDeps): Hono {
       auth: deps.auth,
       logger: deps.logger,
       signing: signing,
+      ...(deps.revocationPublisher ? { revocationPublisher: deps.revocationPublisher } : {}),
     }),
   );
 

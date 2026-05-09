@@ -102,6 +102,17 @@ export const ucansRouter = router({
         })
         .onConflictDoNothing()
         .returning();
+      // Sprint 8 — fire push notification to every PDP webhook so the
+      // revocation is enforced within ~1s instead of waiting for the polling
+      // sweep. Failures are swallowed inside the publisher; the 5s sweep is
+      // the fallback.
+      if (revoked !== undefined) {
+        const result = await ctx.revocationPublisher.publish(ctx.customerId, input.cid);
+        ctx.logger.debug(
+          { cid: input.cid, customerId: ctx.customerId, ...result },
+          'revocation pushed to PDP webhooks',
+        );
+      }
       return { cid: input.cid, revoked: revoked !== undefined };
     }),
 });

@@ -7,6 +7,7 @@ import { createDb } from './db/index.js';
 import { createLogger, type Logger } from './logger.js';
 import { createServer } from './server.js';
 import { createOAuthSweep } from './services/oauth-sweep.js';
+import { createRevocationPublisher } from './services/revocation-publisher.js';
 
 function loadOAuthEncryptionKey(config: Config, logger: Logger): Uint8Array {
   const isDevPlaceholder = config.OAUTH_TOKEN_ENCRYPTION_KEY === '00'.repeat(32);
@@ -53,6 +54,24 @@ async function main(): Promise<void> {
   const auth = createAuth({ db: db.drizzle, config, logger });
   const { signKey, signerDid } = loadSigningKey(config, logger);
   const encryptionKey = loadOAuthEncryptionKey(config, logger);
+
+  const pdpWebhookUrls = (config.PDP_WEBHOOK_URLS ?? '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+  if (pdpWebhookUrls.length === 0) {
+    logger.warn(
+      'PDP_WEBHOOK_URLS not set — push revocation disabled; PDPs will discover revokes via 5s polling sweep only',
+    );
+  } else {
+    logger.info({ count: pdpWebhookUrls.length }, 'push revocation enabled');
+  }
+  const revocationPublisher = createRevocationPublisher({
+    webhookUrls: pdpWebhookUrls,
+    serviceToken: config.CONTROL_PLANE_SERVICE_TOKEN,
+    logger,
+  });
+
   const app = createServer({
     logger,
     db,
@@ -60,6 +79,7 @@ async function main(): Promise<void> {
     signing: { signKey, signerDid },
     internal: { serviceToken: config.CONTROL_PLANE_SERVICE_TOKEN },
     oauth: { config, encryptionKey },
+    revocationPublisher,
   });
 
   const sweep = createOAuthSweep({

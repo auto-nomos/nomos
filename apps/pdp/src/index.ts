@@ -85,6 +85,7 @@ async function main(): Promise<void> {
     emitReceipt: async (ev) => {
       await appendReceipt(config.AUDIT_LOG_PATH, ev);
     },
+    internal: { serviceToken: config.CONTROL_PLANE_SERVICE_TOKEN },
     oauthProxy: {
       fetchOAuthToken: cpClient.fetchOAuthToken,
       refreshOAuthToken: cpClient.refreshOAuthToken,

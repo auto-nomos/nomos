@@ -8,6 +8,7 @@ import { loggerMiddleware } from './middleware/logger.js';
 import { requestId } from './middleware/request-id.js';
 import { type AuditEmitInput, createAuthorizeRoutes } from './routes/authorize.js';
 import { healthRoutes } from './routes/health.js';
+import { createInternalRoutes } from './routes/internal.js';
 import { createProxyRoutes } from './routes/proxy.js';
 import { createReceiptRoutes, type ReceiptEmitInput } from './routes/receipts.js';
 
@@ -17,6 +18,14 @@ export interface ServerDeps {
   revocationCache: RevocationCache;
   emitAudit?: (event: AuditEmitInput) => Promise<void> | void;
   emitReceipt?: (event: ReceiptEmitInput) => Promise<void> | void;
+  /**
+   * Sprint 8 push-revocation. When supplied, mounts
+   * POST /v1/internal/refresh-revocations so the control plane can flush a
+   * customer's revocation set within ~1s of a revoke.
+   */
+  internal?: {
+    serviceToken: string;
+  };
   /**
    * OAuth proxy mode (Sprint 5.5). When supplied, /v1/proxy/:command is
    * mounted and the PDP can call upstream SaaS APIs on behalf of the agent.
@@ -52,6 +61,16 @@ export function createServer(deps: ServerDeps): Hono {
       ...(deps.emitReceipt !== undefined ? { emitReceipt: deps.emitReceipt } : {}),
     }),
   );
+  if (deps.internal) {
+    app.route(
+      '/',
+      createInternalRoutes({
+        revocationCache: deps.revocationCache,
+        serviceToken: deps.internal.serviceToken,
+        logger: deps.logger,
+      }),
+    );
+  }
   if (deps.oauthProxy) {
     app.route(
       '/',

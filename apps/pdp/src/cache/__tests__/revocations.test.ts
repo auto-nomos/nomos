@@ -100,6 +100,33 @@ describe('createRevocationCache', () => {
     cache.stop();
   });
 
+  it('refresh() forces an immediate fetch for one customer', async () => {
+    const fetchSpy = vi.fn(async () => ['fresh-1']);
+    const cache = createRevocationCache({
+      fetchRevocations: fetchSpy,
+      refreshIntervalMs: 60_000, // intentionally large; we should not need to wait
+      logger,
+    });
+    cache.set('cust-1', ['old']);
+    await cache.refresh('cust-1');
+    expect(fetchSpy).toHaveBeenCalledWith('cust-1');
+    expect(cache.getRevoked('cust-1').has('fresh-1')).toBe(true);
+    expect(cache.getRevoked('cust-1').has('old')).toBe(false);
+  });
+
+  it('refresh() keeps stale set when fetch throws', async () => {
+    const cache = createRevocationCache({
+      fetchRevocations: async () => {
+        throw new Error('upstream down');
+      },
+      refreshIntervalMs: 60_000,
+      logger,
+    });
+    cache.set('cust-1', ['cid-1']);
+    await cache.refresh('cust-1');
+    expect(cache.getRevoked('cust-1').has('cid-1')).toBe(true);
+  });
+
   it('start() is idempotent and stop() is safe', () => {
     const cache = createRevocationCache({
       fetchRevocations: async () => undefined,
