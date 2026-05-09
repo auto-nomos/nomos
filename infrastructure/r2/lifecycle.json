@@ -1,0 +1,30 @@
+{
+  "rules": [
+    {
+      "id": "expire-audit-after-7-years",
+      "enabled": true,
+      "conditions": {
+        "prefix": ""
+      },
+      "deleteObjectsTransition": {
+        "condition": {
+          "type": "Age",
+          "maxAge": 220924800
+        }
+      }
+    },
+    {
+      "id": "abort-multipart-after-7-days",
+      "enabled": true,
+      "conditions": {
+        "prefix": ""
+      },
+      "abortMultipartUploadsTransition": {
+        "condition": {
+          "type": "Age",
+          "maxAge": 604800
+        }
+      }
+    }
+  ]
+}
