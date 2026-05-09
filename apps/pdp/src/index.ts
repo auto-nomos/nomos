@@ -1,5 +1,12 @@
+import { appendFile } from 'node:fs/promises';
 import { serve } from '@hono/node-server';
 import { createAuditEmitter, decisionToAudit } from './audit/emit.js';
+import type { ReceiptEmitInput } from './routes/receipts.js';
+
+async function appendReceipt(logPath: string, ev: ReceiptEmitInput): Promise<void> {
+  await appendFile(logPath, `${JSON.stringify({ kind: 'receipt', ...ev })}\n`, 'utf8');
+}
+
 import { createPolicyCache } from './cache/policies.js';
 import { createRevocationCache } from './cache/revocations.js';
 import { loadConfig } from './config.js';
@@ -74,6 +81,9 @@ async function main(): Promise<void> {
         resource: ev.request.resource,
         context: ev.request.context as Record<string, unknown>,
       });
+    },
+    emitReceipt: async (ev) => {
+      await appendReceipt(config.AUDIT_LOG_PATH, ev);
     },
   });
 

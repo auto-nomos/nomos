@@ -7,12 +7,14 @@ import { loggerMiddleware } from './middleware/logger.js';
 import { requestId } from './middleware/request-id.js';
 import { type AuditEmitInput, createAuthorizeRoutes } from './routes/authorize.js';
 import { healthRoutes } from './routes/health.js';
+import { createReceiptRoutes, type ReceiptEmitInput } from './routes/receipts.js';
 
 export interface ServerDeps {
   logger: Logger;
   policyCache: PolicyCache;
   revocationCache: RevocationCache;
   emitAudit?: (event: AuditEmitInput) => Promise<void> | void;
+  emitReceipt?: (event: ReceiptEmitInput) => Promise<void> | void;
 }
 
 export function createServer(deps: ServerDeps): Hono {
@@ -29,6 +31,12 @@ export function createServer(deps: ServerDeps): Hono {
       policyCache: deps.policyCache,
       revocationCache: deps.revocationCache,
       ...(deps.emitAudit !== undefined ? { emitAudit: deps.emitAudit } : {}),
+    }),
+  );
+  app.route(
+    '/',
+    createReceiptRoutes({
+      ...(deps.emitReceipt !== undefined ? { emitReceipt: deps.emitReceipt } : {}),
     }),
   );
 
