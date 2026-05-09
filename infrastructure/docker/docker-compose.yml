@@ -1,0 +1,27 @@
+# Local dev stack for credential-broker (v2 plan).
+# Postgres only — control-plane and PDP run as host Node processes for hot reload.
+# Production (Sprint 11) uses Neon for DATABASE_URL; this compose file is local-only.
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: cb-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: cb
+      POSTGRES_PASSWORD: cb
+      POSTGRES_DB: cb_dev
+    ports:
+      # Host 5433 → container 5432. Avoids clash with any host-installed postgres on 5432.
+      - "5433:5432"
+    volumes:
+      - cb_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cb -d cb_dev"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  cb_pgdata:
+    name: cb_pgdata
