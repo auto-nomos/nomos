@@ -14,8 +14,9 @@
  * Run: `pnpm e2e:sprint3` (after `pnpm db:up`).
  */
 import { generateKeypair } from '@credential-broker/crypto';
-import { createTRPCClient, httpBatchLink } from '@trpc/client';
 import { serve } from '@hono/node-server';
+import { bytesToHex } from '@noble/hashes/utils';
+import { createTRPCClient, httpBatchLink } from '@trpc/client';
 import { eq } from 'drizzle-orm';
 import { pino } from 'pino';
 import { createAuth } from '../apps/control-plane/src/auth/index.js';
@@ -28,7 +29,6 @@ import { createPolicyCache } from '../apps/pdp/src/cache/policies.js';
 import { createRevocationCache } from '../apps/pdp/src/cache/revocations.js';
 import { createControlPlaneClient } from '../apps/pdp/src/control-plane/client.js';
 import { createServer as createPdpServer } from '../apps/pdp/src/server.js';
-import { bytesToHex } from '@noble/hashes/utils';
 
 const CP_PORT = 8788;
 const PDP_PORT = 8787;
@@ -124,14 +124,17 @@ async function main(): Promise<void> {
     const agent = await trpc.agents.create.mutate({ name: 'e2e-bot' });
     log(`  agent=${agent.id} did=${agent.did}`);
     const permitText = `permit(principal, action == Action::"/github/issue/create", resource);`;
-    const policy = await trpc.policies.upsert.mutate({ name: 'allow-issues', cedarText: permitText });
+    const policy = await trpc.policies.upsert.mutate({
+      name: 'allow-issues',
+      cedarText: permitText,
+    });
     log(`  policy=${policy.id}`);
 
     log('warming PDP cache from control plane');
     const bundle = await cpClient.fetchBundle(customerId);
     if (!bundle) throw new Error('bundle empty');
     policyCache.set(customerId, bundle);
-    revocationCache.set(customerId, await cpClient.fetchRevocations(customerId) ?? []);
+    revocationCache.set(customerId, (await cpClient.fetchRevocations(customerId)) ?? []);
 
     log('minting UCAN + calling PDP /v1/authorize → expect allow');
     const ucan = await trpc.ucans.mint.mutate({
