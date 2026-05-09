@@ -44,7 +44,27 @@ Production uses different services behind the same env vars. App code never refe
 
 ## Sprint 5 OAuth callbacks
 
-Sprint 5 introduces OAuth providers (GitHub, Slack, Google, Notion) which require a public callback URL. Use `cloudflared` (see `scripts/dev-tunnel.sh`) to expose `localhost:8788` as `https://<random>.trycloudflare.com`. The compose file does not run cloudflared — start it separately with `pnpm tunnel`.
+Sprint 5 introduces OAuth providers (GitHub, Slack, Google, Notion) which require a public callback URL. Providers cannot reach `localhost`, so we put a cloudflared quick tunnel in front of the control-plane:
+
+```bash
+pnpm db:up                                            # start postgres
+pnpm --filter @credential-broker/control-plane dev    # control-plane on :8788
+pnpm tunnel                                           # cloudflared quick tunnel
+# look for https://<random>.trycloudflare.com in the cloudflared output
+```
+
+Use the printed `https://*.trycloudflare.com` URL as the **OAuth callback host** when configuring dev OAuth apps:
+
+| Provider | Callback path |
+|---|---|
+| GitHub | `/v1/oauth/callback/github` |
+| Slack | `/v1/oauth/callback/slack` |
+| Google | `/v1/oauth/callback/google` |
+| Notion | `/v1/oauth/callback/notion` |
+
+Set `CONTROL_PLANE_PUBLIC_URL` in your control-plane `.env.local` to the tunnel URL so generated auth-URLs include the matching `redirect_uri`.
+
+`cloudflared` is not in compose because quick tunnels are intended for short-lived dev sessions and rotate URLs on each run; running it as a foreground task in your shell keeps the lifecycle obvious. Install: `brew install cloudflare/cloudflare/cloudflared`.
 
 ## Pre-Sprint-3 prereqs
 
