@@ -108,6 +108,9 @@ importers:
         specifier: 3.24.1
         version: 3.24.1
     devDependencies:
+      '@credential-broker/audit-verify':
+        specifier: workspace:*
+        version: link:../../packages/audit-verify
       '@trpc/client':
         specifier: 11.0.0
         version: 11.0.0(@trpc/server@11.0.0(typescript@5.7.2))(typescript@5.7.2)
@@ -366,6 +369,31 @@ importers:
       tsx:
         specifier: 4.21.0
         version: 4.21.0
+      typescript:
+        specifier: 5.7.2
+        version: 5.7.2
+      vitest:
+        specifier: 4.1.5
+        version: 4.1.5(@opentelemetry/api@1.9.1)(@types/node@22.10.5)(@vitest/coverage-v8@4.1.5)(happy-dom@15.11.7)(msw@2.7.0(@types/node@22.10.5)(typescript@5.7.2))(vite@8.0.11(@types/node@22.10.5)(esbuild@0.27.7)(jiti@1.21.7)(tsx@4.21.0)(yaml@2.8.4))
+
+  packages/audit-verify:
+    dependencies:
+      '@credential-broker/crypto':
+        specifier: workspace:*
+        version: link:../crypto
+      '@credential-broker/shared-types':
+        specifier: workspace:*
+        version: link:../shared-types
+      '@credential-broker/ucan':
+        specifier: workspace:*
+        version: link:../ucan
+      '@noble/hashes':
+        specifier: 1.6.1
+        version: 1.6.1
+    devDependencies:
+      '@types/node':
+        specifier: 22.10.5
+        version: 22.10.5
       typescript:
         specifier: 5.7.2
         version: 5.7.2
@@ -1565,6 +1593,10 @@ packages:
 
   '@noble/hashes@1.6.0':
     resolution: {integrity: sha512-YUULf0Uk4/mAA89w+k3+yUYh6NrEvxZa5T6SY3wlMvE2chHkxFUUIDI8/XW1QSC357iA5pSnqt7XEhvFOqmDyQ==}
+    engines: {node: ^14.21.3 || >=16}
+
+  '@noble/hashes@1.6.1':
+    resolution: {integrity: sha512-pq5D8h10hHBjyqX+cfBm0i8JUXJ0UhczFc4r74zbuT9XgewFo2E3J1cOaGtdZynILNmQ685YWGzGE1Zv6io50w==}
     engines: {node: ^14.21.3 || >=16}
 
   '@noble/hashes@1.7.0':
@@ -5820,6 +5852,8 @@ snapshots:
       '@noble/hashes': 1.6.0
 
   '@noble/hashes@1.6.0': {}
+
+  '@noble/hashes@1.6.1': {}
 
   '@noble/hashes@1.7.0': {}
 

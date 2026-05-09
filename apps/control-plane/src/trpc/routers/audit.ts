@@ -1,5 +1,5 @@
 import { TRPCError } from '@trpc/server';
-import { and, desc, eq, gte, lte } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, lte } from 'drizzle-orm';
 import { z } from 'zod';
 import * as schema from '../../db/schema.js';
 import { router, tenantProcedure } from '../index.js';
@@ -34,10 +34,12 @@ export const auditRouter = router({
     }),
 
   /**
-   * Returns a hash-chain proof rooting `eventId` back to the most recent signed
-   * audit root. Sprint 8 adds the signed-root machinery; for Sprint 3 we just
-   * confirm the event belongs to the caller's customer and return the row's
-   * own (prevHash, hash) so consumers can wire up the API contract early.
+   * Hash-chain proof for one event. Walks audit_events forward from the
+   * queried event up to the most recent signed root for the customer (or the
+   * customer's chain head if no root has been signed yet).
+   *
+   * Output is the canonical `AuditBundle` shape consumed by the
+   * @credential-broker/audit-verify CLI.
    */
   proof: tenantProcedure
     .input(z.object({ eventId: z.string().uuid() }))
@@ -51,13 +53,72 @@ export const auditRouter = router({
       if (!ev) {
         throw new TRPCError({ code: 'NOT_FOUND', message: 'audit event not found' });
       }
+
+      // Latest signed root that anchors this event. We require root.signedAt
+      // >= ev.ts so the root post-dates the event, and root.rootEventId's ts
+      // >= ev.ts so it's downstream in the chain.
+      const root = await ctx.db.drizzle.query.auditRoots.findFirst({
+        where: and(
+          eq(schema.auditRoots.customerId, ctx.customerId),
+          gte(schema.auditRoots.signedAt, ev.ts),
+        ),
+        orderBy: [desc(schema.auditRoots.signedAt)],
+      });
+
+      let upperBoundTs: Date | undefined;
+      let rootEvent: typeof ev | undefined;
+      if (root) {
+        rootEvent = await ctx.db.drizzle.query.auditEvents.findFirst({
+          where: and(
+            eq(schema.auditEvents.eventId, root.rootEventId),
+            eq(schema.auditEvents.customerId, ctx.customerId),
+          ),
+        });
+        upperBoundTs = rootEvent?.ts;
+      }
+
+      const conds = [
+        eq(schema.auditEvents.customerId, ctx.customerId),
+        gte(schema.auditEvents.ts, ev.ts),
+      ];
+      if (upperBoundTs !== undefined) {
+        conds.push(lte(schema.auditEvents.ts, upperBoundTs));
+      }
+      const rows = await ctx.db.drizzle.query.auditEvents.findMany({
+        where: and(...conds),
+        orderBy: [asc(schema.auditEvents.ts), asc(schema.auditEvents.prevHash)],
+      });
+
+      // Drop any rows that aren't part of the chain that contains `ev`. With
+      // a single PDP per env this is one chain so nothing gets filtered, but
+      // multi-PDP fan-out (Phase 2) could interleave so this guards us.
+      const chain: typeof rows = [];
+      let expectedPrev = ev.prevHash;
+      for (const row of rows) {
+        if (row.prevHash !== expectedPrev) continue;
+        chain.push(row);
+        expectedPrev = row.hash;
+        if (rootEvent && row.eventId === rootEvent.eventId) break;
+      }
+
       return {
-        eventId: ev.eventId,
-        prevHash: ev.prevHash,
-        hash: ev.hash,
-        chain: [{ prevHash: ev.prevHash, hash: ev.hash, payload: ev.payload }],
-        signedRoot: null as null | { hash: string; signature: string; signedAt: string },
-        note: 'full proof chain lands in Sprint 8',
+        event_id: ev.eventId,
+        events: chain.map((c) => ({
+          event_id: c.eventId,
+          customer_id: c.customerId,
+          prev_hash: c.prevHash,
+          hash: c.hash,
+          payload: c.payload as Record<string, unknown>,
+        })),
+        root: root
+          ? {
+              root_event_id: root.rootEventId,
+              root_hash: root.rootHash,
+              signing_key_id: root.signingKeyId,
+              signature: root.signature,
+              signed_at: root.signedAt.toISOString(),
+            }
+          : null,
       };
     }),
 });
