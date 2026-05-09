@@ -40,6 +40,15 @@ const Config = z.object({
   // Empty = polling-only fallback (PDP still discovers within 5s).
   PDP_WEBHOOK_URLS: z.string().optional(),
 
+  // Sprint 9 — step-up. Knock workflow id `step-up-request` triggers web
+  // push to the deciding user. Empty KNOCK_API_KEY = dev console fallback
+  // (logger prints the deep link). Public dashboard URL is where the
+  // /approve/:id page lives.
+  KNOCK_API_KEY: z.string().optional(),
+  KNOCK_WORKFLOW_ID: z.string().default('step-up-request'),
+  STEPUP_DEFAULT_TTL_MS: z.coerce.number().int().positive().default(60_000),
+  DASHBOARD_PUBLIC_URL: z.string().url().default('http://localhost:3000'),
+
   // Sprint 8.3 / D-4 — env-managed Ed25519 root key over the audit hash chain.
   // Phase 1 default: one key per environment. Customer-managed-key is Phase 2.
   // Generate via `pnpm gen-keys`. AUDIT_VERIFY_KEY ships to the audit-verify CLI.
