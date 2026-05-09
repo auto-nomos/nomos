@@ -1,0 +1,350 @@
+'use client';
+
+import { Copy, KeyRound, Trash2 } from 'lucide-react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { use, useEffect, useState } from 'react';
+import { Badge } from '../../../../components/ui/badge';
+import { Button } from '../../../../components/ui/button';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from '../../../../components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '../../../../components/ui/dialog';
+import { Input } from '../../../../components/ui/input';
+import { Label } from '../../../../components/ui/label';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '../../../../components/ui/table';
+import { trpc } from '../../../../lib/trpc';
+import { formatDate, shortId } from '../../../../lib/utils';
+
+export default function AgentDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params);
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const utils = trpc.useUtils();
+
+  const list = trpc.agents.list.useQuery();
+  const agent = list.data?.find((a) => a.id === id);
+
+  const apiKeys = trpc.apiKeys.list.useQuery({ agentId: id });
+  const audit = trpc.audit.list.useQuery({ agent: agent?.did, limit: 50 }, { enabled: !!agent });
+
+  const [revealedKey, setRevealedKey] = useState<string | null>(null);
+  const [keyName, setKeyName] = useState('default');
+  const [issueOpen, setIssueOpen] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
+  const createKey = trpc.apiKeys.create.useMutation({
+    onSuccess: (k) => {
+      utils.apiKeys.list.invalidate({ agentId: id });
+      setRevealedKey(k.plaintextOnce);
+      setIssueOpen(false);
+    },
+  });
+  const revokeKey = trpc.apiKeys.revoke.useMutation({
+    onSuccess: () => utils.apiKeys.list.invalidate({ agentId: id }),
+  });
+  const deleteAgent = trpc.agents.delete.useMutation({
+    onSuccess: () => {
+      utils.agents.list.invalidate();
+      router.push('/app/agents');
+    },
+  });
+
+  useEffect(() => {
+    // If we arrive with ?reveal=1 right after creation, auto-issue an initial key
+    if (
+      searchParams?.get('reveal') === '1' &&
+      agent &&
+      apiKeys.data?.length === 0 &&
+      !createKey.isPending &&
+      !revealedKey
+    ) {
+      createKey.mutate({ agentId: id, name: 'default' });
+    }
+    // Once we've consumed reveal, strip it from the URL so refresh doesn't loop.
+    if (searchParams?.get('reveal') === '1' && revealedKey) {
+      router.replace(`/app/agents/${id}`);
+    }
+  }, [agent, apiKeys.data, createKey, id, revealedKey, router, searchParams]);
+
+  if (list.isPending) {
+    return <p className="text-sm text-muted-foreground">Loading agent…</p>;
+  }
+  if (!agent) {
+    return <p className="text-sm">Agent not found.</p>;
+  }
+
+  return (
+    <div className="space-y-6">
+      <header className="space-y-1">
+        <p className="text-xs uppercase tracking-wide text-muted-foreground">Agent</p>
+        <h1 className="text-2xl font-semibold tracking-tight">{agent.name}</h1>
+        <p className="font-mono text-xs text-muted-foreground">{agent.did}</p>
+      </header>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <KeyRound className="h-4 w-4" /> API keys
+            </CardTitle>
+            <CardDescription>
+              Plaintext is shown ONCE. The hash is stored; we cannot recover the secret.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {apiKeys.data && apiKeys.data.length > 0 ? (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Prefix</TableHead>
+                    <TableHead>Created</TableHead>
+                    <TableHead />
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {apiKeys.data.map((k) => (
+                    <TableRow key={k.id}>
+                      <TableCell>{k.name}</TableCell>
+                      <TableCell className="font-mono text-xs">{k.prefix}…</TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
+                        {formatDate(k.createdAt)}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {k.revokedAt ? (
+                          <Badge variant="destructive">revoked</Badge>
+                        ) : (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => revokeKey.mutate({ id: k.id })}
+                            disabled={revokeKey.isPending}
+                          >
+                            Revoke
+                          </Button>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            ) : (
+              <p className="text-sm text-muted-foreground">No keys yet.</p>
+            )}
+          </CardContent>
+          <CardFooter>
+            <Button onClick={() => setIssueOpen(true)} size="sm">
+              Issue new key
+            </Button>
+          </CardFooter>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Status</CardTitle>
+            <CardDescription>Operational metadata.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3 text-sm">
+            <Row label="Status">
+              <Badge
+                variant={
+                  agent.status === 'active'
+                    ? 'success'
+                    : agent.status === 'disabled'
+                      ? 'warning'
+                      : 'destructive'
+                }
+              >
+                {agent.status}
+              </Badge>
+            </Row>
+            <Row label="Created">{formatDate(agent.createdAt)}</Row>
+            <Row label="Last active">
+              {agent.lastActiveAt ? formatDate(agent.lastActiveAt) : '—'}
+            </Row>
+            <Row label="DID">
+              <span className="font-mono text-xs">{shortId(agent.did, 16, 6)}</span>
+            </Row>
+          </CardContent>
+          <CardFooter>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => setConfirmDelete(true)}
+              disabled={agent.status === 'deleted'}
+            >
+              <Trash2 className="h-4 w-4" /> Delete agent
+            </Button>
+          </CardFooter>
+        </Card>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Recent audit</CardTitle>
+          <CardDescription>Last 50 decisions involving this DID.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {audit.isPending ? (
+            <p className="text-sm text-muted-foreground">Loading…</p>
+          ) : audit.data && audit.data.length > 0 ? (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Time</TableHead>
+                  <TableHead>Command</TableHead>
+                  <TableHead>Decision</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {audit.data.map((row) => (
+                  <TableRow key={row.eventId}>
+                    <TableCell className="text-xs">{formatDate(row.ts)}</TableCell>
+                    <TableCell className="font-mono text-xs">{row.command ?? '—'}</TableCell>
+                    <TableCell>
+                      <Badge
+                        variant={
+                          row.decision === 'allow'
+                            ? 'success'
+                            : row.decision === 'stepup'
+                              ? 'warning'
+                              : 'destructive'
+                        }
+                      >
+                        {row.decision}
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          ) : (
+            <p className="text-sm text-muted-foreground">No audit events yet.</p>
+          )}
+        </CardContent>
+      </Card>
+
+      <RevealedKeyDialog secret={revealedKey} onClose={() => setRevealedKey(null)} />
+
+      <Dialog open={issueOpen} onOpenChange={setIssueOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Issue API key</DialogTitle>
+            <DialogDescription>
+              The plaintext is returned once. Store it somewhere safe.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-1.5">
+            <Label htmlFor="key-name">Key name</Label>
+            <Input
+              id="key-name"
+              value={keyName}
+              onChange={(e) => setKeyName(e.target.value)}
+              placeholder="ci, prod-deploy, …"
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              variant="ghost"
+              onClick={() => setIssueOpen(false)}
+              disabled={createKey.isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => createKey.mutate({ agentId: id, name: keyName })}
+              disabled={createKey.isPending || keyName.length === 0}
+            >
+              {createKey.isPending ? 'Issuing…' : 'Issue key'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete agent?</DialogTitle>
+            <DialogDescription>
+              This revokes all UCANs scoped to <strong>{agent.name}</strong>. PDP will reject any
+              future authorize requests for this DID. Cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setConfirmDelete(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => deleteAgent.mutate({ id })}
+              disabled={deleteAgent.isPending}
+            >
+              {deleteAgent.isPending ? 'Deleting…' : 'Delete agent'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+function Row({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex items-center justify-between gap-4">
+      <span className="text-muted-foreground">{label}</span>
+      <div>{children}</div>
+    </div>
+  );
+}
+
+function RevealedKeyDialog({ secret, onClose }: { secret: string | null; onClose: () => void }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <Dialog open={secret !== null} onOpenChange={(open) => (!open ? onClose() : undefined)}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Copy this key now</DialogTitle>
+          <DialogDescription>
+            We&apos;ll never show it again. Storing only the hash means we cannot recover it.
+          </DialogDescription>
+        </DialogHeader>
+        <pre className="overflow-auto rounded-md border bg-muted p-3 font-mono text-xs">
+          {secret}
+        </pre>
+        <DialogFooter>
+          <Button
+            variant="outline"
+            onClick={async () => {
+              if (secret) {
+                await navigator.clipboard.writeText(secret);
+                setCopied(true);
+              }
+            }}
+          >
+            <Copy className="h-4 w-4" /> {copied ? 'Copied!' : 'Copy'}
+          </Button>
+          <Button onClick={onClose}>I&apos;ve saved it</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}

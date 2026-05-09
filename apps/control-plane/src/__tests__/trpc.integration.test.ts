@@ -131,6 +131,39 @@ describe.skipIf(!RUN)('tRPC routers (requires postgres)', () => {
     expect(one.name).toBe('GitHub');
   });
 
+  it('apiKeys create reveals plaintext once and list excludes hash', async () => {
+    const agent = await client().agents.create.mutate({ name: 'apikey-host' });
+    const created = await client().apiKeys.create.mutate({
+      agentId: agent.id,
+      name: 'ci-key',
+    });
+    expect(created.plaintextOnce).toMatch(/^cb_[0-9a-f]{8}_[0-9a-f]+$/);
+    expect(created.prefix).toMatch(/^cb_[0-9a-f]{8}$/);
+
+    const list = await client().apiKeys.list.query({ agentId: agent.id });
+    const row = list.find((k) => k.id === created.id);
+    expect(row).toBeDefined();
+    expect((row as { keyHash?: string }).keyHash).toBeUndefined();
+    expect(row?.prefix).toBe(created.prefix);
+    expect(row?.revokedAt).toBeNull();
+
+    const revoked = await client().apiKeys.revoke.mutate({ id: created.id });
+    expect(revoked.revokedAt).toBeTruthy();
+
+    await expect(client().apiKeys.revoke.mutate({ id: created.id })).rejects.toThrow(
+      /not found or already revoked/,
+    );
+  });
+
+  it('apiKeys.create rejects unknown agent', async () => {
+    await expect(
+      client().apiKeys.create.mutate({
+        agentId: '00000000-0000-0000-0000-000000000000',
+        name: 'phantom',
+      }),
+    ).rejects.toThrow(/agent not found/);
+  });
+
   it('ucans.mint creates a UCAN bound to an active agent', async () => {
     const agent = await client().agents.create.mutate({ name: 'mint-test' });
     const ucan = await client().ucans.mint.mutate({
