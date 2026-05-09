@@ -33,9 +33,11 @@
     "zod": "3.24.1"
   },
   "devDependencies": {
+    "@trpc/client": "11.0.0",
     "@types/node": "22.10.5",
     "@types/pg": "8.11.10",
     "drizzle-kit": "0.28.1",
+    "superjson": "2.2.1",
     "tsx": "4.21.0",
     "typescript": "5.7.2",
     "vitest": "4.1.5"
