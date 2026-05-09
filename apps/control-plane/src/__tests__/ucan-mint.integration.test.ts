@@ -231,6 +231,42 @@ describe.skipIf(!RUN)('mintUcan service (requires postgres)', () => {
     expect(result.payload.meta).toBeUndefined();
   });
 
+  it('D-5: stamps contextHints into meta.context_hints when provided', async () => {
+    const customerId = await newCustomer();
+    const agentId = await newAgent(customerId);
+    const result = await mintUcan(
+      {
+        customerId,
+        agentId,
+        command: '/x/y',
+        ttlSeconds: 600,
+        nonce: 'with-hints',
+        contextHints: { user: { department: 'engineering', role: 'staff' } },
+      },
+      { db: db.drizzle, ...signing },
+    );
+    expect(result.payload.meta).toEqual({
+      context_hints: { user: { department: 'engineering', role: 'staff' } },
+    });
+  });
+
+  it('D-5: omits context_hints when contextHints is empty object', async () => {
+    const customerId = await newCustomer();
+    const agentId = await newAgent(customerId);
+    const result = await mintUcan(
+      {
+        customerId,
+        agentId,
+        command: '/x/y',
+        ttlSeconds: 600,
+        nonce: 'empty-hints',
+        contextHints: {},
+      },
+      { db: db.drizzle, ...signing },
+    );
+    expect(result.payload.meta).toBeUndefined();
+  });
+
   it('uses injected `now` for deterministic exp/nbf', async () => {
     const customerId = await newCustomer();
     const agentId = await newAgent(customerId);

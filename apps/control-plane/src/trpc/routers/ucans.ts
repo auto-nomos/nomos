@@ -38,6 +38,12 @@ export const ucansRouter = router({
           .max(86_400 * 7)
           .default(3_600),
         nonce: z.string().min(1).max(64).default('dev'),
+        /**
+         * D-5: issuer-vouched stable context (Sprint 7). Stamped into
+         * `meta.context_hints` so the PDP can use these values during
+         * Cedar evaluation with priority over agent-supplied context.
+         */
+        contextHints: z.record(z.string(), z.unknown()).optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -51,6 +57,7 @@ export const ucansRouter = router({
             oauthConnectionId: input.oauthConnectionId,
             ttlSeconds: input.ttlSeconds,
             nonce: input.nonce,
+            ...(input.contextHints ? { contextHints: input.contextHints } : {}),
           },
           {
             db: ctx.db.drizzle,

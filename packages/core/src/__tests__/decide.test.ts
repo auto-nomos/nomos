@@ -409,6 +409,104 @@ describe('decide', () => {
     expect(decision.allow).toBe(true);
   });
 
+  it('D-5: UCAN meta.context_hints overrides agent-supplied context (issuer wins)', () => {
+    const issuer = generateKeypair();
+    const agent = generateKeypair();
+    // UCAN claims user.department = 'engineering' (issuer-vouched).
+    const ucan = issueUcan({
+      payload: payloadFor(issuer.did, agent.did, {
+        cmd: '/github/issue/create',
+        meta: { context_hints: { user: { department: 'engineering' } } },
+      }),
+      privateKey: issuer.privateKey,
+    });
+
+    const policy = `permit(
+      principal,
+      action == Action::"/github/issue/create",
+      resource
+    ) when { context.user.department == "engineering" };`;
+
+    // Agent tries to lie: claims department = 'security' in request.context.
+    const decision = decide({
+      ucan: ucan.jwt,
+      request: {
+        ucan: ucan.jwt,
+        command: '/github/issue/create',
+        resource: {},
+        context: { user: { department: 'security' } },
+      },
+      policies: policy,
+      now: NOW,
+    });
+    // UCAN hint wins → policy condition matches → allow.
+    expect(decision.allow).toBe(true);
+  });
+
+  it('D-5: PDP-computed time.hour is available to policies that reference it', () => {
+    const issuer = generateKeypair();
+    const agent = generateKeypair();
+    const ucan = issueUcan({
+      payload: payloadFor(issuer.did, agent.did, { cmd: '/github/issue/create' }),
+      privateKey: issuer.privateKey,
+    });
+
+    const policy = `permit(
+      principal,
+      action == Action::"/github/issue/create",
+      resource
+    ) when { context.time.hour >= 0 && context.time.hour < 24 };`;
+
+    const decision = decide({
+      ucan: ucan.jwt,
+      request: {
+        ucan: ucan.jwt,
+        command: '/github/issue/create',
+        resource: {},
+        context: {},
+      },
+      policies: policy,
+      now: NOW,
+    });
+    expect(decision.allow).toBe(true);
+  });
+
+  it('D-5: nested merge preserves agent-supplied keys not overridden by hints', () => {
+    const issuer = generateKeypair();
+    const agent = generateKeypair();
+    const ucan = issueUcan({
+      payload: payloadFor(issuer.did, agent.did, {
+        cmd: '/github/issue/create',
+        meta: { context_hints: { user: { department: 'engineering' } } },
+      }),
+      privateKey: issuer.privateKey,
+    });
+
+    // Policy reads two distinct sub-keys of context.user — one from hints,
+    // one from request.
+    const policy = `permit(
+      principal,
+      action == Action::"/github/issue/create",
+      resource
+    ) when {
+      context.user.department == "engineering" &&
+      context.user.id == "agent-self"
+    };`;
+
+    const decision = decide({
+      ucan: ucan.jwt,
+      request: {
+        ucan: ucan.jwt,
+        command: '/github/issue/create',
+        resource: {},
+        context: { user: { id: 'agent-self' } },
+      },
+      policies: policy,
+      now: NOW,
+    });
+    expect(decision.allow).toBe(true);
+  });
+
   it('skips revocation check when revokedCids is empty set', () => {
     const issuer = generateKeypair();
     const agent = generateKeypair();

@@ -54,6 +54,16 @@ export interface MintInput {
   /** Caller-supplied nonce; surfaced into payload so the same (agent, command,
    *  policy) combo can be minted multiple times with distinct CIDs. */
   nonce: string;
+  /**
+   * D-5 (Sprint 7): issuer-vouched stable context values to stamp into
+   * `meta.context_hints`. The PDP merges these into the Cedar evaluation
+   * context with priority over agent-supplied request.context.
+   *
+   * Use for values the issuer knows at mint time and the agent cannot
+   * change later (e.g. `{ user: { department: "engineering" } }`).
+   * Ephemeral values (time, IP) belong in PDP-computed context, not here.
+   */
+  contextHints?: Record<string, unknown>;
 }
 
 export interface MintDeps {
@@ -117,6 +127,9 @@ export async function mintUcan(input: MintInput, deps: MintDeps): Promise<MintRe
   const meta: Record<string, unknown> = {};
   if (input.policyId) meta.policy_id = input.policyId;
   if (input.oauthConnectionId) meta.oauth_connection_id = input.oauthConnectionId;
+  if (input.contextHints && Object.keys(input.contextHints).length > 0) {
+    meta.context_hints = input.contextHints;
+  }
 
   const payload: UcanPayload = {
     iss: deps.signerDid,

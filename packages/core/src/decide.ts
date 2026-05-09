@@ -76,12 +76,17 @@ export function decide(input: DecideInput): AuthorizeDecision {
   }
 
   const leaf = chainResult.leaf;
+  const mergedContext = mergeContext(
+    input.request.context as unknown as Record<string, unknown>,
+    computeEphemeralContext(now),
+    extractContextHints(leaf.meta),
+  );
   const cedarResult = evaluate({
     policies: input.policies,
     principal: { type: 'Agent', id: leaf.aud },
     action: { type: 'Action', id: input.request.command },
     resource: { type: 'Resource', id: '__request__' },
-    context: input.request.context as unknown as Context,
+    context: mergedContext as unknown as Context,
     entities: [
       { uid: { type: 'Agent', id: leaf.aud }, attrs: {}, parents: [] },
       {
@@ -101,4 +106,64 @@ export function decide(input: DecideInput): AuthorizeDecision {
     allow: true,
     receiptId: buildReceiptId(jwts, input.request),
   };
+}
+
+/**
+ * D-5 resolution (Sprint 7): build the Cedar evaluation context.
+ *
+ * Sources, lowest priority first (later sources win):
+ *  1. `request.context` — supplied by the agent / SDK at authorize time.
+ *     Untrusted; an agent can lie about anything here.
+ *  2. PDP-computed ephemerals — `time.hour` from `now`. Other ephemerals
+ *     (geo IP, etc.) join when external lookup lands in Phase 2.
+ *  3. UCAN `meta.context_hints` — issuer-vouched stable values stamped at
+ *     mint time (e.g. `user.department`). Highest priority because the
+ *     issuer is trusted to know who the user is.
+ *
+ * Merge is deep one level: shared top-level keys (`time`, `user`, `ip`)
+ * have their child fields merged so the agent's `time.source` survives
+ * even when the PDP overrides `time.hour`.
+ */
+function mergeContext(
+  ...sources: ReadonlyArray<Record<string, unknown> | undefined>
+): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const src of sources) {
+    if (!src) continue;
+    for (const [k, v] of Object.entries(src)) {
+      if (
+        v !== null &&
+        typeof v === 'object' &&
+        !Array.isArray(v) &&
+        out[k] &&
+        typeof out[k] === 'object' &&
+        !Array.isArray(out[k])
+      ) {
+        out[k] = {
+          ...(out[k] as Record<string, unknown>),
+          ...(v as Record<string, unknown>),
+        };
+      } else {
+        out[k] = v;
+      }
+    }
+  }
+  return out;
+}
+
+function computeEphemeralContext(nowSec: number): Record<string, unknown> {
+  const date = new Date(nowSec * 1000);
+  return {
+    time: {
+      hour: date.getUTCHours(),
+      epoch: nowSec,
+    },
+  };
+}
+
+function extractContextHints(meta: unknown): Record<string, unknown> | undefined {
+  if (!meta || typeof meta !== 'object') return undefined;
+  const hints = (meta as Record<string, unknown>).context_hints;
+  if (!hints || typeof hints !== 'object' || Array.isArray(hints)) return undefined;
+  return hints as Record<string, unknown>;
 }
