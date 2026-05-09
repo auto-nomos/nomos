@@ -1,4 +1,4 @@
-import { generateKeypair, keypairFromPrivate } from '@credential-broker/crypto';
+import { generateKeypair, keypairFromPrivate, loadSecretboxKey } from '@credential-broker/crypto';
 import { serve } from '@hono/node-server';
 import { hexToBytes } from '@noble/hashes/utils';
 import { createAuth } from './auth/index.js';
@@ -6,6 +6,21 @@ import { type Config, loadConfig } from './config.js';
 import { createDb } from './db/index.js';
 import { createLogger, type Logger } from './logger.js';
 import { createServer } from './server.js';
+
+function loadOAuthEncryptionKey(config: Config, logger: Logger): Uint8Array {
+  const isDevPlaceholder = config.OAUTH_TOKEN_ENCRYPTION_KEY === '00'.repeat(32);
+  if (isDevPlaceholder) {
+    if (config.NODE_ENV === 'production') {
+      throw new Error(
+        'OAUTH_TOKEN_ENCRYPTION_KEY must be set in production. Run `pnpm gen-keys` to generate one.',
+      );
+    }
+    logger.warn(
+      'OAUTH_TOKEN_ENCRYPTION_KEY is the dev placeholder — generate a real one with `pnpm gen-keys` before storing real tokens',
+    );
+  }
+  return loadSecretboxKey(config.OAUTH_TOKEN_ENCRYPTION_KEY);
+}
 
 function loadSigningKey(
   config: Config,
@@ -36,6 +51,7 @@ async function main(): Promise<void> {
   const db = createDb(config);
   const auth = createAuth({ db: db.drizzle, config, logger });
   const { signKey, signerDid } = loadSigningKey(config, logger);
+  const encryptionKey = loadOAuthEncryptionKey(config, logger);
   const app = createServer({
     logger,
     db,
@@ -44,6 +60,10 @@ async function main(): Promise<void> {
       signKey,
       signerDid,
       serviceToken: config.CONTROL_PLANE_SERVICE_TOKEN,
+    },
+    oauth: {
+      config,
+      encryptionKey,
     },
   });
 
