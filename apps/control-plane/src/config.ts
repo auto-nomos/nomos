@@ -14,6 +14,26 @@ const Config = z.object({
   WORKOS_API_KEY: z.string().optional(),
   WORKOS_CLIENT_ID: z.string().optional(),
   SENTRY_DSN: z.string().url().optional(),
+
+  // Sprint 5 — OAuth bridge.
+  // 64-hex-char (32-byte) master key used to encrypt OAuth refresh + access
+  // tokens at rest (XChaCha20-Poly1305). Generate with `pnpm gen-keys`.
+  OAUTH_TOKEN_ENCRYPTION_KEY: z
+    .string()
+    .regex(/^[0-9a-f]{64}$/i)
+    .default('00'.repeat(32)),
+  // HMAC secret used to sign the OAuth `state` query param so the callback
+  // can verify the redirect originated from us.
+  OAUTH_STATE_SIGN_SECRET: z.string().min(16).default('dev-only-oauth-state-secret-32chars'),
+  // Per-provider OAuth app credentials. Empty = connector disabled in dev.
+  OAUTH_GITHUB_CLIENT_ID: z.string().optional(),
+  OAUTH_GITHUB_CLIENT_SECRET: z.string().optional(),
+  OAUTH_SLACK_CLIENT_ID: z.string().optional(),
+  OAUTH_SLACK_CLIENT_SECRET: z.string().optional(),
+  OAUTH_GOOGLE_CLIENT_ID: z.string().optional(),
+  OAUTH_GOOGLE_CLIENT_SECRET: z.string().optional(),
+  OAUTH_NOTION_CLIENT_ID: z.string().optional(),
+  OAUTH_NOTION_CLIENT_SECRET: z.string().optional(),
 });
 
 export type Config = z.infer<typeof Config>;
