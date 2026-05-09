@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { secureHeaders } from 'hono/secure-headers';
 import type { PolicyCache } from './cache/policies.js';
 import type { RevocationCache } from './cache/revocations.js';
-import type { OAuthTokenResponse } from './control-plane/client.js';
+import type { OAuthTokenResponse, StepUpStateResponse } from './control-plane/client.js';
 import type { Logger } from './logger.js';
 import { loggerMiddleware } from './middleware/logger.js';
 import { requestId } from './middleware/request-id.js';
@@ -11,6 +11,7 @@ import { healthRoutes } from './routes/health.js';
 import { createInternalRoutes } from './routes/internal.js';
 import { createProxyRoutes } from './routes/proxy.js';
 import { createReceiptRoutes, type ReceiptEmitInput } from './routes/receipts.js';
+import { createStepUpRoutes } from './routes/stepup.js';
 
 export interface ServerDeps {
   logger: Logger;
@@ -37,6 +38,20 @@ export interface ServerDeps {
     /** Injectable upstream fetch — defaults to global fetch. */
     upstreamFetch?: typeof fetch;
   };
+  /**
+   * Sprint 9 step-up. When supplied, authorize denies that would allow with
+   * cosigner=true synthesize a push_approvals row, and `/v1/stepup/:id`
+   * exposes state for SDK polling.
+   */
+  stepup?: {
+    create: (args: {
+      customerId: string;
+      agentId: string;
+      command: string;
+      resource: Record<string, unknown>;
+    }) => Promise<{ id: string; deepLink: string }>;
+    getStepUp: (id: string) => Promise<StepUpStateResponse | undefined>;
+  };
 }
 
 export function createServer(deps: ServerDeps): Hono {
@@ -53,8 +68,12 @@ export function createServer(deps: ServerDeps): Hono {
       policyCache: deps.policyCache,
       revocationCache: deps.revocationCache,
       ...(deps.emitAudit !== undefined ? { emitAudit: deps.emitAudit } : {}),
+      ...(deps.stepup ? { stepup: { create: deps.stepup.create } } : {}),
     }),
   );
+  if (deps.stepup) {
+    app.route('/', createStepUpRoutes({ getStepUp: deps.stepup.getStepUp, logger: deps.logger }));
+  }
   app.route(
     '/',
     createReceiptRoutes({

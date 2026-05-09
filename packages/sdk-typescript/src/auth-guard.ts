@@ -13,20 +13,49 @@ export interface AuthGuardOptions {
   retry?: { maxAttempts?: number; baseDelayMs?: number };
 }
 
-export interface AuthorizeRequestInput {
-  ucan: string;
-  command: string;
-  resource: Record<string, unknown>;
-  context: Record<string, unknown>;
-}
-
 export interface AuthorizeDecision {
   allow: boolean;
   reason?: string;
   obligations?: Record<string, unknown>;
   receiptId: string;
   requiresStepUp?: boolean;
+  /** Human-facing approval URL (dashboard /approve/:id deep link). */
   stepUpUrl?: string;
+  /** Approval id the SDK polls via `waitForApproval`. */
+  stepUpId?: string;
+}
+
+export interface AuthorizeRequestInput {
+  ucan: string;
+  command: string;
+  resource: Record<string, unknown>;
+  context: Record<string, unknown>;
+  /**
+   * Sprint 9 — step-up retry. Set on the second authorize call after the
+   * user approves; PDP validates the cosigner attestation, injects
+   * `context.cosigner = true`, and re-evaluates.
+   */
+  cosignerJwt?: string;
+}
+
+export type StepUpState = 'pending' | 'approved' | 'denied' | 'expired';
+
+export interface StepUpStatus {
+  id: string;
+  state: StepUpState;
+  command: string;
+  resource: unknown;
+  expiresAt: string;
+  decidedAt: string | null;
+  cosignerJwt: string | null;
+}
+
+export interface WaitForApprovalInput {
+  stepUpId: string;
+  /** Total wait. Default 60s. */
+  timeoutMs?: number;
+  /** Poll cadence. Default 1s. */
+  pollIntervalMs?: number;
 }
 
 export interface ReceiptInput {
@@ -76,6 +105,13 @@ export interface AuthGuard {
    * back to the configured failureMode and surfaces a synthetic decision.
    */
   proxy(req: ProxyInput): Promise<ProxyResult>;
+  /**
+   * Sprint 9 — polls `GET /v1/stepup/:id` until the user approves/denies
+   * the step-up or the timeout fires. On `approved`, the response carries
+   * the cosigner attestation JWT the agent then passes back to
+   * `authorize({ ..., cosignerJwt })`.
+   */
+  waitForApproval(input: WaitForApprovalInput): Promise<StepUpStatus>;
 }
 
 const FAIL_CLOSED: AuthorizeDecision = {
@@ -155,6 +191,50 @@ export function createAuthGuard(opts: AuthGuardOptions): AuthGuard {
       }
     },
 
+    async waitForApproval(input) {
+      const timeoutMs = input.timeoutMs ?? 60_000;
+      const pollIntervalMs = input.pollIntervalMs ?? 1_000;
+      const fetchFn = opts.fetchFn ?? fetch;
+      const deadline = Date.now() + timeoutMs;
+      const url = `${baseUrl}/v1/stepup/${encodeURIComponent(input.stepUpId)}`;
+      while (true) {
+        let res: Response;
+        try {
+          res = await fetchFn(url, { headers });
+        } catch {
+          // Transient — retry until deadline.
+          if (Date.now() >= deadline) {
+            return makeExpired(input.stepUpId);
+          }
+          await sleep(pollIntervalMs);
+          continue;
+        }
+        if (res.status === 404) {
+          return makeExpired(input.stepUpId);
+        }
+        if (!res.ok) {
+          if (Date.now() >= deadline) return makeExpired(input.stepUpId);
+          await sleep(pollIntervalMs);
+          continue;
+        }
+        const body = (await res.json().catch(() => null)) as
+          | (Omit<StepUpStatus, 'cosignerJwt'> & { cosignerJwt: string | null })
+          | null;
+        if (!body || typeof body !== 'object') {
+          if (Date.now() >= deadline) return makeExpired(input.stepUpId);
+          await sleep(pollIntervalMs);
+          continue;
+        }
+        if (body.state !== 'pending') {
+          return body as StepUpStatus;
+        }
+        if (Date.now() >= deadline) {
+          return { ...(body as StepUpStatus), state: 'expired' };
+        }
+        await sleep(pollIntervalMs);
+      }
+    },
+
     async proxy(req) {
       const { apiCall, ...authReq } = req;
       const path = `${baseUrl}/v1/proxy${authReq.command}`;
@@ -231,4 +311,20 @@ function isAuthorizeDecision(v: unknown): v is AuthorizeDecision {
   if (typeof v !== 'object' || v === null) return false;
   const r = v as Record<string, unknown>;
   return typeof r.allow === 'boolean' && typeof r.receiptId === 'string';
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+function makeExpired(stepUpId: string): StepUpStatus {
+  return {
+    id: stepUpId,
+    state: 'expired',
+    command: '',
+    resource: null,
+    expiresAt: new Date().toISOString(),
+    decidedAt: null,
+    cosignerJwt: null,
+  };
 }

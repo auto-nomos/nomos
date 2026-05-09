@@ -50,7 +50,14 @@ describe('AuthorizeDecision', () => {
         receiptId: 'r-1',
         requiresStepUp: true,
         stepUpUrl: 'https://app.cb.dev/approve/abc',
+        stepUpId: 'a-123',
       }),
+    ).not.toThrow();
+  });
+
+  it('parses a step-up retry deny (cosigner_invalid)', () => {
+    expect(() =>
+      AuthorizeDecision.parse({ allow: false, reason: 'cosigner_invalid', receiptId: 'r-1' }),
     ).not.toThrow();
   });
 

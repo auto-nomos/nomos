@@ -1,0 +1,113 @@
+import { and, eq } from 'drizzle-orm';
+import type { DrizzleClient } from '../../db/index.js';
+import * as schema from '../../db/schema.js';
+import type { Logger } from '../../logger.js';
+import type { StepUpNotifier } from './notify.js';
+
+export class StepUpCreateError extends Error {
+  readonly code: 'agent_not_found' | 'customer_owner_missing';
+  constructor(code: StepUpCreateError['code'], message: string) {
+    super(message);
+    this.code = code;
+    this.name = 'StepUpCreateError';
+  }
+}
+
+export interface StepUpCreateInput {
+  customerId: string;
+  agentId: string;
+  command: string;
+  resource: Record<string, unknown>;
+  ttlSeconds?: number;
+}
+
+export interface StepUpCreated {
+  id: string;
+  expiresAt: Date;
+  deepLink: string;
+}
+
+export interface StepUpCreateDeps {
+  db: DrizzleClient;
+  notifier: StepUpNotifier;
+  dashboardPublicUrl: string;
+  defaultTtlSeconds?: number;
+  logger: Logger;
+  now?: () => Date;
+}
+
+const DEFAULT_TTL_SECONDS = 60;
+
+export async function createStepUpApproval(
+  input: StepUpCreateInput,
+  deps: StepUpCreateDeps,
+): Promise<StepUpCreated> {
+  const ttlSeconds = input.ttlSeconds ?? deps.defaultTtlSeconds ?? DEFAULT_TTL_SECONDS;
+  const now = (deps.now ?? (() => new Date()))();
+  const expiresAt = new Date(now.getTime() + ttlSeconds * 1_000);
+
+  const [agent] = await deps.db
+    .select({ id: schema.agents.id, customerId: schema.agents.customerId })
+    .from(schema.agents)
+    .where(and(eq(schema.agents.id, input.agentId), eq(schema.agents.customerId, input.customerId)))
+    .limit(1);
+  if (!agent) {
+    throw new StepUpCreateError('agent_not_found', 'agent not found for this customer');
+  }
+
+  const [owner] = await deps.db
+    .select({ userId: schema.memberships.userId })
+    .from(schema.memberships)
+    .where(
+      and(
+        eq(schema.memberships.customerId, input.customerId),
+        eq(schema.memberships.role, 'owner'),
+      ),
+    )
+    .limit(1);
+
+  const [row] = await deps.db
+    .insert(schema.pushApprovals)
+    .values({
+      customerId: input.customerId,
+      agentId: input.agentId,
+      command: input.command,
+      resource: input.resource,
+      state: 'pending',
+      requestedAt: now,
+      expiresAt,
+    })
+    .returning({ id: schema.pushApprovals.id, expiresAt: schema.pushApprovals.expiresAt });
+  if (!row) {
+    throw new Error('push_approvals insert returned no rows');
+  }
+
+  const deepLink = `${deps.dashboardPublicUrl.replace(/\/+$/, '')}/approve/${row.id}`;
+
+  if (owner) {
+    void deps
+      .notifier({
+        approvalId: row.id,
+        customerId: input.customerId,
+        agentId: input.agentId,
+        decidingUserId: owner.userId,
+        command: input.command,
+        resource: input.resource,
+        deepLink,
+        ttlSeconds,
+      })
+      .catch((err) => {
+        deps.logger.warn(
+          { err, approvalId: row.id },
+          'step-up notifier failed (caller still gets approval id)',
+        );
+      });
+  } else {
+    deps.logger.warn(
+      { customerId: input.customerId, approvalId: row.id },
+      'no customer owner found — push notification skipped; approval still pending',
+    );
+  }
+
+  return { id: row.id, expiresAt: row.expiresAt, deepLink };
+}

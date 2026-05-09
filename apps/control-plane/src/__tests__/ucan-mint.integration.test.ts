@@ -101,7 +101,7 @@ describe.skipIf(!RUN)('mintUcan service (requires postgres)', () => {
     expect(result.jwt.split('.')).toHaveLength(3);
     expect(result.payload.iss).toBe(signing.signerDid);
     expect(result.payload.cmd).toBe('/github/issue/create');
-    expect(result.payload.meta).toEqual({ oauth_connection_id: conn.id });
+    expect(result.payload.meta).toEqual({ agent_id: agentId, oauth_connection_id: conn.id });
     expect(result.expiresAt.getTime()).toBeGreaterThan(Date.now());
 
     const stored = await db.drizzle.query.ucanIssues.findFirst({
@@ -228,7 +228,7 @@ describe.skipIf(!RUN)('mintUcan service (requires postgres)', () => {
       },
       { db: db.drizzle, ...signing },
     );
-    expect(result.payload.meta).toBeUndefined();
+    expect(result.payload.meta).toEqual({ agent_id: agentId });
   });
 
   it('D-5: stamps contextHints into meta.context_hints when provided', async () => {
@@ -246,11 +246,12 @@ describe.skipIf(!RUN)('mintUcan service (requires postgres)', () => {
       { db: db.drizzle, ...signing },
     );
     expect(result.payload.meta).toEqual({
+      agent_id: agentId,
       context_hints: { user: { department: 'engineering', role: 'staff' } },
     });
   });
 
-  it('D-5: omits context_hints when contextHints is empty object', async () => {
+  it('D-5: omits context_hints when contextHints is empty object; carries agent_id', async () => {
     const customerId = await newCustomer();
     const agentId = await newAgent(customerId);
     const result = await mintUcan(
@@ -264,7 +265,7 @@ describe.skipIf(!RUN)('mintUcan service (requires postgres)', () => {
       },
       { db: db.drizzle, ...signing },
     );
-    expect(result.payload.meta).toBeUndefined();
+    expect(result.payload.meta).toEqual({ agent_id: agentId });
   });
 
   it('uses injected `now` for deterministic exp/nbf', async () => {

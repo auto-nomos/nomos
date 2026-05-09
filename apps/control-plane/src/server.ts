@@ -11,6 +11,7 @@ import { createHealthRoutes } from './routes/health.js';
 import { createInternalRoutes } from './routes/internal.js';
 import { createOAuthRoutes } from './routes/oauth.js';
 import type { RevocationPublisher } from './services/revocation-publisher.js';
+import type { StepUpNotifier } from './services/stepup/notify.js';
 import { handleTrpc } from './trpc/handler.js';
 
 export interface ServerDeps {
@@ -37,6 +38,12 @@ export interface ServerDeps {
   };
   /** Sprint 8 — push revocation. When omitted, ucans.revoke noop-publishes. */
   revocationPublisher?: RevocationPublisher;
+  /** Sprint 9 step-up. When omitted, /v1/internal/stepup/* is not mounted. */
+  stepup?: {
+    notifier: StepUpNotifier;
+    dashboardPublicUrl: string;
+    defaultTtlSeconds?: number;
+  };
 }
 
 export function createServer(deps: ServerDeps): Hono {
@@ -76,6 +83,7 @@ export function createServer(deps: ServerDeps): Hono {
         ...(deps.oauth?.config ? { config: deps.oauth.config } : {}),
         ...(deps.oauth?.fetch ? { fetch: deps.oauth.fetch } : {}),
         logger: deps.logger,
+        ...(deps.stepup ? { stepup: deps.stepup } : {}),
       }),
     );
   }

@@ -56,6 +56,24 @@ export interface OAuthTokenResponse {
   scopesGranted: string[];
 }
 
+export interface StepUpCreateResponse {
+  id: string;
+  expiresAt: string;
+  deepLink: string;
+}
+
+export interface StepUpStateResponse {
+  id: string;
+  customerId: string;
+  agentId: string;
+  command: string;
+  resource: unknown;
+  state: 'pending' | 'approved' | 'denied' | 'expired';
+  expiresAt: string;
+  decidedAt: string | null;
+  cosignerAttestationJwt: string | null;
+}
+
 export interface ControlPlaneClient {
   fetchBundle(customerId: string): Promise<string | undefined>;
   fetchRevocations(customerId: string): Promise<string[] | undefined>;
@@ -67,6 +85,18 @@ export interface ControlPlaneClient {
    * itself rejected by provider — caller should deny `oauth_token_invalid`).
    */
   refreshOAuthToken(customerId: string, connectionId: string): Promise<OAuthTokenResponse>;
+  /**
+   * Sprint 9 — step-up. PDP detects step-up potential during authorize and
+   * asks the control plane to create a push_approvals row + Knock fan-out.
+   */
+  createStepUp(args: {
+    customerId: string;
+    agentId: string;
+    command: string;
+    resource: Record<string, unknown>;
+    ttlSeconds?: number;
+  }): Promise<StepUpCreateResponse>;
+  getStepUp(id: string): Promise<StepUpStateResponse | undefined>;
 }
 
 export class OAuthTokenFetchError extends Error {
@@ -171,5 +201,72 @@ export function createControlPlaneClient(opts: ControlPlaneClientOptions): Contr
     return (await res.json()) as OAuthTokenResponse;
   }
 
-  return { fetchBundle, fetchRevocations, fetchOAuthToken, refreshOAuthToken };
+  async function createStepUp(args: {
+    customerId: string;
+    agentId: string;
+    command: string;
+    resource: Record<string, unknown>;
+    ttlSeconds?: number;
+  }): Promise<StepUpCreateResponse> {
+    const res = await fetchImpl(`${opts.baseUrl}/v1/internal/stepup/create`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        authorization: `Bearer ${opts.serviceToken}`,
+      },
+      body: JSON.stringify({
+        customer_id: args.customerId,
+        agent_id: args.agentId,
+        command: args.command,
+        resource: args.resource,
+        ...(args.ttlSeconds !== undefined ? { ttl_seconds: args.ttlSeconds } : {}),
+      }),
+    });
+    if (!res.ok) {
+      throw new Error(`stepup create HTTP ${res.status}`);
+    }
+    const body = (await res.json()) as { id: string; expires_at: string; deep_link: string };
+    return { id: body.id, expiresAt: body.expires_at, deepLink: body.deep_link };
+  }
+
+  async function getStepUp(id: string): Promise<StepUpStateResponse | undefined> {
+    const res = await fetchImpl(`${opts.baseUrl}/v1/internal/stepup/${encodeURIComponent(id)}`, {
+      headers: { authorization: `Bearer ${opts.serviceToken}` },
+    });
+    if (res.status === 404) return undefined;
+    if (!res.ok) {
+      throw new Error(`stepup fetch HTTP ${res.status}`);
+    }
+    const body = (await res.json()) as {
+      id: string;
+      customer_id: string;
+      agent_id: string;
+      command: string;
+      resource: unknown;
+      state: 'pending' | 'approved' | 'denied' | 'expired';
+      expires_at: string;
+      decided_at: string | null;
+      cosigner_attestation_jwt: string | null;
+    };
+    return {
+      id: body.id,
+      customerId: body.customer_id,
+      agentId: body.agent_id,
+      command: body.command,
+      resource: body.resource,
+      state: body.state,
+      expiresAt: body.expires_at,
+      decidedAt: body.decided_at,
+      cosignerAttestationJwt: body.cosigner_attestation_jwt,
+    };
+  }
+
+  return {
+    fetchBundle,
+    fetchRevocations,
+    fetchOAuthToken,
+    refreshOAuthToken,
+    createStepUp,
+    getStepUp,
+  };
 }

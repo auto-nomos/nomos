@@ -112,6 +112,13 @@ async function main(): Promise<void> {
       fetchOAuthToken: cpClient.fetchOAuthToken,
       refreshOAuthToken: cpClient.refreshOAuthToken,
     },
+    stepup: {
+      create: async (args) => {
+        const created = await cpClient.createStepUp(args);
+        return { id: created.id, deepLink: created.deepLink };
+      },
+      getStepUp: cpClient.getStepUp,
+    },
   });
 
   const server = serve({ fetch: app.fetch, port: config.PORT }, (info) => {

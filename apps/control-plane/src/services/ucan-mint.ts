@@ -124,7 +124,7 @@ export async function mintUcan(input: MintInput, deps: MintDeps): Promise<MintRe
 
   const nowMs = deps.now ? deps.now() : Date.now();
   const nowSec = Math.floor(nowMs / 1000);
-  const meta: Record<string, unknown> = {};
+  const meta: Record<string, unknown> = { agent_id: agent.id };
   if (input.policyId) meta.policy_id = input.policyId;
   if (input.oauthConnectionId) meta.oauth_connection_id = input.oauthConnectionId;
   if (input.contextHints && Object.keys(input.contextHints).length > 0) {

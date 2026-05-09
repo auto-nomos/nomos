@@ -8,6 +8,7 @@ import { createLogger, type Logger } from './logger.js';
 import { createServer } from './server.js';
 import { createOAuthSweep } from './services/oauth-sweep.js';
 import { createRevocationPublisher } from './services/revocation-publisher.js';
+import { createStepUpNotifier } from './services/stepup/notify.js';
 import { createAuditArchiveWorker, createR2Uploader } from './workers/audit-archive.js';
 import { createAuditRootSigner } from './workers/audit-root-signer.js';
 
@@ -93,6 +94,17 @@ async function main(): Promise<void> {
     logger,
   });
 
+  const stepUpNotifier = createStepUpNotifier({
+    apiKey: config.KNOCK_API_KEY,
+    workflow: config.KNOCK_WORKFLOW_ID,
+    logger,
+  });
+  if (!config.KNOCK_API_KEY) {
+    logger.warn(
+      'KNOCK_API_KEY not set — step-up notifications will log deep links to console only',
+    );
+  }
+
   const app = createServer({
     logger,
     db,
@@ -101,6 +113,11 @@ async function main(): Promise<void> {
     internal: { serviceToken: config.CONTROL_PLANE_SERVICE_TOKEN },
     oauth: { config, encryptionKey },
     revocationPublisher,
+    stepup: {
+      notifier: stepUpNotifier,
+      dashboardPublicUrl: config.DASHBOARD_PUBLIC_URL,
+      defaultTtlSeconds: Math.floor(config.STEPUP_DEFAULT_TTL_MS / 1_000),
+    },
   });
 
   const sweep = createOAuthSweep({

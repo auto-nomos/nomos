@@ -10,5 +10,8 @@ export type {
   ProxyInput,
   ProxyResult,
   ReceiptInput,
+  StepUpState,
+  StepUpStatus,
+  WaitForApprovalInput,
 } from './auth-guard.js';
 export { createAuthGuard } from './auth-guard.js';

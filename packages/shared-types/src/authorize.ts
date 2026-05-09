@@ -14,6 +14,13 @@ export const AuthorizeRequest = z.object({
   command: Command,
   resource: z.record(z.string(), z.unknown()),
   context: AuthorizeContext,
+  /**
+   * Sprint 9 — step-up retry. SDK supplies the cosigner attestation JWT
+   * the dashboard minted after a passkey approval. PDP validates the
+   * signature + `meta.cosigner_for` matches the request's UCAN cid, then
+   * injects `context.cosigner = true` for re-evaluation.
+   */
+  cosignerJwt: z.string().min(1).optional(),
 });
 
 export const DenyReason = z.enum([
@@ -27,6 +34,9 @@ export const DenyReason = z.enum([
   'oauth_token_invalid',
   'unknown_customer',
   'malformed_ucan',
+  'step_up_required',
+  'cosigner_invalid',
+  'cosigner_expired',
 ]);
 
 export const AuthorizeDecision = z.object({
@@ -35,7 +45,15 @@ export const AuthorizeDecision = z.object({
   obligations: z.record(z.string(), z.unknown()).optional(),
   receiptId: z.string().min(1),
   requiresStepUp: z.boolean().optional(),
+  /**
+   * URL the SDK can show the human (deep link to dashboard /approve/:id).
+   */
   stepUpUrl: z.string().url().optional(),
+  /**
+   * Approval id the SDK polls via `GET /v1/stepup/:id` until the user
+   * approves or 60s expires, then re-issues authorize with `cosignerJwt`.
+   */
+  stepUpId: z.string().min(1).optional(),
 });
 
 export const ReceiptInput = z.object({
