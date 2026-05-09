@@ -5,6 +5,8 @@ const Config = z.object({
   LOG_LEVEL: z.enum(['trace', 'debug', 'info', 'warn', 'error', 'fatal']).default('info'),
   CONTROL_PLANE_URL: z.string().url().default('http://localhost:8788'),
   CONTROL_PLANE_SERVICE_TOKEN: z.string().min(1).default('dev-shared-token'),
+  CONTROL_PLANE_BUNDLE_VERIFY_KEY: z.string().optional(),
+  PDP_CUSTOMER_IDS: z.string().optional(),
   POLICY_REFRESH_MS: z.coerce.number().int().positive().default(60_000),
   REVOCATION_REFRESH_MS: z.coerce.number().int().positive().default(5_000),
   AUDIT_LOG_PATH: z.string().min(1).default('./audit.log'),
