@@ -1,12 +1,15 @@
 import { appendFile } from 'node:fs/promises';
 import { serve } from '@hono/node-server';
 import { createAuditEmitter, decisionToAudit } from './audit/emit.js';
+import { createPostgresAuditEmitter } from './audit/postgres-emitter.js';
+import { createPgAuditWriter } from './audit/postgres-writer.js';
 import type { ReceiptEmitInput } from './routes/receipts.js';
 
 async function appendReceipt(logPath: string, ev: ReceiptEmitInput): Promise<void> {
   await appendFile(logPath, `${JSON.stringify({ kind: 'receipt', ...ev })}\n`, 'utf8');
 }
 
+import pg from 'pg';
 import { createPolicyCache } from './cache/policies.js';
 import { createRevocationCache } from './cache/revocations.js';
 import { loadConfig } from './config.js';
@@ -65,7 +68,26 @@ async function main(): Promise<void> {
     ]),
   );
 
-  const auditEmitter = createAuditEmitter({ logPath: config.AUDIT_LOG_PATH });
+  const auditPool =
+    config.AUDIT_BACKEND === 'postgres'
+      ? new pg.Pool({ connectionString: config.DATABASE_URL })
+      : undefined;
+  const pgEmitter = auditPool
+    ? createPostgresAuditEmitter({
+        writer: createPgAuditWriter(auditPool),
+        flushIntervalMs: config.AUDIT_FLUSH_INTERVAL_MS,
+        batchSizeMax: config.AUDIT_BATCH_SIZE_MAX,
+        logger,
+      })
+    : undefined;
+  if (pgEmitter) pgEmitter.start();
+  const fileEmitter = pgEmitter
+    ? undefined
+    : createAuditEmitter({ logPath: config.AUDIT_LOG_PATH });
+  const auditEmitter = pgEmitter ?? fileEmitter;
+  if (!auditEmitter) {
+    throw new Error('audit emitter could not be initialized');
+  }
 
   const app = createServer({
     logger,
@@ -101,6 +123,8 @@ async function main(): Promise<void> {
     policyCache.stop();
     revocationCache.stop();
     server.close();
+    if (pgEmitter) await pgEmitter.stop();
+    if (auditPool) await auditPool.end();
     await otel.shutdown();
     await sentry.shutdown();
     process.exit(0);

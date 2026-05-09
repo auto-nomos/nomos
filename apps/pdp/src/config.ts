@@ -10,6 +10,15 @@ const Config = z.object({
   POLICY_REFRESH_MS: z.coerce.number().int().positive().default(60_000),
   REVOCATION_REFRESH_MS: z.coerce.number().int().positive().default(5_000),
   AUDIT_LOG_PATH: z.string().min(1).default('./audit.log'),
+  /**
+   * Sprint 8.2 — DATABASE_URL is the Postgres the audit emitter writes to.
+   * Local docker default matches `infrastructure/docker/docker-compose.yml`.
+   * Required in production; in tests the JSONL fallback is allowed.
+   */
+  DATABASE_URL: z.string().min(1).default('postgres://cb:cb@localhost:5433/cb_dev'),
+  AUDIT_BACKEND: z.enum(['postgres', 'jsonl']).default('postgres'),
+  AUDIT_FLUSH_INTERVAL_MS: z.coerce.number().int().positive().default(100),
+  AUDIT_BATCH_SIZE_MAX: z.coerce.number().int().positive().default(100),
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   OTEL_EXPORTER_OTLP_ENDPOINT: z.string().url().optional(),
   OTEL_EXPORTER_OTLP_HEADERS: z.string().optional(),
