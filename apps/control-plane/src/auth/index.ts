@@ -46,8 +46,16 @@ export function createAuth(deps: AuthDeps) {
       // strings, which Postgres rejects on uuid columns.
       database: { generateId: () => randomUUID() },
     },
-    // Permit Hono's `app.request` test transport which uses http://localhost.
-    trustedOrigins: ['http://localhost', 'http://localhost:3000'],
+    // Permit Hono's `app.request` test transport (origin = http://localhost),
+    // common dev dashboard ports, and 127.0.0.1 variants used by e2e scripts.
+    trustedOrigins: [
+      'http://localhost',
+      'http://localhost:3000',
+      'http://localhost:8788',
+      'http://127.0.0.1',
+      'http://127.0.0.1:3000',
+      'http://127.0.0.1:8788',
+    ],
     emailAndPassword: {
       enabled: true,
       autoSignIn: true,

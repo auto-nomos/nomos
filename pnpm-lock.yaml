@@ -11,21 +11,39 @@ importers:
       '@biomejs/biome':
         specifier: 2.4.14
         version: 2.4.14
+      '@credential-broker/control-plane':
+        specifier: workspace:*
+        version: link:apps/control-plane
       '@credential-broker/crypto':
         specifier: workspace:*
         version: link:packages/crypto
+      '@credential-broker/pdp':
+        specifier: workspace:*
+        version: link:apps/pdp
+      '@hono/node-server':
+        specifier: 1.13.7
+        version: 1.13.7(hono@4.6.14)
       '@noble/hashes':
         specifier: 1.7.0
         version: 1.7.0
+      '@trpc/client':
+        specifier: 11.0.0
+        version: 11.0.0(@trpc/server@11.0.0(typescript@5.7.2))(typescript@5.7.2)
       '@vitest/coverage-v8':
         specifier: 4.1.5
         version: 4.1.5(vitest@4.1.5)
+      drizzle-orm:
+        specifier: 0.36.4
+        version: 0.36.4(@opentelemetry/api@1.9.1)(@types/pg@8.15.6)(kysely@0.28.17)(pg@8.13.1)
       husky:
         specifier: 9.1.7
         version: 9.1.7
       lint-staged:
         specifier: 17.0.2
         version: 17.0.2
+      pino:
+        specifier: 9.5.0
+        version: 9.5.0
       tsx:
         specifier: 4.21.0
         version: 4.21.0
@@ -4063,6 +4081,13 @@ snapshots:
     optionalDependencies:
       '@opentelemetry/api': 1.9.1
       '@types/pg': 8.11.10
+      kysely: 0.28.17
+      pg: 8.13.1
+
+  drizzle-orm@0.36.4(@opentelemetry/api@1.9.1)(@types/pg@8.15.6)(kysely@0.28.17)(pg@8.13.1):
+    optionalDependencies:
+      '@opentelemetry/api': 1.9.1
+      '@types/pg': 8.15.6
       kysely: 0.28.17
       pg: 8.13.1
 

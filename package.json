@@ -23,6 +23,7 @@
     "db:reset": "docker compose -f infrastructure/docker/docker-compose.yml down -v && docker compose -f infrastructure/docker/docker-compose.yml up -d postgres",
     "db:logs": "docker compose -f infrastructure/docker/docker-compose.yml logs -f postgres",
     "gen-keys": "tsx scripts/gen-keys.mts",
+    "e2e:sprint3": "tsx scripts/e2e-sprint3.mts",
     "prepare": "husky"
   },
   "lint-staged": {
@@ -32,11 +33,17 @@
   },
   "devDependencies": {
     "@biomejs/biome": "2.4.14",
+    "@credential-broker/control-plane": "workspace:*",
     "@credential-broker/crypto": "workspace:*",
+    "@credential-broker/pdp": "workspace:*",
+    "@hono/node-server": "1.13.7",
     "@noble/hashes": "1.7.0",
+    "@trpc/client": "11.0.0",
     "@vitest/coverage-v8": "4.1.5",
+    "drizzle-orm": "0.36.4",
     "husky": "9.1.7",
     "lint-staged": "17.0.2",
+    "pino": "9.5.0",
     "tsx": "4.21.0",
     "turbo": "2.9.10",
     "typescript": "5.7.2",
