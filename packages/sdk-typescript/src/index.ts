@@ -6,6 +6,8 @@ export type {
   AuthorizeDecision,
   AuthorizeRequestInput,
   FailureMode,
+  MintedUcan,
+  MintUcanInput,
   ProxyApiCall,
   ProxyInput,
   ProxyResult,
@@ -14,4 +16,4 @@ export type {
   StepUpStatus,
   WaitForApprovalInput,
 } from './auth-guard.js';
-export { createAuthGuard } from './auth-guard.js';
+export { createAuthGuard, MintUcanError } from './auth-guard.js';

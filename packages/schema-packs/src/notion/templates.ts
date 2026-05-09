@@ -1,7 +1,12 @@
 import type { PolicyTemplate } from '../types.js';
 
-const READS = ['page.read', 'database.query', 'block.read'] as const;
-const WRITES = ['page.create', 'page.update', 'block.append'] as const;
+export const READS = ['/notion/page/read', '/notion/database/query', '/notion/block/read'] as const;
+export const WRITES = [
+  '/notion/page/create',
+  '/notion/page/update',
+  '/notion/block/append',
+] as const;
+export const actions = [...READS, ...WRITES] as const;
 
 const READ_LIST = READS.map((a) => `Action::"${a}"`).join(', ');
 const WRITE_LIST = WRITES.map((a) => `Action::"${a}"`).join(', ');

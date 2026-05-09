@@ -77,6 +77,12 @@ importers:
       '@credential-broker/crypto':
         specifier: workspace:*
         version: link:../../packages/crypto
+      '@credential-broker/policy-builder':
+        specifier: workspace:*
+        version: link:../../packages/policy-builder
+      '@credential-broker/schema-packs':
+        specifier: workspace:*
+        version: link:../../packages/schema-packs
       '@credential-broker/shared-types':
         specifier: workspace:*
         version: link:../../packages/shared-types
@@ -472,6 +478,31 @@ importers:
       '@types/node':
         specifier: 22.10.5
         version: 22.10.5
+      typescript:
+        specifier: 5.7.2
+        version: 5.7.2
+      vitest:
+        specifier: 4.1.5
+        version: 4.1.5(@opentelemetry/api@1.9.1)(@types/node@22.10.5)(@vitest/coverage-v8@4.1.5)(happy-dom@15.11.7)(msw@2.7.0(@types/node@22.10.5)(typescript@5.7.2))(vite@8.0.11(@types/node@22.10.5)(esbuild@0.27.7)(jiti@1.21.7)(tsx@4.21.0)(yaml@2.8.4))
+
+  packages/mcp-server:
+    dependencies:
+      '@credential-broker/sdk':
+        specifier: workspace:*
+        version: link:../sdk-typescript
+      '@modelcontextprotocol/sdk':
+        specifier: 1.18.1
+        version: 1.18.1
+      zod:
+        specifier: 3.24.1
+        version: 3.24.1
+    devDependencies:
+      '@types/node':
+        specifier: 22.10.5
+        version: 22.10.5
+      tsx:
+        specifier: 4.21.0
+        version: 4.21.0
       typescript:
         specifier: 5.7.2
         version: 5.7.2

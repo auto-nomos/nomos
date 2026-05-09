@@ -1,7 +1,12 @@
 import type { PolicyTemplate } from '../types.js';
 
-const READS = ['drive.read', 'drive.list', 'calendar.read'] as const;
-const WRITES = ['drive.write', 'calendar.create_event', 'calendar.update_event'] as const;
+export const READS = ['/google/drive/read', '/google/drive/list', '/google/calendar/read'] as const;
+export const WRITES = [
+  '/google/drive/write',
+  '/google/calendar/event/create',
+  '/google/calendar/event/update',
+] as const;
+export const actions = [...READS, ...WRITES] as const;
 
 const READ_LIST = READS.map((a) => `Action::"${a}"`).join(', ');
 const WRITE_LIST = WRITES.map((a) => `Action::"${a}"`).join(', ');

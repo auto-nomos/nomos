@@ -6,11 +6,46 @@ export type FailureMode = 'closed' | 'open';
 export interface AuthGuardOptions {
   apiKey: string;
   pdpUrl: string;
+  /**
+   * Required for `mintUcan()` — points at the control plane (e.g.
+   * https://api.example.com). Optional if the caller only uses
+   * `authorize()` / `proxy()` with externally-supplied UCANs.
+   */
+  controlPlaneUrl?: string;
   failureMode?: FailureMode;
   /** Schema id (optional metadata sent to PDP for routing). */
   schema?: string;
   fetchFn?: FetchFn;
   retry?: { maxAttempts?: number; baseDelayMs?: number };
+}
+
+export interface MintedUcan {
+  jwt: string;
+  cid: string;
+  /** Epoch milliseconds. */
+  expiresAt: number;
+}
+
+export interface MintUcanInput {
+  commands: string[];
+  /** Lifetime in seconds. Defaults to control-plane default (600s). Capped at 3600s. */
+  ttlSeconds?: number;
+  /**
+   * Pin a specific oauth connection. Only needed when the customer has
+   * multiple connections for the same connector (e.g. two GitHub orgs).
+   */
+  oauthConnectionId?: string;
+}
+
+export class MintUcanError extends Error {
+  constructor(
+    message: string,
+    readonly code: string,
+    readonly status: number,
+  ) {
+    super(message);
+    this.name = 'MintUcanError';
+  }
 }
 
 export interface AuthorizeDecision {
@@ -96,6 +131,12 @@ export interface AuthGuard {
   authorize(req: AuthorizeRequestInput): Promise<AuthorizeDecision>;
   emitReceipt(receiptId: string, input: ReceiptInput): Promise<void>;
   /**
+   * Trades the configured API key for short-lived UCANs (one per command).
+   * Caches results in memory and refreshes when remaining TTL drops below
+   * 60s. Requires `controlPlaneUrl` in `AuthGuardOptions`.
+   */
+  mintUcan(input: MintUcanInput): Promise<Map<string, MintedUcan>>;
+  /**
    * Sprint 5.5 — proxy mode. Sends UCAN + apiCall to the PDP's
    * `/v1/proxy/:command`; the PDP runs authorize and, on allow, calls the
    * upstream SaaS with the customer's OAuth token. The agent never sees the
@@ -126,9 +167,17 @@ const FAIL_OPEN: AuthorizeDecision = {
   receiptId: 'sdk-fail-open',
 };
 
+/**
+ * Refresh a cache entry whose remaining TTL has fallen below this many
+ * milliseconds. Picked so a 600s default UCAN refreshes at the 540s mark —
+ * plenty of slack for clock skew + network jitter.
+ */
+const REFRESH_BEFORE_MS = 60_000;
+
 export function createAuthGuard(opts: AuthGuardOptions): AuthGuard {
   const { customerId } = parseApiKey(opts.apiKey);
   const baseUrl = opts.pdpUrl.replace(/\/+$/, '');
+  const controlPlaneUrl = opts.controlPlaneUrl?.replace(/\/+$/, '');
   const failureMode: FailureMode = opts.failureMode ?? 'closed';
   const headers = {
     'content-type': 'application/json',
@@ -136,6 +185,10 @@ export function createAuthGuard(opts: AuthGuardOptions): AuthGuard {
     authorization: `Bearer ${opts.apiKey}`,
     ...(opts.schema ? { 'x-cb-schema': opts.schema } : {}),
   };
+
+  // Cache UCANs by command. mintUcan refreshes any entry whose remaining
+  // TTL is below REFRESH_BEFORE_MS.
+  const ucanCache = new Map<string, MintedUcan>();
 
   return {
     customerId,
@@ -189,6 +242,69 @@ export function createAuthGuard(opts: AuthGuardOptions): AuthGuard {
       if (!res.ok) {
         throw new Error(`receipt rejected: HTTP ${res.status}`);
       }
+    },
+
+    async mintUcan(input) {
+      if (!controlPlaneUrl) {
+        throw new MintUcanError(
+          'mintUcan requires controlPlaneUrl in AuthGuardOptions',
+          'control_plane_url_missing',
+          0,
+        );
+      }
+      const now = Date.now();
+      const stale: string[] = [];
+      const fresh = new Map<string, MintedUcan>();
+      for (const command of input.commands) {
+        const cached = ucanCache.get(command);
+        if (cached && cached.expiresAt - now > REFRESH_BEFORE_MS) {
+          fresh.set(command, cached);
+        } else {
+          stale.push(command);
+        }
+      }
+      if (stale.length === 0) {
+        return fresh;
+      }
+
+      const fetchFn = opts.fetchFn ?? fetch;
+      const res = await fetchFn(`${controlPlaneUrl}/v1/mint-ucan`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          commands: stale,
+          ...(input.ttlSeconds !== undefined ? { ttlSeconds: input.ttlSeconds } : {}),
+          ...(input.oauthConnectionId !== undefined
+            ? { oauthConnectionId: input.oauthConnectionId }
+            : {}),
+        }),
+      });
+      if (!res.ok) {
+        let errBody: { error?: string; error_code?: string } = {};
+        try {
+          errBody = (await res.json()) as typeof errBody;
+        } catch {
+          // ignore — body may be empty
+        }
+        throw new MintUcanError(
+          errBody.error ?? `mint-ucan ${res.status}`,
+          errBody.error_code ?? 'mint_failed',
+          res.status,
+        );
+      }
+      const body = (await res.json()) as {
+        ucans: Array<{ command: string; jwt: string; cid: string; expiresAt: string }>;
+      };
+      for (const u of body.ucans) {
+        const minted: MintedUcan = {
+          jwt: u.jwt,
+          cid: u.cid,
+          expiresAt: Date.parse(u.expiresAt),
+        };
+        ucanCache.set(u.command, minted);
+        fresh.set(u.command, minted);
+      }
+      return fresh;
     },
 
     async waitForApproval(input) {

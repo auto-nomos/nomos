@@ -1,14 +1,10 @@
 'use client';
 
-import {
-  type ParseToIrResult,
-  parseToIr,
-  roundTrip,
-  type VisualPolicy,
-} from '@credential-broker/policy-builder';
+import { emitPolicySet, type VisualPolicy } from '@credential-broker/policy-builder/browser';
 import { PolicyBuilder } from '@credential-broker/policy-builder/components';
 import { CheckCircle2, XCircle } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
+import { trpc } from '../lib/trpc';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from './ui/card';
 
@@ -21,20 +17,35 @@ export interface VisualPolicyTabProps {
 }
 
 export function VisualPolicyTab({ cedarText, onApply, readOnly = false }: VisualPolicyTabProps) {
-  const initial = useMemo(() => parseToIr(cedarText), [cedarText]);
-  const [policies, setPolicies] = useState<VisualPolicy[]>(initial.policies);
-  const [unrepresentable, setUnrepresentable] = useState(initial.unrepresentable);
+  // Cedar → IR runs server-side because cedar-wasm is Node-only.
+  // Debounce the input the same way the Cedar tab debounces preview parses.
+  const [debouncedText, setDebouncedText] = useState(cedarText);
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedText(cedarText), 250);
+    return () => clearTimeout(t);
+  }, [cedarText]);
+
+  const parsed = trpc.policies.parseToIr.useQuery(
+    { cedarText: debouncedText || ' ' },
+    { enabled: debouncedText.length > 0 },
+  );
+  // The existing `preview` query validates emitted Cedar at save time —
+  // we fetch it imperatively so it doesn't cache against a single argument.
+  const utils = trpc.useUtils();
+
+  const [policies, setPolicies] = useState<VisualPolicy[]>([]);
+  const [unrepresentable, setUnrepresentable] = useState<{ reason: string; cedar: string }[]>([]);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
 
-  // re-sync when the parent text changes (e.g., after a save or a Cedar-tab edit)
+  // Re-sync when the server's parse result lands.
   useEffect(() => {
-    const r: ParseToIrResult = parseToIr(cedarText);
-    setPolicies(r.policies);
-    setUnrepresentable(r.unrepresentable);
+    if (!parsed.data) return;
+    setPolicies(parsed.data.policies as VisualPolicy[]);
+    setUnrepresentable(parsed.data.unrepresentable ?? []);
     setDirty(false);
     setValidationError(null);
-  }, [cedarText]);
+  }, [parsed.data]);
 
   const allUnrepresentable = policies.length === 0 && unrepresentable.length > 0;
 
@@ -43,15 +54,40 @@ export function VisualPolicyTab({ cedarText, onApply, readOnly = false }: Visual
     setDirty(true);
   }
 
-  function applyToCedar() {
-    const r = roundTrip(policies);
-    if (!r.ok) {
-      setValidationError(r.errors[0]?.message ?? 'emitted Cedar failed to re-parse');
+  async function applyToCedar() {
+    const cedar = emitPolicySet(policies);
+    const check = await utils.policies.preview.fetch({ cedarText: cedar });
+    if (!check.ok) {
+      setValidationError(
+        typeof check.errors[0] === 'string'
+          ? check.errors[0]
+          : ((check.errors[0] as { message?: string } | undefined)?.message ??
+              'emitted Cedar failed to re-parse'),
+      );
       return;
     }
     setValidationError(null);
-    onApply(r.cedarText);
+    onApply(cedar);
     setDirty(false);
+  }
+
+  function discard() {
+    if (!parsed.data) return;
+    setPolicies(parsed.data.policies as VisualPolicy[]);
+    setUnrepresentable(parsed.data.unrepresentable ?? []);
+    setDirty(false);
+    setValidationError(null);
+  }
+
+  if (parsed.isPending) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Visual builder</CardTitle>
+          <CardDescription>Parsing…</CardDescription>
+        </CardHeader>
+      </Card>
+    );
   }
 
   return (
@@ -66,8 +102,8 @@ export function VisualPolicyTab({ cedarText, onApply, readOnly = false }: Visual
             </span>
           ) : (
             <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
-              <CheckCircle2 className="h-3.5 w-3.5" /> {policies.length} policy
-              {policies.length === 1 ? '' : 'ies'} loaded
+              <CheckCircle2 className="h-3.5 w-3.5" /> {policies.length} polic
+              {policies.length === 1 ? 'y' : 'ies'} loaded
               {unrepresentable.length > 0 ? `, ${unrepresentable.length} skipped` : ''}
             </span>
           )}
@@ -97,8 +133,8 @@ export function VisualPolicyTab({ cedarText, onApply, readOnly = false }: Visual
         {unrepresentable.length > 0 && (
           <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/40 dark:text-amber-100">
             <p className="font-medium">
-              {unrepresentable.length} policy
-              {unrepresentable.length === 1 ? '' : 'ies'} skipped:
+              {unrepresentable.length} polic
+              {unrepresentable.length === 1 ? 'y' : 'ies'} skipped:
             </p>
             <ul className="mt-1 list-disc pl-5 font-mono">
               {unrepresentable.map((u, i) => (
@@ -117,17 +153,7 @@ export function VisualPolicyTab({ cedarText, onApply, readOnly = false }: Visual
       </CardContent>
       {!readOnly && (
         <CardFooter className="justify-end gap-2">
-          <Button
-            variant="ghost"
-            onClick={() => {
-              const r = parseToIr(cedarText);
-              setPolicies(r.policies);
-              setUnrepresentable(r.unrepresentable);
-              setDirty(false);
-              setValidationError(null);
-            }}
-            disabled={!dirty}
-          >
+          <Button variant="ghost" onClick={discard} disabled={!dirty}>
             Discard
           </Button>
           <Button onClick={applyToCedar} disabled={!dirty}>

@@ -42,25 +42,29 @@ credential-broker/
 ## Quickstart (development)
 
 ```bash
-# Prereqs: Node 22 LTS, pnpm 11
+# Prereqs: Node 22 LTS, pnpm 11, Docker
 nvm use                       # picks up .nvmrc
 corepack enable && corepack prepare pnpm@11.0.8 --activate
 
-# Install
+# Install + boot Postgres
 pnpm install
+pnpm db:up
 
-# Run all tests
+# Watch the wedge run end-to-end (mints a UCAN, proxies through PDP to a mock GitHub)
+pnpm demo
+
+# Other useful commands
 pnpm test
-
-# Lint + format check
 pnpm lint
-
-# Type check
 pnpm typecheck
-
-# Build all
 pnpm build
 ```
+
+`pnpm demo` is the fastest way to confirm everything is wired correctly. It boots
+the control-plane and PDP in-process, signs up a customer, creates a Cedar policy,
+mints a proxy-bound UCAN, and exercises both an allowed and a denied call —
+proving the OAuth token never leaves the PDP. To wire it to your real Claude
+Desktop or Cursor, see `packages/mcp-server/README.md`.
 
 ## Sprint roadmap
 

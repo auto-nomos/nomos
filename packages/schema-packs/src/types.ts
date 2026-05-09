@@ -30,4 +30,10 @@ export interface IntegrationPack {
   id: IntegrationId;
   name: string;
   templates: PolicyTemplate[];
+  /**
+   * Canonical command list for this integration. Same vocabulary the SDK
+   * uses to call the PDP — sourcing UI dropdowns from here keeps policy
+   * authors and SDK callers in sync.
+   */
+  actions: string[];
 }

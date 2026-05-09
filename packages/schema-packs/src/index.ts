@@ -23,3 +23,7 @@ export function templatesFor(integrationId: IntegrationId): PolicyTemplate[] {
 export function templateById(id: string): PolicyTemplate | undefined {
   return listTemplates().find((t) => t.id === id);
 }
+
+export function actionsFor(integrationId: IntegrationId): string[] {
+  return PACKS.find((p) => p.id === integrationId)?.actions ?? [];
+}

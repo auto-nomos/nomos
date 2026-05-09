@@ -1,0 +1,36 @@
+{
+  "name": "@credential-broker/mcp-server",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Distributable MCP server backed by Credential Broker. Wire into Claude Desktop / Cursor; the OAuth tokens stay on the PDP.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "credential-broker-mcp": "./dist/bin.js"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json && chmod +x dist/bin.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "start": "node dist/bin.js",
+    "dev": "tsx src/bin.ts",
+    "clean": "rm -rf dist .turbo"
+  },
+  "dependencies": {
+    "@credential-broker/sdk": "workspace:*",
+    "@modelcontextprotocol/sdk": "1.18.1",
+    "zod": "3.24.1"
+  },
+  "devDependencies": {
+    "@types/node": "22.10.5",
+    "tsx": "4.21.0",
+    "typescript": "5.7.2",
+    "vitest": "4.1.5"
+  }
+}

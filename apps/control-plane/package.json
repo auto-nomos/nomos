@@ -30,6 +30,8 @@
     "@credential-broker/cedar": "workspace:*",
     "@credential-broker/core": "workspace:*",
     "@credential-broker/crypto": "workspace:*",
+    "@credential-broker/policy-builder": "workspace:*",
+    "@credential-broker/schema-packs": "workspace:*",
     "@credential-broker/shared-types": "workspace:*",
     "@credential-broker/ucan": "workspace:*",
     "@dsnp/parquetjs": "1.8.6",

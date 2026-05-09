@@ -4,6 +4,7 @@ import { CheckCircle2, XCircle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { use, useEffect, useState } from 'react';
 import { PolicyEditor } from '../../../../components/policy-editor';
+import { PolicyTestPanel } from '../../../../components/policy-test-panel';
 import { Button } from '../../../../components/ui/button';
 import {
   Card,
@@ -164,15 +165,15 @@ export default function PolicyDetailPage({ params }: { params: Promise<{ id: str
         <TabsContent value="visual">
           <VisualPolicyTab
             cedarText={text}
-            onApply={(next) => {
-              setText(next);
+            onApply={(t) => {
+              setText(t);
               setDirty(true);
             }}
           />
         </TabsContent>
 
         <TabsContent value="test">
-          <PolicyTestPanel />
+          <PolicyTestPanel policyId={id} integrationId={policy.data.integrationId ?? null} />
         </TabsContent>
       </Tabs>
     </div>
@@ -190,24 +191,4 @@ function errorMessage(e: unknown): string {
     return (e as { message: string }).message;
   }
   return 'unknown error';
-}
-
-function PolicyTestPanel() {
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base">Test panel</CardTitle>
-        <CardDescription>
-          Forms a deterministic authorize request and runs Cedar against it. Wired in 6.4 follow-up.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <p className="text-sm text-muted-foreground">
-          The full test-against-PDP flow lands with the schema-pack work in Sprint 10. Today the
-          editor's live validation already catches the common case (parse errors). Authorize-style
-          dry runs will appear here once schemas + sample contexts are reachable from the dashboard.
-        </p>
-      </CardContent>
-    </Card>
-  );
 }

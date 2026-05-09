@@ -1,4 +1,12 @@
-# mcp-github
+# mcp-github (deprecated example)
+
+> **Looking for the production MCP server?** Use [`@credential-broker/mcp-server`](../../packages/mcp-server)
+> instead. It's the distributable equivalent of this file: zero-trust by
+> default (proxy mode, no agent-side OAuth token), supports multiple
+> integrations, and ships as `npx -y @credential-broker/mcp-server`.
+
+This example is kept for tests and historical reference. It uses the older
+`/v1/authorize` flow where the agent holds the GitHub token directly.
 
 Reference Model Context Protocol server that exposes GitHub tools (`create_issue`,
 `read_repo`, `merge_pr`) gated by the Credential Broker SDK. Each tool call goes

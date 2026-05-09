@@ -10,6 +10,7 @@ import { loggerMiddleware } from './middleware/logger.js';
 import { requestId } from './middleware/request-id.js';
 import { createHealthRoutes } from './routes/health.js';
 import { createInternalRoutes } from './routes/internal.js';
+import { createMintUcanRoutes } from './routes/mint-ucan.js';
 import { createOAuthRoutes } from './routes/oauth.js';
 import type { RevocationPublisher } from './services/revocation-publisher.js';
 import type { StepUpNotifier } from './services/stepup/notify.js';
@@ -83,6 +84,10 @@ export function createServer(deps: ServerDeps): Hono {
   app.use('*', loggerMiddleware(deps.logger));
 
   app.route('/', createHealthRoutes({ db: deps.db }));
+
+  // SDK ↔ control-plane: trade an API key for short-lived UCANs. The PDP
+  // never sees API keys; this route is the only one that does.
+  app.route('/', createMintUcanRoutes({ db: deps.db, signing }));
 
   // Better-Auth handles all /auth/* routes itself.
   app.all('/auth/*', (c) => deps.auth.handler(c.req.raw));

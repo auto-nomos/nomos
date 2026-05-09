@@ -1,7 +1,16 @@
 import type { PolicyTemplate } from '../types.js';
 
-const READS = ['channel.list', 'channel.history', 'message.read'] as const;
-const WRITES = ['message.post', 'message.update', 'channel.create'] as const;
+export const READS = [
+  '/slack/channel/list',
+  '/slack/channel/history',
+  '/slack/message/read',
+] as const;
+export const WRITES = [
+  '/slack/message/post',
+  '/slack/message/update',
+  '/slack/channel/create',
+] as const;
+export const actions = [...READS, ...WRITES] as const;
 
 const READ_LIST = READS.map((a) => `Action::"${a}"`).join(', ');
 const WRITE_LIST = WRITES.map((a) => `Action::"${a}"`).join(', ');

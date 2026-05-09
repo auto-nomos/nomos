@@ -1,7 +1,22 @@
 import type { PolicyTemplate } from '../types.js';
 
-const READS = ['repo.read', 'repo.list', 'issue.read', 'issue.list', 'pr.read'] as const;
-const WRITES = ['issue.create', 'issue.comment', 'issue.close', 'pr.create', 'pr.merge'] as const;
+export const READS = [
+  '/github/user/read',
+  '/github/repo/read',
+  '/github/repo/list',
+  '/github/issue/read',
+  '/github/issue/list',
+  '/github/pr/read',
+] as const;
+export const WRITES = [
+  '/github/issue/create',
+  '/github/issue/comment',
+  '/github/issue/close',
+  '/github/pr/create',
+  '/github/pr/merge',
+] as const;
+
+export const actions = [...READS, ...WRITES] as const;
 
 const READ_LIST = READS.map((a) => `Action::"${a}"`).join(', ');
 const WRITE_LIST = WRITES.map((a) => `Action::"${a}"`).join(', ');

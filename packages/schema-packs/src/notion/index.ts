@@ -1,9 +1,10 @@
 import type { IntegrationPack } from '../types.js';
-import { templates } from './templates.js';
+import { actions, templates } from './templates.js';
 
 export const notionPack: IntegrationPack = {
   id: 'notion',
   name: 'Notion',
   templates,
+  actions: [...actions],
 };
-export { templates };
+export { actions, templates };

@@ -1,9 +1,10 @@
 import type { IntegrationPack } from '../types.js';
-import { templates } from './templates.js';
+import { actions, templates } from './templates.js';
 
 export const githubPack: IntegrationPack = {
   id: 'github',
   name: 'GitHub',
   templates,
+  actions: [...actions],
 };
-export { templates };
+export { actions, templates };

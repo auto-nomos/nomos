@@ -26,6 +26,7 @@
     "tunnel": "bash scripts/dev-tunnel.sh",
     "e2e:sprint3": "tsx scripts/e2e-sprint3.mts",
     "e2e:sprint5": "tsx scripts/e2e-sprint5.mts",
+    "demo": "tsx scripts/demo.mts",
     "changeset": "changeset",
     "prepare": "husky"
   },

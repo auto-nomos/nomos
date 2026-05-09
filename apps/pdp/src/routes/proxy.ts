@@ -48,6 +48,7 @@ export interface ProxyRouteDeps {
   policyCache: PolicyCache;
   revocationCache: RevocationCache;
   schemaForCustomer?: (customerId: string) => Schema | undefined;
+  trustedIssuerDid?: string;
   fetchOAuthToken: (customerId: string, connectionId: string) => Promise<OAuthTokenResponse>;
   /**
    * Force-refresh path. When upstream returns 401 the route calls this and
@@ -98,7 +99,13 @@ export function createProxyRoutes(deps: ProxyRouteDeps): Hono {
     const policies = deps.policyCache.getPolicies(customerId);
     if (policies === undefined) {
       log.warn({ customerId }, 'no policies cached for customer');
-      return c.json({ error: 'unknown customer or policy bundle not yet loaded' }, 404);
+      return c.json(
+        {
+          error: 'unknown customer or policy bundle not yet loaded',
+          error_code: 'no_policies',
+        },
+        404,
+      );
     }
     const revokedCids = deps.revocationCache.getRevoked(customerId);
     const schema = deps.schemaForCustomer?.(customerId);
@@ -109,6 +116,7 @@ export function createProxyRoutes(deps: ProxyRouteDeps): Hono {
       policies,
       revokedCids,
       ...(schema !== undefined ? { schema } : {}),
+      ...(deps.trustedIssuerDid !== undefined ? { trustedIssuerDid: deps.trustedIssuerDid } : {}),
     };
 
     const decision = decide(decideInput);
@@ -129,7 +137,7 @@ export function createProxyRoutes(deps: ProxyRouteDeps): Hono {
     }
 
     if (!decision.allow) {
-      return c.json({ allow: false, decision }, 403);
+      return c.json({ allow: false, decision, error_code: 'denied' }, 403);
     }
 
     const leaf = leafUcan(parsed.data.ucan);
@@ -143,6 +151,7 @@ export function createProxyRoutes(deps: ProxyRouteDeps): Hono {
           allow: true,
           decision,
           error: 'ucan has no oauth_connection_id meta — re-mint with proxy binding',
+          error_code: 'ucan_missing_oauth_binding',
         },
         400,
       );
@@ -153,11 +162,24 @@ export function createProxyRoutes(deps: ProxyRouteDeps): Hono {
       token = await deps.fetchOAuthToken(customerId, connectionId);
     } catch (err) {
       log.error({ err, connectionId }, 'control-plane oauth token fetch failed');
-      return c.json({ error: 'oauth_token_fetch_failed', decision, connectionId }, 502);
+      return c.json(
+        {
+          error: 'oauth_token_fetch_failed',
+          error_code: 'oauth_token_fetch_failed',
+          decision,
+          connectionId,
+        },
+        502,
+      );
     }
     if (!isKnownProvider(token.connector)) {
       return c.json(
-        { error: 'connector_not_supported_by_proxy', connector: token.connector, decision },
+        {
+          error: 'connector_not_supported_by_proxy',
+          error_code: 'connector_not_supported',
+          connector: token.connector,
+          decision,
+        },
         501,
       );
     }
@@ -171,7 +193,10 @@ export function createProxyRoutes(deps: ProxyRouteDeps): Hono {
       });
     } catch (err) {
       log.error({ err, connectionId, provider }, 'upstream proxy call failed');
-      return c.json({ error: 'upstream_call_failed', decision }, 502);
+      return c.json(
+        { error: 'upstream_call_failed', error_code: 'upstream_call_failed', decision },
+        502,
+      );
     }
 
     // 401 from upstream + refresh capability available → refresh + retry once.
@@ -193,6 +218,7 @@ export function createProxyRoutes(deps: ProxyRouteDeps): Hono {
         return c.json(
           {
             error: 'oauth_token_invalid',
+            error_code: 'oauth_token_invalid',
             decision,
             connectionId,
             connector: provider,
