@@ -53,6 +53,10 @@ describe.skipIf(!RUN)('policies.dryRun (requires postgres)', () => {
     const config = loadConfig({ DATABASE_URL: TEST_URL });
     auth = createAuth({ db: db.drizzle, config, logger });
     app = createServer({ logger, db, auth, signing });
+    await db.drizzle
+      .insert(schema.schemas)
+      .values({ id: 'github', version: 'v1', definition: {}, schemaHash: '' })
+      .onConflictDoNothing();
   });
 
   afterAll(async () => {
