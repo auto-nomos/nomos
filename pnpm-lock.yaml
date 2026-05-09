@@ -215,9 +215,15 @@ importers:
         specifier: 3.24.1
         version: 3.24.1
     devDependencies:
+      '@hono/node-server':
+        specifier: 1.13.7
+        version: 1.13.7(hono@4.6.14)
       '@types/node':
         specifier: 22.10.5
         version: 22.10.5
+      hono:
+        specifier: 4.6.14
+        version: 4.6.14
       msw:
         specifier: 2.7.0
         version: 2.7.0(@types/node@22.10.5)(typescript@5.7.2)
