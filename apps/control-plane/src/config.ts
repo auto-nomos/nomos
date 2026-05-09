@@ -52,6 +52,20 @@ const Config = z.object({
     .int()
     .positive()
     .default(24 * 60 * 60 * 1_000),
+
+  // Sprint 8.5 — Cloudflare R2 audit archive. When any of these are blank the
+  // archive worker is disabled (the audit_events Postgres rows still keep
+  // every event; the archive is for long-term immutable retention).
+  R2_AUDIT_ENDPOINT: z.string().url().optional(),
+  R2_AUDIT_BUCKET: z.string().min(1).default('cb-audit-archive-dev'),
+  R2_AUDIT_ACCESS_KEY_ID: z.string().optional(),
+  R2_AUDIT_SECRET_ACCESS_KEY: z.string().optional(),
+  /** How often the archive worker runs. Default 1h. */
+  AUDIT_ARCHIVE_INTERVAL_MS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(60 * 60 * 1_000),
 });
 
 export type Config = z.infer<typeof Config>;

@@ -8,6 +8,7 @@ import { createLogger, type Logger } from './logger.js';
 import { createServer } from './server.js';
 import { createOAuthSweep } from './services/oauth-sweep.js';
 import { createRevocationPublisher } from './services/revocation-publisher.js';
+import { createAuditArchiveWorker, createR2Uploader } from './workers/audit-archive.js';
 import { createAuditRootSigner } from './workers/audit-root-signer.js';
 
 function loadOAuthEncryptionKey(config: Config, logger: Logger): Uint8Array {
@@ -126,6 +127,38 @@ async function main(): Promise<void> {
     logger.info({ intervalMs: config.AUDIT_ROOT_SIGN_INTERVAL_MS }, 'audit root signer started');
   }
 
+  const r2Configured =
+    !!config.R2_AUDIT_ENDPOINT &&
+    !!config.R2_AUDIT_ACCESS_KEY_ID &&
+    !!config.R2_AUDIT_SECRET_ACCESS_KEY;
+  const auditArchive = r2Configured
+    ? createAuditArchiveWorker({
+        db: db.drizzle,
+        uploader: createR2Uploader({
+          bucket: config.R2_AUDIT_BUCKET,
+          // biome-ignore lint/style/noNonNullAssertion: r2Configured guards undefined.
+          endpoint: config.R2_AUDIT_ENDPOINT!,
+          // biome-ignore lint/style/noNonNullAssertion: r2Configured guards undefined.
+          accessKeyId: config.R2_AUDIT_ACCESS_KEY_ID!,
+          // biome-ignore lint/style/noNonNullAssertion: r2Configured guards undefined.
+          secretAccessKey: config.R2_AUDIT_SECRET_ACCESS_KEY!,
+        }),
+        intervalMs: config.AUDIT_ARCHIVE_INTERVAL_MS,
+        logger,
+      })
+    : undefined;
+  if (auditArchive) {
+    auditArchive.start();
+    logger.info(
+      { intervalMs: config.AUDIT_ARCHIVE_INTERVAL_MS, bucket: config.R2_AUDIT_BUCKET },
+      'audit archive worker started',
+    );
+  } else {
+    logger.warn(
+      'R2 audit archive disabled — set R2_AUDIT_ENDPOINT / R2_AUDIT_ACCESS_KEY_ID / R2_AUDIT_SECRET_ACCESS_KEY to enable',
+    );
+  }
+
   const server = serve({ fetch: app.fetch, port: config.PORT }, (info) => {
     logger.info({ port: info.port }, 'control-plane listening');
   });
@@ -134,6 +167,7 @@ async function main(): Promise<void> {
     logger.info({ signal }, 'shutting down');
     sweep.stop();
     auditRootSigner?.stop();
+    auditArchive?.stop();
     server.close();
     await db.pool.end();
     process.exit(0);
