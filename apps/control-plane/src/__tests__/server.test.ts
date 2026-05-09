@@ -1,13 +1,18 @@
+import type pg from 'pg';
 import { pino } from 'pino';
 import { describe, expect, it } from 'vitest';
-import type { Db } from '../db/index.js';
+import type { Db, DrizzleClient } from '../db/index.js';
 import { createServer } from '../server.js';
 
 const logger = pino({ level: 'silent' });
-const okDb = {
-  query: async () => ({ rows: [{ ok: 1 }] }),
-  end: async () => undefined,
-} as unknown as Db;
+
+const okDb: Db = {
+  pool: {
+    query: async () => ({ rows: [{ ok: 1 }] }),
+    end: async () => undefined,
+  } as unknown as pg.Pool,
+  drizzle: {} as DrizzleClient,
+};
 
 describe('server', () => {
   it('responds 404 with not_found JSON on unknown path', async () => {

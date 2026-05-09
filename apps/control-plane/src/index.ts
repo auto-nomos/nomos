@@ -18,7 +18,7 @@ async function main(): Promise<void> {
   const shutdown = async (signal: string): Promise<void> => {
     logger.info({ signal }, 'shutting down');
     server.close();
-    await db.end();
+    await db.pool.end();
     process.exit(0);
   };
 

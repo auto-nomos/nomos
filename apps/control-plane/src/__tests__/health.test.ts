@@ -1,6 +1,7 @@
+import type pg from 'pg';
 import { pino } from 'pino';
-import { describe, expect, it, vi } from 'vitest';
-import type { Db } from '../db/index.js';
+import { describe, expect, it } from 'vitest';
+import type { Db, DrizzleClient } from '../db/index.js';
 import { createHealthRoutes } from '../routes/health.js';
 import { createServer } from '../server.js';
 
@@ -8,9 +9,9 @@ const logger = pino({ level: 'silent' });
 
 function fakeDb(query: () => Promise<{ rows: { ok: number }[] }>): Db {
   return {
-    query,
-    end: async () => undefined,
-  } as unknown as Db;
+    pool: { query, end: async () => undefined } as unknown as pg.Pool,
+    drizzle: {} as DrizzleClient,
+  };
 }
 
 describe('health routes', () => {
@@ -64,6 +65,5 @@ describe('health routes', () => {
     });
     expect(router).toBeDefined();
     expect(typeof router.fetch).toBe('function');
-    void vi; // keep import to avoid TS unused warning
   });
 });
