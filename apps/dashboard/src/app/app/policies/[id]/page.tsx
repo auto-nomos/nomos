@@ -15,6 +15,7 @@ import {
 import { Input } from '../../../../components/ui/input';
 import { Label } from '../../../../components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../../../components/ui/tabs';
+import { VisualPolicyTab } from '../../../../components/visual-policy-tab';
 import { trpc } from '../../../../lib/trpc';
 import { formatDate } from '../../../../lib/utils';
 
@@ -110,9 +111,7 @@ export default function PolicyDetailPage({ params }: { params: Promise<{ id: str
       <Tabs defaultValue="cedar">
         <TabsList>
           <TabsTrigger value="cedar">Cedar</TabsTrigger>
-          <TabsTrigger value="visual" disabled>
-            Visual (S7)
-          </TabsTrigger>
+          <TabsTrigger value="visual">Visual</TabsTrigger>
           <TabsTrigger value="test">Test policy</TabsTrigger>
         </TabsList>
 
@@ -160,6 +159,16 @@ export default function PolicyDetailPage({ params }: { params: Promise<{ id: str
               ) : null}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="visual">
+          <VisualPolicyTab
+            cedarText={text}
+            onApply={(next) => {
+              setText(next);
+              setDirty(true);
+            }}
+          />
         </TabsContent>
 
         <TabsContent value="test">

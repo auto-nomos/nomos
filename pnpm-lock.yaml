@@ -141,6 +141,12 @@ importers:
       '@credential-broker/control-plane':
         specifier: workspace:*
         version: link:../control-plane
+      '@credential-broker/policy-builder':
+        specifier: workspace:*
+        version: link:../../packages/policy-builder
+      '@credential-broker/schema-packs':
+        specifier: workspace:*
+        version: link:../../packages/schema-packs
       '@credential-broker/shared-types':
         specifier: workspace:*
         version: link:../../packages/shared-types
