@@ -23,6 +23,9 @@ importers:
       '@credential-broker/pdp':
         specifier: workspace:*
         version: link:apps/pdp
+      '@credential-broker/sdk':
+        specifier: workspace:*
+        version: link:packages/sdk-typescript
       '@hono/node-server':
         specifier: 1.13.7
         version: 1.13.7(hono@4.6.14)

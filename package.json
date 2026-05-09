@@ -25,6 +25,7 @@
     "gen-keys": "tsx scripts/gen-keys.mts",
     "tunnel": "bash scripts/dev-tunnel.sh",
     "e2e:sprint3": "tsx scripts/e2e-sprint3.mts",
+    "e2e:sprint5": "tsx scripts/e2e-sprint5.mts",
     "changeset": "changeset",
     "prepare": "husky"
   },
@@ -39,6 +40,7 @@
     "@credential-broker/control-plane": "workspace:*",
     "@credential-broker/crypto": "workspace:*",
     "@credential-broker/pdp": "workspace:*",
+    "@credential-broker/sdk": "workspace:*",
     "@hono/node-server": "1.13.7",
     "@noble/hashes": "1.7.0",
     "@trpc/client": "11.0.0",

@@ -25,7 +25,10 @@ export interface InternalDeps {
 export function createInternalRoutes(deps: InternalDeps): Hono {
   const app = new Hono();
 
-  app.use('*', internalAuth(deps.serviceToken));
+  // Scope the bearer guard to /v1/internal/* so requests for other routes
+  // (e.g. /v1/oauth/callback, mounted on the same parent app) don't get
+  // intercepted with 401 by this sub-app's middleware.
+  app.use('/v1/internal/*', internalAuth(deps.serviceToken));
 
   app.get('/v1/internal/bundles/:customerId', async (c) => {
     const customerId = c.req.param('customerId');
