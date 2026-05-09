@@ -19,7 +19,6 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "start": "node dist/bin.js",
-    "dev": "tsx src/bin.ts",
     "clean": "rm -rf dist .turbo"
   },
   "dependencies": {
