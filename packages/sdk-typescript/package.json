@@ -26,9 +26,11 @@
     "@credential-broker/shared-types": "workspace:*"
   },
   "devDependencies": {
+    "@hono/node-server": "1.13.7",
     "@types/node": "22.10.5",
+    "@vitest/coverage-v8": "4.1.5",
+    "hono": "4.6.14",
     "typescript": "5.7.2",
-    "vitest": "4.1.5",
-    "@vitest/coverage-v8": "4.1.5"
+    "vitest": "4.1.5"
   }
 }

@@ -269,12 +269,18 @@ importers:
         specifier: workspace:*
         version: link:../shared-types
     devDependencies:
+      '@hono/node-server':
+        specifier: 1.13.7
+        version: 1.13.7(hono@4.6.14)
       '@types/node':
         specifier: 22.10.5
         version: 22.10.5
       '@vitest/coverage-v8':
         specifier: 4.1.5
         version: 4.1.5(vitest@4.1.5)
+      hono:
+        specifier: 4.6.14
+        version: 4.6.14
       typescript:
         specifier: 5.7.2
         version: 5.7.2
