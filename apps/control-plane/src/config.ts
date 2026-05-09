@@ -8,6 +8,8 @@ const Config = z.object({
   DATABASE_DIRECT_URL: z.string().min(1).default('postgres://cb:cb@localhost:5433/cb_dev'),
   CONTROL_PLANE_SERVICE_TOKEN: z.string().min(1).default('dev-shared-token'),
   CONTROL_PLANE_BUNDLE_SIGN_KEY: z.string().optional(),
+  CONTROL_PLANE_PUBLIC_URL: z.string().url().default('http://localhost:8788'),
+  BETTER_AUTH_SECRET: z.string().min(16).default('dev-only-better-auth-secret-must-be-32+'),
   WORKOS_API_KEY: z.string().optional(),
   WORKOS_CLIENT_ID: z.string().optional(),
   SENTRY_DSN: z.string().url().optional(),

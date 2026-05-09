@@ -31,12 +31,12 @@ describe.skipIf(!RUN)('db migration smoke (requires postgres)', () => {
       await db.pool.query('DELETE FROM customers WHERE id = $1', [id]);
     }
     for (const id of cleanupUserIds) {
-      await db.pool.query('DELETE FROM users WHERE id = $1', [id]);
+      await db.pool.query('DELETE FROM "user" WHERE id = $1', [id]);
     }
     await db.pool.end();
   });
 
-  it('all 13 application tables exist', async () => {
+  it('all 16 tables exist (12 application + 4 Better-Auth)', async () => {
     const result = await db.pool.query<{ table_name: string }>(
       `SELECT table_name FROM information_schema.tables
        WHERE table_schema = 'public' AND table_type = 'BASE TABLE'
@@ -44,6 +44,7 @@ describe.skipIf(!RUN)('db migration smoke (requires postgres)', () => {
     );
     const tables = result.rows.map((r) => r.table_name).sort();
     expect(tables).toEqual([
+      'account',
       'agents',
       'api_keys',
       'audit_events',
@@ -55,8 +56,10 @@ describe.skipIf(!RUN)('db migration smoke (requires postgres)', () => {
       'push_approvals',
       'revocations',
       'schemas',
+      'session',
       'ucan_issues',
-      'users',
+      'user',
+      'verification',
     ]);
   });
 
@@ -82,7 +85,7 @@ describe.skipIf(!RUN)('db migration smoke (requires postgres)', () => {
       .values({ name: `cascade-${Date.now()}` })
       .returning();
     const [u] = await db.drizzle
-      .insert(schema.users)
+      .insert(schema.user)
       .values({ email: `cascade-${Date.now()}-${Math.random()}@x.test` })
       .returning();
     const [m] = await db.drizzle
@@ -99,8 +102,8 @@ describe.skipIf(!RUN)('db migration smoke (requires postgres)', () => {
     });
     expect(remainingMembership).toBeUndefined();
 
-    const userStill = await db.drizzle.query.users.findFirst({
-      where: eq(schema.users.id, u!.id),
+    const userStill = await db.drizzle.query.user.findFirst({
+      where: eq(schema.user.id, u!.id),
     });
     expect(userStill).toBeDefined();
   });

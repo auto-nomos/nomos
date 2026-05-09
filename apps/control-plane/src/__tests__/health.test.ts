@@ -1,11 +1,16 @@
 import type pg from 'pg';
 import { pino } from 'pino';
 import { describe, expect, it } from 'vitest';
+import type { Auth } from '../auth/index.js';
 import type { Db, DrizzleClient } from '../db/index.js';
 import { createHealthRoutes } from '../routes/health.js';
 import { createServer } from '../server.js';
 
 const logger = pino({ level: 'silent' });
+
+const stubAuth: Auth = {
+  handler: async () => new Response(null, { status: 200 }),
+} as unknown as Auth;
 
 function fakeDb(query: () => Promise<{ rows: { ok: number }[] }>): Db {
   return {
@@ -19,6 +24,7 @@ describe('health routes', () => {
     const app = createServer({
       logger,
       db: fakeDb(async () => ({ rows: [{ ok: 1 }] })),
+      auth: stubAuth,
     });
     const res = await app.request('/healthz');
     expect(res.status).toBe(200);
@@ -31,6 +37,7 @@ describe('health routes', () => {
     const app = createServer({
       logger,
       db: fakeDb(async () => ({ rows: [{ ok: 1 }] })),
+      auth: stubAuth,
     });
     const res = await app.request('/readyz');
     expect(res.status).toBe(200);
@@ -42,6 +49,7 @@ describe('health routes', () => {
       db: fakeDb(async () => {
         throw new Error('connection refused');
       }),
+      auth: stubAuth,
     });
     const res = await app.request('/readyz');
     expect(res.status).toBe(503);
@@ -54,6 +62,7 @@ describe('health routes', () => {
     const app = createServer({
       logger,
       db: fakeDb(async () => ({ rows: [] })),
+      auth: stubAuth,
     });
     const res = await app.request('/readyz');
     expect(res.status).toBe(503);

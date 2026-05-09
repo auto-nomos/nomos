@@ -1,4 +1,5 @@
 import { serve } from '@hono/node-server';
+import { createAuth } from './auth/index.js';
 import { loadConfig } from './config.js';
 import { createDb } from './db/index.js';
 import { createLogger } from './logger.js';
@@ -9,7 +10,8 @@ async function main(): Promise<void> {
   const logger = createLogger(config);
 
   const db = createDb(config);
-  const app = createServer({ logger, db });
+  const auth = createAuth({ db: db.drizzle, config, logger });
+  const app = createServer({ logger, db, auth });
 
   const server = serve({ fetch: app.fetch, port: config.PORT }, (info) => {
     logger.info({ port: info.port }, 'control-plane listening');
