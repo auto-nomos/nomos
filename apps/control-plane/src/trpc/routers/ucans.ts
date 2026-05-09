@@ -1,21 +1,9 @@
-import { generateKeypair } from '@credential-broker/crypto';
-import { issueUcan } from '@credential-broker/ucan';
 import { TRPCError } from '@trpc/server';
 import { and, desc, eq } from 'drizzle-orm';
 import { z } from 'zod';
 import * as schema from '../../db/schema.js';
+import { MintError, mintUcan } from '../../services/ucan-mint.js';
 import { router, tenantProcedure } from '../index.js';
-
-/**
- * Dev-only signing keypair. Sprint 3.7 introduces `scripts/gen-keys.ts` to
- * persist a stable signing key in env; for now each process generates its own
- * which is fine for local-dev tRPC sanity checks.
- */
-let DEV_SIGNING_KEY: ReturnType<typeof generateKeypair> | null = null;
-function getDevSigningKey() {
-  if (!DEV_SIGNING_KEY) DEV_SIGNING_KEY = generateKeypair();
-  return DEV_SIGNING_KEY;
-}
 
 const COMMAND_RE = /^\/[a-z0-9_-]+(\/[a-z0-9_-]+)*$/;
 
@@ -41,6 +29,8 @@ export const ucansRouter = router({
       z.object({
         agentId: z.string().uuid(),
         command: z.string().regex(COMMAND_RE),
+        policyId: z.string().uuid().optional(),
+        oauthConnectionId: z.string().uuid().optional(),
         ttlSeconds: z
           .number()
           .int()
@@ -51,44 +41,36 @@ export const ucansRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const agent = await ctx.db.drizzle.query.agents.findFirst({
-        where: and(
-          eq(schema.agents.id, input.agentId),
-          eq(schema.agents.customerId, ctx.customerId),
-        ),
-      });
-      if (!agent || agent.status !== 'active') {
-        throw new TRPCError({ code: 'NOT_FOUND', message: 'active agent not found' });
+      try {
+        const result = await mintUcan(
+          {
+            customerId: ctx.customerId,
+            agentId: input.agentId,
+            command: input.command,
+            policyId: input.policyId,
+            oauthConnectionId: input.oauthConnectionId,
+            ttlSeconds: input.ttlSeconds,
+            nonce: input.nonce,
+          },
+          {
+            db: ctx.db.drizzle,
+            signKey: ctx.signing.signKey,
+            signerDid: ctx.signing.signerDid,
+          },
+        );
+        return { cid: result.cid, jwt: result.jwt, expiresAt: result.expiresAt };
+      } catch (err) {
+        if (err instanceof MintError) {
+          const code =
+            err.code === 'agent_not_found' || err.code === 'agent_not_active'
+              ? 'NOT_FOUND'
+              : err.code === 'policy_not_found' || err.code === 'oauth_connection_not_found'
+                ? 'NOT_FOUND'
+                : 'FORBIDDEN';
+          throw new TRPCError({ code, message: err.message });
+        }
+        throw err;
       }
-
-      const signingKey = getDevSigningKey();
-      const now = Math.floor(Date.now() / 1000);
-      const payload = {
-        iss: signingKey.did,
-        aud: agent.did,
-        cmd: input.command,
-        pol: [],
-        nonce: input.nonce,
-        nbf: now - 60,
-        exp: now + input.ttlSeconds,
-      };
-      const ucan = issueUcan({ payload, privateKey: signingKey.privateKey });
-
-      const [issued] = await ctx.db.drizzle
-        .insert(schema.ucanIssues)
-        .values({
-          cid: ucan.cid,
-          customerId: ctx.customerId,
-          agentId: agent.id,
-          payload,
-          jwt: ucan.jwt,
-          expiresAt: new Date((now + input.ttlSeconds) * 1000),
-        })
-        .returning();
-      if (!issued) {
-        throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'ucan insert failed' });
-      }
-      return { cid: issued.cid, jwt: ucan.jwt, expiresAt: issued.expiresAt };
     }),
 
   revoke: tenantProcedure

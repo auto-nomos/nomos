@@ -9,6 +9,7 @@ export interface TrpcHandlerDeps {
   db: Db;
   auth: Auth;
   logger: Logger;
+  signing: { signKey: Uint8Array; signerDid: string };
 }
 
 export function handleTrpc(req: Request, deps: TrpcHandlerDeps): Promise<Response> {

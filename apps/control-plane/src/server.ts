@@ -1,3 +1,4 @@
+import { generateKeypair } from '@credential-broker/crypto';
 import { Hono } from 'hono';
 import { secureHeaders } from 'hono/secure-headers';
 import type { Auth } from './auth/index.js';
@@ -15,10 +16,15 @@ export interface ServerDeps {
   logger: Logger;
   db: Db;
   auth: Auth;
+  /**
+   * Control-plane signing key (Ed25519). Used to sign policy bundles and
+   * minted UCANs. When omitted (only in tests / dev), an ephemeral keypair is
+   * generated at startup. `index.ts` always supplies this from
+   * `CONTROL_PLANE_BUNDLE_SIGN_KEY` so production never falls back.
+   */
+  signing?: { signKey: Uint8Array; signerDid: string };
   /** Internal-route deps. When omitted, /v1/internal/* is not mounted. */
   internal?: {
-    signKey: Uint8Array;
-    signerDid: string;
     serviceToken: string;
   };
   /** OAuth bridge deps. When omitted, /v1/oauth/* is not mounted. */
@@ -32,6 +38,7 @@ export interface ServerDeps {
 
 export function createServer(deps: ServerDeps): Hono {
   const app = new Hono();
+  const signing = deps.signing ?? ephemeralSigning();
 
   app.use('*', secureHeaders());
   app.use('*', requestId());
@@ -44,7 +51,12 @@ export function createServer(deps: ServerDeps): Hono {
 
   // tRPC under /trpc — every procedure resolves session via Better-Auth.
   app.all('/trpc/*', (c) =>
-    handleTrpc(c.req.raw, { db: deps.db, auth: deps.auth, logger: deps.logger }),
+    handleTrpc(c.req.raw, {
+      db: deps.db,
+      auth: deps.auth,
+      logger: deps.logger,
+      signing: signing,
+    }),
   );
 
   // Service-to-service endpoints (PDP polls these for signed bundle + revocations).
@@ -53,8 +65,8 @@ export function createServer(deps: ServerDeps): Hono {
       '/',
       createInternalRoutes({
         db: deps.db,
-        signKey: deps.internal.signKey,
-        signerDid: deps.internal.signerDid,
+        signKey: signing.signKey,
+        signerDid: signing.signerDid,
         serviceToken: deps.internal.serviceToken,
       }),
     );
@@ -84,4 +96,9 @@ export function createServer(deps: ServerDeps): Hono {
   app.notFound((c) => c.json({ error: 'not_found' }, 404));
 
   return app;
+}
+
+function ephemeralSigning(): { signKey: Uint8Array; signerDid: string } {
+  const kp = generateKeypair();
+  return { signKey: kp.privateKey, signerDid: kp.did };
 }

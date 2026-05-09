@@ -56,15 +56,9 @@ async function main(): Promise<void> {
     logger,
     db,
     auth,
-    internal: {
-      signKey,
-      signerDid,
-      serviceToken: config.CONTROL_PLANE_SERVICE_TOKEN,
-    },
-    oauth: {
-      config,
-      encryptionKey,
-    },
+    signing: { signKey, signerDid },
+    internal: { serviceToken: config.CONTROL_PLANE_SERVICE_TOKEN },
+    oauth: { config, encryptionKey },
   });
 
   const server = serve({ fetch: app.fetch, port: config.PORT }, (info) => {

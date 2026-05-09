@@ -8,11 +8,14 @@ export interface ContextDeps {
   db: Db;
   auth: Auth;
   logger: Logger;
+  /** Control-plane signing key, used to sign minted UCANs (Sprint 5.4). */
+  signing: { signKey: Uint8Array; signerDid: string };
 }
 
 export interface Context {
   db: Db;
   logger: Logger;
+  signing: { signKey: Uint8Array; signerDid: string };
   session: {
     user: { id: string; email: string; name: string | null };
     token: string;
@@ -56,6 +59,7 @@ export async function createContext(req: Request, deps: ContextDeps): Promise<Co
   return {
     db: deps.db,
     logger: deps.logger,
+    signing: deps.signing,
     session: userPayload,
     customerId,
   };

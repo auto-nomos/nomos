@@ -158,7 +158,7 @@ describe.skipIf(!RUN)('tRPC routers (requires postgres)', () => {
         agentId: '00000000-0000-0000-0000-000000000000',
         command: '/x/y',
       }),
-    ).rejects.toThrow(/active agent not found/);
+    ).rejects.toThrow(/agent .* not found in this customer/);
   });
 
   it('audit.list returns paginated events for the tenant (empty in fresh tenant)', async () => {

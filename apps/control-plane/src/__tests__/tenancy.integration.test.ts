@@ -130,7 +130,7 @@ describe.skipIf(!RUN)('cross-tenant isolation (requires postgres)', () => {
         command: '/x/y',
         ttlSeconds: 60,
       }),
-    ).rejects.toThrow(/active agent not found/);
+    ).rejects.toThrow(/agent .* not found in this customer/);
   });
 
   it('alice cannot revoke bob UCANs', async () => {
