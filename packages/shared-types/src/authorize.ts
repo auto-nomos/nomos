@@ -34,6 +34,7 @@ export const DenyReason = z.enum([
   'oauth_token_invalid',
   'unknown_customer',
   'malformed_ucan',
+  'untrusted_issuer',
   'step_up_required',
   'cosigner_invalid',
   'cosigner_expired',

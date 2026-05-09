@@ -4,7 +4,8 @@ import './globals.css';
 
 export const metadata: Metadata = {
   title: 'Credential Broker',
-  description: 'Agent Authorization Platform — capabilities, not credentials.',
+  description:
+    'Auth gateway for API calls — register your App, define a policy, let us proxy SaaS calls with borrowed credentials.',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

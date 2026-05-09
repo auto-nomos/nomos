@@ -12,6 +12,7 @@ import { bytesToHex } from '@noble/hashes/utils';
 import { createTRPCClient, httpBatchLink } from '@trpc/client';
 import { eq } from 'drizzle-orm';
 import pino from 'pino';
+import superjson from 'superjson';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createPostgresAuditEmitter } from '../../../pdp/src/audit/postgres-emitter.js';
 import { createPgAuditWriter } from '../../../pdp/src/audit/postgres-writer.js';
@@ -45,6 +46,7 @@ describe.skipIf(!RUN)('audit.proof bundle round-trip (requires postgres)', () =>
       links: [
         httpBatchLink({
           url: 'http://localhost/trpc',
+          transformer: superjson,
           fetch: (url, init) => app.request(url.toString(), init as RequestInit),
           headers: () => (cookie ? { cookie } : {}),
         }),

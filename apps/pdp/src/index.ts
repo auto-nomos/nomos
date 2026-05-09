@@ -1,5 +1,7 @@
 import { appendFile } from 'node:fs/promises';
+import { didFromPublicKey } from '@credential-broker/crypto';
 import { serve } from '@hono/node-server';
+import { hexToBytes } from '@noble/hashes/utils';
 import { createAuditEmitter, decisionToAudit } from './audit/emit.js';
 import { createPostgresAuditEmitter } from './audit/postgres-emitter.js';
 import { createPgAuditWriter } from './audit/postgres-writer.js';
@@ -36,6 +38,21 @@ async function main(): Promise<void> {
     logger,
     onSignatureFailure: (err) => sentry.captureException(err),
   });
+  const trustedIssuerDid = config.CONTROL_PLANE_BUNDLE_VERIFY_KEY
+    ? didFromPublicKey(hexToBytes(config.CONTROL_PLANE_BUNDLE_VERIFY_KEY))
+    : undefined;
+  if (trustedIssuerDid) {
+    logger.info({ trustedIssuerDid }, 'pdp UCAN root issuer trust anchor configured');
+  } else {
+    if (config.NODE_ENV === 'production') {
+      throw new Error(
+        'CONTROL_PLANE_BUNDLE_VERIFY_KEY is required in production so the PDP can verify policy bundles and pin UCAN root issuers.',
+      );
+    }
+    logger.warn(
+      'CONTROL_PLANE_BUNDLE_VERIFY_KEY not set — UCAN root issuer is not pinned. Acceptable for local dev only.',
+    );
+  }
 
   // Customers the PDP services. In dev: comma-separated env list.
   // Sprint 8 push-revocation will let the control plane register customers
@@ -93,6 +110,7 @@ async function main(): Promise<void> {
     logger,
     policyCache,
     revocationCache,
+    ...(trustedIssuerDid !== undefined ? { trustedIssuerDid } : {}),
     emitAudit: async (ev) => {
       await auditEmitter.emit({
         customer_id: ev.customerId,

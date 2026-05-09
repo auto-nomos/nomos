@@ -20,7 +20,7 @@ import { trpc } from '../../../../lib/trpc';
 
 const STARTER = `permit (
   principal,
-  action,
+  action == Action::"/github/user/read",
   resource
 );`;
 

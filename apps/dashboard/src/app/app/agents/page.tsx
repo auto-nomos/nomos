@@ -29,21 +29,22 @@ export default function AgentsPage() {
     <div className="space-y-6">
       <header className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Agents</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Apps</h1>
           <p className="text-sm text-muted-foreground">
-            Each agent has a stable DID; an API key is issued on the detail page.
+            An App is a credential slot for one piece of code that calls our PDP — your AI agent,
+            MCP server, script, or service. Each App has a stable DID + API key (revealed once).
           </p>
         </div>
         <Button asChild>
           <Link href="/app/agents/new">
-            <Plus className="h-4 w-4" /> New agent
+            <Plus className="h-4 w-4" /> New App
           </Link>
         </Button>
       </header>
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">All agents</CardTitle>
+          <CardTitle className="text-base">All Apps</CardTitle>
           <CardDescription>{list.data ? `${list.data.length} total` : 'Loading…'}</CardDescription>
         </CardHeader>
         <CardContent>
@@ -92,9 +93,9 @@ export default function AgentsPage() {
             </Table>
           ) : (
             <div className="rounded-lg border border-dashed p-8 text-center">
-              <p className="text-sm text-muted-foreground">No agents yet.</p>
+              <p className="text-sm text-muted-foreground">No Apps yet.</p>
               <Button asChild className="mt-4" size="sm">
-                <Link href="/app/agents/new">Create your first agent</Link>
+                <Link href="/app/agents/new">Register your first App</Link>
               </Button>
             </div>
           )}

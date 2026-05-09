@@ -19,6 +19,8 @@ export interface ServerDeps {
   revocationCache: RevocationCache;
   emitAudit?: (event: AuditEmitInput) => Promise<void> | void;
   emitReceipt?: (event: ReceiptEmitInput) => Promise<void> | void;
+  /** Expected root UCAN issuer DID, derived from the control-plane verify key. */
+  trustedIssuerDid?: string;
   /**
    * Sprint 8 push-revocation. When supplied, mounts
    * POST /v1/internal/refresh-revocations so the control plane can flush a
@@ -68,6 +70,7 @@ export function createServer(deps: ServerDeps): Hono {
       policyCache: deps.policyCache,
       revocationCache: deps.revocationCache,
       ...(deps.emitAudit !== undefined ? { emitAudit: deps.emitAudit } : {}),
+      ...(deps.trustedIssuerDid !== undefined ? { trustedIssuerDid: deps.trustedIssuerDid } : {}),
       ...(deps.stepup
         ? {
             stepup: {
@@ -104,6 +107,7 @@ export function createServer(deps: ServerDeps): Hono {
         policyCache: deps.policyCache,
         revocationCache: deps.revocationCache,
         fetchOAuthToken: deps.oauthProxy.fetchOAuthToken,
+        ...(deps.trustedIssuerDid !== undefined ? { trustedIssuerDid: deps.trustedIssuerDid } : {}),
         ...(deps.oauthProxy.refreshOAuthToken !== undefined
           ? { refreshOAuthToken: deps.oauthProxy.refreshOAuthToken }
           : {}),

@@ -7,6 +7,7 @@
 import { createTRPCClient, httpBatchLink } from '@trpc/client';
 import { eq } from 'drizzle-orm';
 import { pino } from 'pino';
+import superjson from 'superjson';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { type Auth, createAuth } from '../auth/index.js';
 import { loadConfig } from '../config.js';
@@ -32,6 +33,7 @@ describe.skipIf(!RUN)('tRPC routers (requires postgres)', () => {
       links: [
         httpBatchLink({
           url: 'http://localhost/trpc',
+          transformer: superjson,
           fetch: (url, init) => app.request(url.toString(), init as RequestInit),
           headers: () => (cookie ? { cookie } : {}),
         }),
@@ -60,11 +62,13 @@ describe.skipIf(!RUN)('tRPC routers (requires postgres)', () => {
     cookie = (signUp.headers.get('set-cookie') ?? '').split(';')[0] ?? '';
 
     const u = await db.drizzle.query.user.findFirst({ where: eq(schema.user.email, email) });
-    userId = u!.id;
+    if (!u) throw new Error('signed-up test user not found');
+    userId = u.id;
     const m = await db.drizzle.query.memberships.findFirst({
       where: eq(schema.memberships.userId, userId),
     });
-    customerId = m!.customerId;
+    if (!m) throw new Error('signed-up test membership not found');
+    customerId = m.customerId;
   });
 
   afterAll(async () => {
@@ -137,8 +141,10 @@ describe.skipIf(!RUN)('tRPC routers (requires postgres)', () => {
       agentId: agent.id,
       name: 'ci-key',
     });
-    expect(created.plaintextOnce).toMatch(/^cb_[0-9a-f]{8}_[0-9a-f]+$/);
-    expect(created.prefix).toMatch(/^cb_[0-9a-f]{8}$/);
+    expect(created.plaintextOnce).toMatch(
+      new RegExp(`^cb_${customerId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}_[0-9a-f]+$`),
+    );
+    expect(created.prefix).toBe(`cb_${customerId}`);
 
     const list = await client().apiKeys.list.query({ agentId: agent.id });
     const row = list.find((k) => k.id === created.id);
@@ -183,6 +189,25 @@ describe.skipIf(!RUN)('tRPC routers (requires postgres)', () => {
 
     const revoked = await client().ucans.revoke.mutate({ cid: ucan.cid, reason: 'unit test' });
     expect(revoked.revoked).toBe(true);
+  });
+
+  it('agents.delete revokes outstanding UCANs for that agent', async () => {
+    const agent = await client().agents.create.mutate({ name: 'delete-revokes-ucans' });
+    const ucan = await client().ucans.mint.mutate({
+      agentId: agent.id,
+      command: '/github/issue/create',
+      ttlSeconds: 600,
+      nonce: `delete-revoke-${Date.now()}`,
+    });
+
+    const deleted = await client().agents.delete.mutate({ id: agent.id });
+    expect(deleted.deleted).toBe(true);
+    expect(deleted.revokedUcans).toBe(1);
+
+    const revoked = await db.drizzle.query.revocations.findFirst({
+      where: eq(schema.revocations.cid, ucan.cid),
+    });
+    expect(revoked?.reason).toBe('agent_deleted');
   });
 
   it('ucans.mint refuses non-existent / wrong-tenant agent', async () => {

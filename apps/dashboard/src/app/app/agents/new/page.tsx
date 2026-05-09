@@ -31,9 +31,10 @@ export default function NewAgentPage() {
   return (
     <div className="mx-auto max-w-xl space-y-6">
       <header>
-        <h1 className="text-2xl font-semibold tracking-tight">New agent</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Register an App</h1>
         <p className="text-sm text-muted-foreground">
-          Pick a memorable name. You can attach policies and mint UCANs after creation.
+          Pick a memorable name. You can attach policies and mint authorization grants after
+          creation.
         </p>
       </header>
       <Card>
@@ -45,7 +46,7 @@ export default function NewAgentPage() {
           }}
         >
           <CardHeader>
-            <CardTitle className="text-base">Agent details</CardTitle>
+            <CardTitle className="text-base">App details</CardTitle>
             <CardDescription>This name appears in audit logs and the registry.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -71,7 +72,7 @@ export default function NewAgentPage() {
               Cancel
             </Button>
             <Button type="submit" disabled={create.isPending || name.length === 0}>
-              {create.isPending ? 'Creating…' : 'Create agent'}
+              {create.isPending ? 'Creating…' : 'Register App'}
             </Button>
           </CardFooter>
         </form>

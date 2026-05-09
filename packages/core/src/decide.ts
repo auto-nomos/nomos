@@ -14,6 +14,12 @@ export interface DecideInput {
   policies: string;
   revokedCids?: ReadonlySet<string>;
   schema?: Schema;
+  /**
+   * Optional root issuer trust anchor. PDPs that know the control-plane
+   * signing DID should set this so arbitrary self-issued UCANs cannot satisfy
+   * broad Cedar policies.
+   */
+  trustedIssuerDid?: string;
   now?: number;
 }
 
@@ -64,6 +70,10 @@ export function decide(input: DecideInput): AuthorizeDecision {
 
   if (!chainResult.valid) {
     return deny(CHAIN_ERROR_TO_REASON[chainResult.error], jwts, input.request);
+  }
+
+  if (input.trustedIssuerDid && chainResult.root.iss !== input.trustedIssuerDid) {
+    return deny('untrusted_issuer', jwts, input.request);
   }
 
   const revoked = input.revokedCids;

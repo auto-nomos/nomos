@@ -96,7 +96,7 @@ interface PolicyRow {
   id: string;
   name: string;
   integrationId: string | null;
-  updatedAt: string;
+  updatedAt: string | Date;
 }
 
 function groupByIntegration(rows: PolicyRow[]): Record<string, PolicyRow[]> {

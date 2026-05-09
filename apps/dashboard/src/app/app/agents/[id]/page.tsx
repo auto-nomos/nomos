@@ -86,16 +86,16 @@ export default function AgentDetailPage({ params }: { params: Promise<{ id: stri
   }, [agent, apiKeys.data, createKey, id, revealedKey, router, searchParams]);
 
   if (list.isPending) {
-    return <p className="text-sm text-muted-foreground">Loading agent…</p>;
+    return <p className="text-sm text-muted-foreground">Loading App…</p>;
   }
   if (!agent) {
-    return <p className="text-sm">Agent not found.</p>;
+    return <p className="text-sm">App not found.</p>;
   }
 
   return (
     <div className="space-y-6">
       <header className="space-y-1">
-        <p className="text-xs uppercase tracking-wide text-muted-foreground">Agent</p>
+        <p className="text-xs uppercase tracking-wide text-muted-foreground">App</p>
         <h1 className="text-2xl font-semibold tracking-tight">{agent.name}</h1>
         <p className="font-mono text-xs text-muted-foreground">{agent.did}</p>
       </header>
@@ -192,7 +192,7 @@ export default function AgentDetailPage({ params }: { params: Promise<{ id: stri
               onClick={() => setConfirmDelete(true)}
               disabled={agent.status === 'deleted'}
             >
-              <Trash2 className="h-4 w-4" /> Delete agent
+              <Trash2 className="h-4 w-4" /> Delete App
             </Button>
           </CardFooter>
         </Card>
@@ -283,10 +283,10 @@ export default function AgentDetailPage({ params }: { params: Promise<{ id: stri
       <Dialog open={confirmDelete} onOpenChange={setConfirmDelete}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Delete agent?</DialogTitle>
+            <DialogTitle>Delete App?</DialogTitle>
             <DialogDescription>
-              This revokes all UCANs scoped to <strong>{agent.name}</strong>. PDP will reject any
-              future authorize requests for this DID. Cannot be undone.
+              This revokes all authorization grants scoped to <strong>{agent.name}</strong>. PDP
+              will reject any future authorize requests for this DID. Cannot be undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -298,7 +298,7 @@ export default function AgentDetailPage({ params }: { params: Promise<{ id: stri
               onClick={() => deleteAgent.mutate({ id })}
               disabled={deleteAgent.isPending}
             >
-              {deleteAgent.isPending ? 'Deleting…' : 'Delete agent'}
+              {deleteAgent.isPending ? 'Deleting…' : 'Delete App'}
             </Button>
           </DialogFooter>
         </DialogContent>

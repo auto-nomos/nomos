@@ -1,6 +1,6 @@
 import { generateKeypair } from '@credential-broker/crypto';
 import { TRPCError } from '@trpc/server';
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, isNull } from 'drizzle-orm';
 import { z } from 'zod';
 import * as schema from '../../db/schema.js';
 import { router, tenantProcedure } from '../index.js';
@@ -66,9 +66,54 @@ export const agentsRouter = router({
       if (!updated) {
         throw new TRPCError({ code: 'NOT_FOUND', message: 'agent not found' });
       }
-      // Cascade revocation of all this agent's UCANs by inserting into revocations.
-      // Real implementation lands in Sprint 8 push-revocation; for now mark agent
-      // deleted; PDP will reject via status check.
-      return { id: updated.id, deleted: true };
+
+      const issued = await ctx.db.drizzle.query.ucanIssues.findMany({
+        where: and(
+          eq(schema.ucanIssues.agentId, input.id),
+          eq(schema.ucanIssues.customerId, ctx.customerId),
+        ),
+        columns: { cid: true },
+      });
+      const cids = issued.map((u) => u.cid);
+
+      if (cids.length > 0) {
+        await ctx.db.drizzle
+          .insert(schema.revocations)
+          .values(
+            cids.map((cid) => ({
+              cid,
+              customerId: ctx.customerId,
+              reason: 'agent_deleted',
+              revokedBy: ctx.session.user.id,
+            })),
+          )
+          .onConflictDoNothing();
+
+        const pushResults = await Promise.allSettled(
+          cids.map((cid) => ctx.revocationPublisher.publish(ctx.customerId, cid)),
+        );
+        ctx.logger.debug(
+          {
+            agentId: input.id,
+            customerId: ctx.customerId,
+            revokedCount: cids.length,
+            pushFailures: pushResults.filter((r) => r.status === 'rejected').length,
+          },
+          'agent delete revoked issued UCANs',
+        );
+      }
+
+      await ctx.db.drizzle
+        .update(schema.apiKeys)
+        .set({ revokedAt: new Date() })
+        .where(
+          and(
+            eq(schema.apiKeys.agentId, input.id),
+            eq(schema.apiKeys.customerId, ctx.customerId),
+            isNull(schema.apiKeys.revokedAt),
+          ),
+        );
+
+      return { id: updated.id, deleted: true, revokedUcans: cids.length };
     }),
 });

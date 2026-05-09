@@ -7,6 +7,7 @@
 import { createTRPCClient, httpBatchLink } from '@trpc/client';
 import { eq } from 'drizzle-orm';
 import { pino } from 'pino';
+import superjson from 'superjson';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { type Auth, createAuth } from '../auth/index.js';
 import { loadConfig } from '../config.js';
@@ -39,6 +40,7 @@ describe.skipIf(!RUN)('cross-tenant isolation (requires postgres)', () => {
       links: [
         httpBatchLink({
           url: 'http://localhost/trpc',
+          transformer: superjson,
           fetch: (url, init) => app.request(url.toString(), init as RequestInit),
           headers: () => (cookie ? { cookie } : {}),
         }),

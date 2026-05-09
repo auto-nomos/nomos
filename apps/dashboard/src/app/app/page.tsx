@@ -25,14 +25,15 @@ export default function AppHomePage() {
           {customer.data?.name ?? 'Workspace'}
         </h1>
         <p className="text-sm text-muted-foreground">
-          Capabilities, not credentials. Mint UCANs and let the PDP enforce policy.
+          Auth gateway for API calls. Register your apps, write a policy, let the PDP gate every
+          SaaS call with borrowed credentials.
         </p>
       </header>
 
       <div className="grid gap-4 sm:grid-cols-3">
         <Stat
           icon={<Bot className="h-4 w-4" />}
-          label="Agents"
+          label="Apps"
           value={agents.data?.length ?? '—'}
           href="/app/agents"
         />
@@ -56,7 +57,7 @@ export default function AppHomePage() {
             <KeyRound className="h-4 w-4" /> Get started
           </CardTitle>
           <CardDescription>
-            Walk through onboarding to connect a SaaS, create your first agent and policy.
+            Walk through onboarding to connect a SaaS, register your first App and policy.
           </CardDescription>
         </CardHeader>
         <CardContent>

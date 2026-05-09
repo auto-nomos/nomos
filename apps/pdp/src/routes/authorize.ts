@@ -23,6 +23,7 @@ export interface AuthorizeRouteDeps {
   revocationCache: RevocationCache;
   emitAudit?: (event: AuditEmitInput) => Promise<void> | void;
   schemaForCustomer?: (customerId: string) => Schema | undefined;
+  trustedIssuerDid?: string;
   /**
    * Sprint 9 — when supplied, denies that *would* allow with cosigner=true
    * trigger a control-plane push_approvals row + Knock notification, and the
@@ -144,6 +145,7 @@ export function createAuthorizeRoutes(deps: AuthorizeRouteDeps): Hono {
       policies,
       revokedCids,
       ...(schema !== undefined ? { schema } : {}),
+      ...(deps.trustedIssuerDid !== undefined ? { trustedIssuerDid: deps.trustedIssuerDid } : {}),
     };
 
     let decision: AuthorizeDecision = decide(input);

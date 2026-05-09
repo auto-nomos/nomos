@@ -34,7 +34,7 @@ function makePayload(iss: string, aud: string, overrides: Partial<UcanPayload> =
   };
 }
 
-function buildApp() {
+function buildApp(opts: { trustedIssuerDid?: string } = {}) {
   const logger = pino({ level: 'silent' });
   const policyCache = createPolicyCache({
     fetchBundle: async () => undefined,
@@ -51,6 +51,7 @@ function buildApp() {
     logger,
     policyCache,
     revocationCache,
+    ...(opts.trustedIssuerDid !== undefined ? { trustedIssuerDid: opts.trustedIssuerDid } : {}),
     emitAudit: async (ev) => {
       audits.push({ command: ev.request.command, allow: ev.decision.allow });
     },
@@ -193,6 +194,34 @@ describe('POST /v1/authorize', () => {
     const body = (await res.json()) as { allow: boolean; reason: string };
     expect(body.allow).toBe(false);
     expect(body.reason).toBe('policy_denied');
+  });
+
+  it('returns 200 deny + reason=untrusted_issuer when PDP is pinned to another root issuer', async () => {
+    const trusted = generateKeypair();
+    const { app, policyCache } = buildApp({ trustedIssuerDid: trusted.did });
+    policyCache.set(CUSTOMER, githubPolicy);
+
+    const attacker = generateKeypair();
+    const agent = generateKeypair();
+    const ucan = issueUcan({
+      payload: makePayload(attacker.did, agent.did),
+      privateKey: attacker.privateKey,
+    });
+
+    const res = await app.request('/v1/authorize', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-cb-customer': CUSTOMER },
+      body: JSON.stringify({
+        ucan: ucan.jwt,
+        command: '/github/issue/create',
+        resource: { repo: 'acme/billing' },
+        context: {},
+      }),
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { allow: boolean; reason: string };
+    expect(body.allow).toBe(false);
+    expect(body.reason).toBe('untrusted_issuer');
   });
 
   it('returns 400 when JSON body is malformed', async () => {

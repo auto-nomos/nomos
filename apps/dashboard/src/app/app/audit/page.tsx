@@ -120,7 +120,7 @@ export default function AuditPage() {
           <CardDescription>All fields scope to your customer automatically.</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
-          <FilterField label="Agent (DID)" id="agent">
+          <FilterField label="App (DID)" id="agent">
             <Input
               id="agent"
               value={agent}
@@ -190,7 +190,7 @@ export default function AuditPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Time</TableHead>
-                  <TableHead>Agent</TableHead>
+                  <TableHead>App</TableHead>
                   <TableHead>Command</TableHead>
                   <TableHead>Decision</TableHead>
                   <TableHead>Event</TableHead>
@@ -275,7 +275,7 @@ function AuditDrawer({ event, onClose }: { event: AuditRow | null; onClose: () =
               <span className="font-mono text-xs">{event.eventId}</span>
             </Row>
             <Row label="Time">{formatDate(event.ts)}</Row>
-            <Row label="Agent">
+            <Row label="App">
               <span className="font-mono text-xs">{event.agent}</span>
             </Row>
             <Row label="Command">

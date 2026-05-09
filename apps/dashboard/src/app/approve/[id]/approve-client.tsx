@@ -102,8 +102,8 @@ export function ApproveClient({ approvalId }: ApproveClientProps) {
   return (
     <div className="space-y-6">
       <header className="space-y-1">
-        <h1 className="text-xl font-semibold">Approve agent action</h1>
-        <p className="text-sm text-zinc-500">Step-up requested by an agent in your account.</p>
+        <h1 className="text-xl font-semibold">Approve App action</h1>
+        <p className="text-sm text-zinc-500">Step-up requested by an App in your account.</p>
       </header>
 
       <dl className="space-y-2 rounded-md border border-zinc-200 p-4 text-sm">

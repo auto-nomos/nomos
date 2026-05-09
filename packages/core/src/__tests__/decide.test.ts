@@ -70,6 +70,65 @@ describe('decide', () => {
     expect(decision.receiptId).toMatch(/^[0-9a-f]{64}$/);
   });
 
+  it('denies arbitrary UCAN issuers when a trusted root issuer is configured', () => {
+    const trusted = generateKeypair();
+    const attacker = generateKeypair();
+    const agent = generateKeypair();
+    const ucan = issueUcan({
+      payload: payloadFor(attacker.did, agent.did, { cmd: '/github/issue/create' }),
+      privateKey: attacker.privateKey,
+    });
+
+    const decision = decide({
+      ucan: ucan.jwt,
+      request: {
+        ucan: ucan.jwt,
+        command: '/github/issue/create',
+        resource: { repo: 'acme/billing' },
+        context: {},
+      },
+      policies: githubPolicy,
+      trustedIssuerDid: trusted.did,
+      now: NOW,
+    });
+
+    expect(decision.allow).toBe(false);
+    expect(decision.reason).toBe('untrusted_issuer');
+  });
+
+  it('allows delegated UCAN chains rooted at the trusted control-plane issuer', () => {
+    const trusted = generateKeypair();
+    const mid = generateKeypair();
+    const leafAgent = generateKeypair();
+
+    const root = issueUcan({
+      payload: payloadFor(trusted.did, mid.did, { cmd: '/github' }),
+      privateKey: trusted.privateKey,
+    });
+    const leaf = issueUcan({
+      payload: payloadFor(mid.did, leafAgent.did, {
+        cmd: '/github/issue/create',
+        exp: 1_700_002_000,
+      }),
+      privateKey: mid.privateKey,
+    });
+
+    const decision = decide({
+      ucan: [root.jwt, leaf.jwt],
+      request: {
+        ucan: leaf.jwt,
+        command: '/github/issue/create',
+        resource: { repo: 'acme/billing' },
+        context: {},
+      },
+      policies: githubPolicy,
+      trustedIssuerDid: trusted.did,
+      now: NOW,
+    });
+
+    expect(decision.allow).toBe(true);
+  });
+
   it('denies when policy condition fails (canonical: ACME 2026 invoices)', () => {
     const issuer = generateKeypair();
     const agent = generateKeypair();

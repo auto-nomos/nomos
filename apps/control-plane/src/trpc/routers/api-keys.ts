@@ -5,7 +5,6 @@ import { z } from 'zod';
 import * as schema from '../../db/schema.js';
 import { router, tenantProcedure } from '../index.js';
 
-const PREFIX_LEN = 8;
 const SECRET_BYTES = 24;
 
 function randomHex(len: number): string {
@@ -14,8 +13,8 @@ function randomHex(len: number): string {
   return Array.from(buf, (b) => b.toString(16).padStart(2, '0')).join('');
 }
 
-function generateKey(): { prefix: string; plaintext: string; keyHash: string } {
-  const prefix = `cb_${randomHex(PREFIX_LEN / 2)}`; // 8 hex chars after prefix
+function generateKey(customerId: string): { prefix: string; plaintext: string; keyHash: string } {
+  const prefix = `cb_${customerId}`;
   const secret = randomHex(SECRET_BYTES);
   const plaintext = `${prefix}_${secret}`;
   const keyHash = sha256Hex(plaintext);
@@ -72,7 +71,7 @@ export const apiKeysRouter = router({
         throw new TRPCError({ code: 'NOT_FOUND', message: 'agent not found' });
       }
 
-      const { prefix, plaintext, keyHash } = generateKey();
+      const { prefix, plaintext, keyHash } = generateKey(ctx.customerId);
       const [created] = await ctx.db.drizzle
         .insert(schema.apiKeys)
         .values({

@@ -27,7 +27,7 @@ const CONNECTORS: { id: ConnectorId; label: string; blurb: string }[] = [
 
 const STARTER_POLICY = `permit (
   principal,
-  action == Action::"github_create_issue",
+  action == Action::"/github/issue/create",
   resource
 );`;
 
@@ -52,7 +52,9 @@ export default function OnboardingPage() {
     <main className="container max-w-2xl py-12">
       <header className="mb-8 space-y-1">
         <h1 className="text-2xl font-semibold tracking-tight">Welcome aboard</h1>
-        <p className="text-sm text-muted-foreground">Three quick steps to a working agent.</p>
+        <p className="text-sm text-muted-foreground">
+          Three steps to your first authorized API call.
+        </p>
         <Stepper step={step} />
       </header>
 
@@ -64,7 +66,7 @@ export default function OnboardingPage() {
 }
 
 function Stepper({ step }: { step: number }) {
-  const labels = ['Connect SaaS', 'Create agent', 'Author policy'];
+  const labels = ['Connect SaaS', 'Register App', 'Author policy'];
   return (
     <ol className="mt-4 flex gap-2 text-xs">
       {labels.map((l, i) => {
@@ -113,8 +115,8 @@ function ConnectStep({ onNext }: { onNext: () => void }) {
       <CardHeader>
         <CardTitle>Connect your first SaaS</CardTitle>
         <CardDescription>
-          The agent never holds tokens. The control plane stores them encrypted; the PDP borrows
-          them per call.
+          Your code never holds tokens. We store the refresh token encrypted; the PDP borrows a
+          fresh access token per call after policy says yes.
         </CardDescription>
       </CardHeader>
       <CardContent className="grid gap-3 sm:grid-cols-2">
@@ -177,13 +179,15 @@ function AgentStep({ onNext }: { onNext: () => void }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Create your first agent</CardTitle>
+        <CardTitle>Register your first App</CardTitle>
         <CardDescription>
-          Each agent has a stable DID and an API key (revealed once on the agent detail page).
+          An App is the credential slot for one piece of code that calls our PDP — your AI agent,
+          MCP server, script, or service. Each App gets a stable DID + API key (revealed once on the
+          detail page).
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
-        <Label htmlFor="agent-name">Agent name</Label>
+        <Label htmlFor="agent-name">App name</Label>
         <Input
           id="agent-name"
           value={name}
@@ -198,7 +202,7 @@ function AgentStep({ onNext }: { onNext: () => void }) {
       </CardContent>
       <CardFooter>
         <Button onClick={() => create.mutate({ name })} disabled={create.isPending || !name}>
-          {create.isPending ? 'Creating…' : 'Create agent'}
+          {create.isPending ? 'Creating…' : 'Register App'}
         </Button>
       </CardFooter>
     </Card>
