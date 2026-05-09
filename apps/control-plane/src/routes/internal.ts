@@ -113,12 +113,21 @@ export function createInternalRoutes(deps: InternalDeps): Hono {
       const command = typeof b.command === 'string' ? b.command : '';
       const resource = (b.resource as Record<string, unknown> | undefined) ?? {};
       const ttlSeconds = typeof b.ttl_seconds === 'number' ? b.ttl_seconds : undefined;
+      const originalUcanCid =
+        typeof b.original_ucan_cid === 'string' ? b.original_ucan_cid : undefined;
       if (!customerId || !agentId || !command) {
         return c.json({ error: 'customer_id, agent_id, command required' }, 400);
       }
       try {
         const created = await createStepUpApproval(
-          { customerId, agentId, command, resource, ...(ttlSeconds ? { ttlSeconds } : {}) },
+          {
+            customerId,
+            agentId,
+            command,
+            resource,
+            ...(ttlSeconds ? { ttlSeconds } : {}),
+            ...(originalUcanCid ? { originalUcanCid } : {}),
+          },
           {
             db: deps.db.drizzle,
             notifier: stepup.notifier,

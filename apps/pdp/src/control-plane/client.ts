@@ -95,6 +95,7 @@ export interface ControlPlaneClient {
     command: string;
     resource: Record<string, unknown>;
     ttlSeconds?: number;
+    originalUcanCid?: string;
   }): Promise<StepUpCreateResponse>;
   getStepUp(id: string): Promise<StepUpStateResponse | undefined>;
 }
@@ -207,6 +208,7 @@ export function createControlPlaneClient(opts: ControlPlaneClientOptions): Contr
     command: string;
     resource: Record<string, unknown>;
     ttlSeconds?: number;
+    originalUcanCid?: string;
   }): Promise<StepUpCreateResponse> {
     const res = await fetchImpl(`${opts.baseUrl}/v1/internal/stepup/create`, {
       method: 'POST',
@@ -220,6 +222,7 @@ export function createControlPlaneClient(opts: ControlPlaneClientOptions): Contr
         command: args.command,
         resource: args.resource,
         ...(args.ttlSeconds !== undefined ? { ttl_seconds: args.ttlSeconds } : {}),
+        ...(args.originalUcanCid !== undefined ? { original_ucan_cid: args.originalUcanCid } : {}),
       }),
     });
     if (!res.ok) {

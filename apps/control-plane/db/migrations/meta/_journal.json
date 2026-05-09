@@ -22,6 +22,20 @@
       "when": 1778327189452,
       "tag": "0002_sturdy_tombstone",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1778330950866,
+      "tag": "0003_equal_black_bird",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1778331024179,
+      "tag": "0004_noisy_pyro",
+      "breakpoints": true
     }
   ]
 }

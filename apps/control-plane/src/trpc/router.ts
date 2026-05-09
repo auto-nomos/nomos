@@ -5,6 +5,7 @@ import { auditRouter } from './routers/audit.js';
 import { customersRouter } from './routers/customers.js';
 import { policiesRouter } from './routers/policies.js';
 import { schemasRouter } from './routers/schemas.js';
+import { stepupRouter } from './routers/stepup.js';
 import { ucansRouter } from './routers/ucans.js';
 
 export const appRouter = router({
@@ -15,6 +16,7 @@ export const appRouter = router({
   schemas: schemasRouter,
   ucans: ucansRouter,
   audit: auditRouter,
+  stepup: stepupRouter,
 });
 
 export type AppRouter = typeof appRouter;

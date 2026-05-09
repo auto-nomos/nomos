@@ -7,6 +7,7 @@ import {
   noopRevocationPublisher,
   type RevocationPublisher,
 } from '../services/revocation-publisher.js';
+import type { WebAuthnConfig } from '../services/stepup/webauthn.js';
 
 export interface ContextDeps {
   db: Db;
@@ -16,6 +17,8 @@ export interface ContextDeps {
   signing: { signKey: Uint8Array; signerDid: string };
   /** Sprint 8 — push revocation. Defaults to noop when unset (tests / dev). */
   revocationPublisher?: RevocationPublisher;
+  /** Sprint 9 — passkey origin/rpId. Required for stepup router. */
+  webauthn?: WebAuthnConfig;
 }
 
 export interface Context {
@@ -23,6 +26,7 @@ export interface Context {
   logger: Logger;
   signing: { signKey: Uint8Array; signerDid: string };
   revocationPublisher: RevocationPublisher;
+  webauthn: WebAuthnConfig | null;
   session: {
     user: { id: string; email: string; name: string | null };
     token: string;
@@ -68,6 +72,7 @@ export async function createContext(req: Request, deps: ContextDeps): Promise<Co
     logger: deps.logger,
     signing: deps.signing,
     revocationPublisher: deps.revocationPublisher ?? noopRevocationPublisher(),
+    webauthn: deps.webauthn ?? null,
     session: userPayload,
     customerId,
   };

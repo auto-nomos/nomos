@@ -19,6 +19,8 @@ export interface StepUpCreateInput {
   command: string;
   resource: Record<string, unknown>;
   ttlSeconds?: number;
+  /** CID of the original UCAN that triggered step-up. */
+  originalUcanCid?: string;
 }
 
 export interface StepUpCreated {
@@ -76,6 +78,7 @@ export async function createStepUpApproval(
       state: 'pending',
       requestedAt: now,
       expiresAt,
+      ...(input.originalUcanCid ? { originalUcanCid: input.originalUcanCid } : {}),
     })
     .returning({ id: schema.pushApprovals.id, expiresAt: schema.pushApprovals.expiresAt });
   if (!row) {

@@ -5,7 +5,7 @@ import {
   type AuthorizeRequest,
   AuthorizeRequest as AuthorizeRequestSchema,
 } from '@credential-broker/shared-types';
-import { parseUcanJwt } from '@credential-broker/ucan';
+import { computeCid, parseUcanJwt } from '@credential-broker/ucan';
 import { Hono } from 'hono';
 import { decisionToAudit } from '../audit/emit.js';
 import type { PolicyCache } from '../cache/policies.js';
@@ -30,6 +30,7 @@ export interface AuthorizeRouteDeps {
       agentId: string;
       command: string;
       resource: Record<string, unknown>;
+      originalUcanCid?: string;
     }) => Promise<{ id: string; deepLink: string }>;
   };
 }
@@ -104,6 +105,7 @@ export function createAuthorizeRoutes(deps: AuthorizeRouteDeps): Hono {
               agentId,
               command: request.command,
               resource: request.resource as Record<string, unknown>,
+              originalUcanCid: computeCid(request.ucan),
             });
             decision = {
               ...decision,

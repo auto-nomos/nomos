@@ -12,6 +12,7 @@ import { createInternalRoutes } from './routes/internal.js';
 import { createOAuthRoutes } from './routes/oauth.js';
 import type { RevocationPublisher } from './services/revocation-publisher.js';
 import type { StepUpNotifier } from './services/stepup/notify.js';
+import type { WebAuthnConfig } from './services/stepup/webauthn.js';
 import { handleTrpc } from './trpc/handler.js';
 
 export interface ServerDeps {
@@ -44,6 +45,8 @@ export interface ServerDeps {
     dashboardPublicUrl: string;
     defaultTtlSeconds?: number;
   };
+  /** Sprint 9 — WebAuthn config (RP id + origin) for passkey approval. */
+  webauthn?: WebAuthnConfig;
 }
 
 export function createServer(deps: ServerDeps): Hono {
@@ -67,6 +70,7 @@ export function createServer(deps: ServerDeps): Hono {
       logger: deps.logger,
       signing: signing,
       ...(deps.revocationPublisher ? { revocationPublisher: deps.revocationPublisher } : {}),
+      ...(deps.webauthn ? { webauthn: deps.webauthn } : {}),
     }),
   );
 

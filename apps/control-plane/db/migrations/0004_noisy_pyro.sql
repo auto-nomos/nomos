@@ -1,0 +1,1 @@
+ALTER TABLE "push_approvals" ADD COLUMN "original_ucan_cid" text;

@@ -9,6 +9,7 @@ import { createServer } from './server.js';
 import { createOAuthSweep } from './services/oauth-sweep.js';
 import { createRevocationPublisher } from './services/revocation-publisher.js';
 import { createStepUpNotifier } from './services/stepup/notify.js';
+import { deriveWebAuthnConfig } from './services/stepup/webauthn.js';
 import { createAuditArchiveWorker, createR2Uploader } from './workers/audit-archive.js';
 import { createAuditRootSigner } from './workers/audit-root-signer.js';
 
@@ -118,6 +119,7 @@ async function main(): Promise<void> {
       dashboardPublicUrl: config.DASHBOARD_PUBLIC_URL,
       defaultTtlSeconds: Math.floor(config.STEPUP_DEFAULT_TTL_MS / 1_000),
     },
+    webauthn: deriveWebAuthnConfig(config.DASHBOARD_PUBLIC_URL),
   });
 
   const sweep = createOAuthSweep({

@@ -316,11 +316,7 @@ function AuditDrawer({ event, onClose }: { event: AuditRow | null; onClose: () =
         ) : null}
 
         <DialogFooter>
-          <Button
-            variant="outline"
-            disabled={!proof.data || !!proof.data?.note}
-            title={proof.data?.note ?? undefined}
-          >
+          <Button variant="outline" disabled={!proof.data}>
             Show proof (S8)
           </Button>
           <Button onClick={onClose}>Close</Button>

@@ -1,8 +1,9 @@
 /**
  * Authoritative data model for the credential-broker control plane.
  *
- * Phase 1 spec section 6 defines 13 application tables; we additionally maintain
- * 4 Better-Auth tables (user/session/account/verification) for sign-in. Total: 17.
+ * Phase 1 spec section 6 defines 13 application tables; Sprint 8 added
+ * audit_roots; Sprint 9 adds webauthn_credentials. Plus 4 Better-Auth
+ * tables (user/session/account/verification) for sign-in. Total: 19.
  *
  * Better-Auth owns the user/session/account/verification tables. Application
  * tables (memberships, revocations.revoked_by, push_approvals.decided_by)
@@ -332,6 +333,12 @@ export const pushApprovals = pgTable(
     decidedAt: timestamp('decided_at', { withTimezone: true }),
     decidedBy: uuid('decided_by').references(() => user.id),
     cosignerAttestationJwt: text('cosigner_attestation_jwt'),
+    /**
+     * Sprint 9 — CID of the original UCAN that triggered the step-up. The
+     * cosigner UCAN's `meta.cosigner_for` is this value; the PDP refuses
+     * any cosigner whose `cosigner_for` doesn't match the request's UCAN.
+     */
+    originalUcanCid: text('original_ucan_cid'),
     expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
   },
   (t) => ({
@@ -377,12 +384,45 @@ export const apiKeys = pgTable(
   }),
 );
 
+/**
+ * Sprint 9 — passkey credentials registered against Better-Auth users.
+ * One user may register many credentials (laptop, phone, etc).
+ * `credentialId` is the WebAuthn credential identifier (base64url, returned
+ * by the authenticator). `publicKey` is base64url of the COSE-encoded key.
+ * `counter` rotates on each assertion to detect cloned authenticators.
+ */
+export const webauthnCredentials = pgTable(
+  'webauthn_credentials',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    credentialId: text('credential_id').notNull(),
+    publicKey: text('public_key').notNull(),
+    counter: integer('counter').notNull().default(0),
+    transports: text('transports'),
+    name: text('name'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    lastUsedAt: timestamp('last_used_at', { withTimezone: true }),
+  },
+  (t) => ({
+    userIdx: index('webauthn_credentials_user_idx').on(t.userId),
+    credentialIdIdx: uniqueIndex('webauthn_credentials_credential_id_idx').on(t.credentialId),
+  }),
+);
+
 // ===== Relations =====
 
 export const userRelations = relations(user, ({ many }) => ({
   memberships: many(memberships),
   sessions: many(session),
   accounts: many(account),
+  webauthnCredentials: many(webauthnCredentials),
+}));
+
+export const webauthnCredentialsRelations = relations(webauthnCredentials, ({ one }) => ({
+  user: one(user, { fields: [webauthnCredentials.userId], references: [user.id] }),
 }));
 
 export const sessionRelations = relations(session, ({ one }) => ({

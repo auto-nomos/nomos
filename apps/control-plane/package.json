@@ -34,6 +34,7 @@
     "@credential-broker/ucan": "workspace:*",
     "@dsnp/parquetjs": "1.8.6",
     "@hono/node-server": "1.13.7",
+    "@simplewebauthn/server": "13.3.0",
     "@trpc/server": "11.0.0",
     "better-auth": "1.6.9",
     "drizzle-orm": "0.36.4",
