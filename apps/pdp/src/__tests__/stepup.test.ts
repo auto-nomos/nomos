@@ -211,6 +211,114 @@ describe('POST /v1/authorize step-up', () => {
   });
 });
 
+describe('POST /v1/authorize cosigner retry', () => {
+  it('allows when cosignerJwt is valid + approval=approved', async () => {
+    const { app, policyCache, stepupState } = buildApp();
+    policyCache.set(CUSTOMER, stripePolicy);
+    const issuer = generateKeypair();
+    const agent = generateKeypair();
+    const requestUcan = issueUcan({
+      payload: makePayload(issuer.did, agent.did),
+      privateKey: issuer.privateKey,
+    });
+    const origCid = (await import('@credential-broker/ucan')).computeCid(requestUcan.jwt);
+    const approvalId = 'aprv-cosign-1';
+    const cosigner = issueUcan({
+      payload: {
+        iss: issuer.did,
+        aud: agent.did,
+        cmd: '/stripe/charge',
+        pol: [],
+        nonce: 'cos',
+        nbf: Math.floor(Date.now() / 1000) - 60,
+        exp: Math.floor(Date.now() / 1000) + 600,
+        meta: { cosigner_for: origCid, approval_id: approvalId, decided_by: 'u-1' },
+      },
+      privateKey: issuer.privateKey,
+    });
+    stepupState.set(approvalId, {
+      id: approvalId,
+      customerId: CUSTOMER,
+      agentId: AGENT_ID,
+      command: '/stripe/charge',
+      resource: { amount: 250 },
+      state: 'approved',
+      expiresAt: new Date(Date.now() + 60_000).toISOString(),
+      decidedAt: new Date().toISOString(),
+      cosignerAttestationJwt: cosigner.jwt,
+    });
+    const res = await app.request('/v1/authorize', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-cb-customer': CUSTOMER },
+      body: JSON.stringify({
+        ucan: requestUcan.jwt,
+        command: '/stripe/charge',
+        resource: { amount: 250 },
+        context: {},
+        cosignerJwt: cosigner.jwt,
+      }),
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { allow: boolean; requiresStepUp?: boolean };
+    expect(body.allow).toBe(true);
+    expect(body.requiresStepUp).toBeUndefined();
+  });
+
+  it('denies cosigner_mismatch when JWT cid does not match request', async () => {
+    const { app, policyCache, stepupState } = buildApp();
+    policyCache.set(CUSTOMER, stripePolicy);
+    const issuer = generateKeypair();
+    const agent = generateKeypair();
+    const requestUcan = issueUcan({
+      payload: makePayload(issuer.did, agent.did),
+      privateKey: issuer.privateKey,
+    });
+    const approvalId = 'aprv-cosign-2';
+    const cosigner = issueUcan({
+      payload: {
+        iss: issuer.did,
+        aud: agent.did,
+        cmd: '/stripe/charge',
+        pol: [],
+        nonce: 'cos2',
+        nbf: Math.floor(Date.now() / 1000) - 60,
+        exp: Math.floor(Date.now() / 1000) + 600,
+        meta: {
+          cosigner_for: 'b' + 'x'.repeat(46),
+          approval_id: approvalId,
+          decided_by: 'u-1',
+        },
+      },
+      privateKey: issuer.privateKey,
+    });
+    stepupState.set(approvalId, {
+      id: approvalId,
+      customerId: CUSTOMER,
+      agentId: AGENT_ID,
+      command: '/stripe/charge',
+      resource: { amount: 250 },
+      state: 'approved',
+      expiresAt: new Date(Date.now() + 60_000).toISOString(),
+      decidedAt: new Date().toISOString(),
+      cosignerAttestationJwt: cosigner.jwt,
+    });
+    const res = await app.request('/v1/authorize', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-cb-customer': CUSTOMER },
+      body: JSON.stringify({
+        ucan: requestUcan.jwt,
+        command: '/stripe/charge',
+        resource: { amount: 250 },
+        context: {},
+        cosignerJwt: cosigner.jwt,
+      }),
+    });
+    const body = (await res.json()) as { allow: boolean; reason: string };
+    expect(body.allow).toBe(false);
+    expect(body.reason).toBe('cosigner_invalid');
+  });
+});
+
 describe('GET /v1/stepup/:id', () => {
   it('returns approval state for the right customer', async () => {
     const { app, policyCache, stepupState } = buildApp();

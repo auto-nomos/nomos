@@ -1,17 +1,21 @@
 import type { Schema } from '@credential-broker/cedar';
 import { type DecideInput, decide } from '@credential-broker/core';
+import { sha256Hex } from '@credential-broker/crypto';
 import {
   type AuthorizeDecision,
   type AuthorizeRequest,
   AuthorizeRequest as AuthorizeRequestSchema,
+  type DenyReason,
 } from '@credential-broker/shared-types';
-import { computeCid, parseUcanJwt } from '@credential-broker/ucan';
+import { canonicalize, computeCid, parseUcanJwt } from '@credential-broker/ucan';
 import { Hono } from 'hono';
 import { decisionToAudit } from '../audit/emit.js';
 import type { PolicyCache } from '../cache/policies.js';
 import type { RevocationCache } from '../cache/revocations.js';
+import type { StepUpStateResponse } from '../control-plane/client.js';
 import { getLog } from '../middleware/logger.js';
 import { recordAuthorize } from '../observability/metrics.js';
+import { validateCosigner } from '../services/cosigner-validate.js';
 import { evaluateStepUpPotential, shouldDetectStepUp } from '../services/stepup.js';
 
 export interface AuthorizeRouteDeps {
@@ -23,6 +27,10 @@ export interface AuthorizeRouteDeps {
    * Sprint 9 — when supplied, denies that *would* allow with cosigner=true
    * trigger a control-plane push_approvals row + Knock notification, and the
    * decision returns `{ requiresStepUp: true, stepUpUrl, stepUpId }`.
+   *
+   * On the SDK retry with `cosignerJwt`, the same deps are used to fetch
+   * approval state and validate the JWT before re-evaluating with
+   * `context.cosigner = true`.
    */
   stepup?: {
     create: (args: {
@@ -32,6 +40,7 @@ export interface AuthorizeRouteDeps {
       resource: Record<string, unknown>;
       originalUcanCid?: string;
     }) => Promise<{ id: string; deepLink: string }>;
+    fetchApproval?: (id: string) => Promise<StepUpStateResponse | undefined>;
   };
 }
 
@@ -82,9 +91,56 @@ export function createAuthorizeRoutes(deps: AuthorizeRouteDeps): Hono {
     const revokedCids = deps.revocationCache.getRevoked(customerId);
     const schema = deps.schemaForCustomer?.(customerId);
 
+    let effectiveRequest = request;
+
+    // Sprint 9 — cosigner retry. When the SDK supplies `cosignerJwt`, the
+    // PDP validates it (signature, command, cid binding, approval state)
+    // and merges `context.cosigner = true` before evaluating Cedar.
+    if (request.cosignerJwt && deps.stepup?.fetchApproval) {
+      const fetchApproval = deps.stepup.fetchApproval;
+      const validation = await validateCosigner({
+        cosignerJwt: request.cosignerJwt,
+        requestUcan: request.ucan,
+        command: request.command,
+        fetchApproval,
+      });
+      if (!validation.ok) {
+        const denyReason: DenyReason =
+          validation.reason === 'cosigner_expired' ? 'cosigner_expired' : 'cosigner_invalid';
+        const receiptBasis = `cosigner-deny|${request.ucan}|${canonicalize(request as unknown as Record<string, unknown>)}`;
+        const denyDecision: AuthorizeDecision = {
+          allow: false,
+          reason: denyReason,
+          receiptId: sha256Hex(receiptBasis),
+        };
+        recordAuthorize(decisionToAudit(denyDecision), denyDecision.reason);
+        if (deps.emitAudit) {
+          await deps.emitAudit({
+            customerId,
+            request,
+            decision: { ...denyDecision },
+            ts: Date.now(),
+            agentDid: 'unknown',
+          });
+        }
+        log.info(
+          { customerId, command: request.command, allow: false, reason: denyReason },
+          'authorize cosigner-deny',
+        );
+        return c.json(denyDecision, 200);
+      }
+      effectiveRequest = {
+        ...request,
+        context: {
+          ...(request.context as Record<string, unknown>),
+          cosigner: true,
+        },
+      };
+    }
+
     const input: DecideInput = {
-      ucan: request.ucan,
-      request,
+      ucan: effectiveRequest.ucan,
+      request: effectiveRequest,
       policies,
       revokedCids,
       ...(schema !== undefined ? { schema } : {}),

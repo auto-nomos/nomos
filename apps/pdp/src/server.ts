@@ -68,7 +68,14 @@ export function createServer(deps: ServerDeps): Hono {
       policyCache: deps.policyCache,
       revocationCache: deps.revocationCache,
       ...(deps.emitAudit !== undefined ? { emitAudit: deps.emitAudit } : {}),
-      ...(deps.stepup ? { stepup: { create: deps.stepup.create } } : {}),
+      ...(deps.stepup
+        ? {
+            stepup: {
+              create: deps.stepup.create,
+              fetchApproval: deps.stepup.getStepUp,
+            },
+          }
+        : {}),
     }),
   );
   if (deps.stepup) {
