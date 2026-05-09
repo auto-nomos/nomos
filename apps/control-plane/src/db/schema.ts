@@ -286,6 +286,35 @@ export const auditEvents = pgTable(
   }),
 );
 
+/**
+ * Sprint 8.3 (D-4) — daily root signatures over the audit hash chain.
+ * One row per (customer_id, signing run). `root_event_id` points at the
+ * audit_events row whose hash was anchored; `signature` is the Ed25519
+ * signature of `root_hash` by the env-managed audit signing key.
+ */
+export const auditRoots = pgTable(
+  'audit_roots',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    customerId: uuid('customer_id')
+      .notNull()
+      .references(() => customers.id, { onDelete: 'cascade' }),
+    rootEventId: uuid('root_event_id')
+      .notNull()
+      .references(() => auditEvents.eventId, { onDelete: 'restrict' }),
+    rootHash: text('root_hash').notNull(),
+    /** Stable identifier for the signing key (`did:key:...` or env handle). */
+    signingKeyId: text('signing_key_id').notNull(),
+    /** Hex-encoded Ed25519 signature over root_hash. */
+    signature: text('signature').notNull(),
+    signedAt: timestamp('signed_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    customerSignedAtIdx: index('audit_roots_customer_signed_at_idx').on(t.customerId, t.signedAt),
+    rootEventIdx: uniqueIndex('audit_roots_root_event_idx').on(t.rootEventId),
+  }),
+);
+
 export const pushApprovals = pgTable(
   'push_approvals',
   {
@@ -402,6 +431,14 @@ export const revocationsRelations = relations(revocations, ({ one }) => ({
 
 export const auditEventsRelations = relations(auditEvents, ({ one }) => ({
   customer: one(customers, { fields: [auditEvents.customerId], references: [customers.id] }),
+}));
+
+export const auditRootsRelations = relations(auditRoots, ({ one }) => ({
+  customer: one(customers, { fields: [auditRoots.customerId], references: [customers.id] }),
+  rootEvent: one(auditEvents, {
+    fields: [auditRoots.rootEventId],
+    references: [auditEvents.eventId],
+  }),
 }));
 
 export const oauthConnectionsRelations = relations(oauthConnections, ({ one }) => ({

@@ -41,3 +41,20 @@ console.info(`  pubkey: ${publicKeyHex}`);
 console.info('');
 console.info('PDP env needs CONTROL_PLANE_BUNDLE_VERIFY_KEY set to the same hex');
 console.info('value above to verify signed bundle responses.');
+
+// Sprint 8.3 / D-4 — separate keypair signs daily audit roots. The verify key
+// ships to the audit-verify CLI (and gets pinned in customer compliance docs).
+const auditKp = generateKeypair();
+const auditPriv = bytesToHex(auditKp.privateKey);
+const auditPub = bytesToHex(auditKp.publicKey);
+appendOrUpdate(ENV_FILE, 'AUDIT_SIGN_KEY', auditPriv);
+appendOrUpdate(ENV_FILE, 'AUDIT_VERIFY_KEY', auditPub);
+appendOrUpdate(ENV_FILE, 'AUDIT_SIGNING_KEY_ID', auditKp.did);
+
+console.info('');
+console.info('Audit root signing keypair written to .env.local');
+console.info(`  did:    ${auditKp.did}`);
+console.info(`  pubkey: ${auditPub}`);
+console.info('');
+console.info('Audit verifier (npx @credential-broker/audit-verify) needs');
+console.info('AUDIT_VERIFY_KEY set to the same hex value.');

@@ -39,6 +39,19 @@ const Config = z.object({
   // plane POSTs to on revoke (e.g. `http://localhost:8787/v1/internal/refresh-revocations`).
   // Empty = polling-only fallback (PDP still discovers within 5s).
   PDP_WEBHOOK_URLS: z.string().optional(),
+
+  // Sprint 8.3 / D-4 — env-managed Ed25519 root key over the audit hash chain.
+  // Phase 1 default: one key per environment. Customer-managed-key is Phase 2.
+  // Generate via `pnpm gen-keys`. AUDIT_VERIFY_KEY ships to the audit-verify CLI.
+  AUDIT_SIGN_KEY: z.string().optional(),
+  AUDIT_VERIFY_KEY: z.string().optional(),
+  AUDIT_SIGNING_KEY_ID: z.string().optional(),
+  /** How often the daily-root signer runs. Default 24h. */
+  AUDIT_ROOT_SIGN_INTERVAL_MS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(24 * 60 * 60 * 1_000),
 });
 
 export type Config = z.infer<typeof Config>;

@@ -8,6 +8,7 @@ import { createLogger, type Logger } from './logger.js';
 import { createServer } from './server.js';
 import { createOAuthSweep } from './services/oauth-sweep.js';
 import { createRevocationPublisher } from './services/revocation-publisher.js';
+import { createAuditRootSigner } from './workers/audit-root-signer.js';
 
 function loadOAuthEncryptionKey(config: Config, logger: Logger): Uint8Array {
   const isDevPlaceholder = config.OAUTH_TOKEN_ENCRYPTION_KEY === '00'.repeat(32);
@@ -22,6 +23,25 @@ function loadOAuthEncryptionKey(config: Config, logger: Logger): Uint8Array {
     );
   }
   return loadSecretboxKey(config.OAUTH_TOKEN_ENCRYPTION_KEY);
+}
+
+function loadAuditSigningKey(
+  config: Config,
+  logger: Logger,
+): { signKey: Uint8Array; signingKeyId: string } | undefined {
+  if (!config.AUDIT_SIGN_KEY || config.AUDIT_SIGN_KEY.length === 0) {
+    if (config.NODE_ENV === 'production') {
+      throw new Error(
+        'AUDIT_SIGN_KEY is required in production. Run `pnpm gen-keys` once and set the value.',
+      );
+    }
+    logger.warn('AUDIT_SIGN_KEY not set — daily audit roots disabled in dev. Run `pnpm gen-keys`.');
+    return undefined;
+  }
+  const kp = keypairFromPrivate(hexToBytes(config.AUDIT_SIGN_KEY));
+  const signingKeyId = config.AUDIT_SIGNING_KEY_ID ?? kp.did;
+  logger.info({ signingKeyId }, 'loaded audit root signing key from env');
+  return { signKey: kp.privateKey, signingKeyId };
 }
 
 function loadSigningKey(
@@ -91,6 +111,21 @@ async function main(): Promise<void> {
   sweep.start();
   logger.info('oauth refresh sweep started (interval=1h, lookahead=24h)');
 
+  const auditSigning = loadAuditSigningKey(config, logger);
+  const auditRootSigner = auditSigning
+    ? createAuditRootSigner({
+        db: db.drizzle,
+        signKey: auditSigning.signKey,
+        signingKeyId: auditSigning.signingKeyId,
+        logger,
+        intervalMs: config.AUDIT_ROOT_SIGN_INTERVAL_MS,
+      })
+    : undefined;
+  if (auditRootSigner) {
+    auditRootSigner.start();
+    logger.info({ intervalMs: config.AUDIT_ROOT_SIGN_INTERVAL_MS }, 'audit root signer started');
+  }
+
   const server = serve({ fetch: app.fetch, port: config.PORT }, (info) => {
     logger.info({ port: info.port }, 'control-plane listening');
   });
@@ -98,6 +133,7 @@ async function main(): Promise<void> {
   const shutdown = async (signal: string): Promise<void> => {
     logger.info({ signal }, 'shutting down');
     sweep.stop();
+    auditRootSigner?.stop();
     server.close();
     await db.pool.end();
     process.exit(0);
