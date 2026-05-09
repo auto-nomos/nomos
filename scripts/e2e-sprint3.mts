@@ -51,11 +51,8 @@ async function main(): Promise<void> {
     logger,
     db: cpDb,
     auth,
-    internal: {
-      signKey: signKp.privateKey,
-      signerDid: signKp.did,
-      serviceToken: SERVICE_TOKEN,
-    },
+    signing: { signKey: signKp.privateKey, signerDid: signKp.did },
+    internal: { serviceToken: SERVICE_TOKEN },
   });
   const cpServer = serve({ fetch: cpApp.fetch, port: CP_PORT });
 

@@ -93,6 +93,8 @@ function Stepper({ step }: { step: number }) {
 function ConnectStep({ onNext }: { onNext: () => void }) {
   const [pending, setPending] = useState<ConnectorId | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const connections = trpc.oauth.list.useQuery();
+  const connectedSet = new Set((connections.data ?? []).map((c) => c.connector));
 
   async function connect(id: ConnectorId) {
     setError(null);
@@ -116,22 +118,32 @@ function ConnectStep({ onNext }: { onNext: () => void }) {
         </CardDescription>
       </CardHeader>
       <CardContent className="grid gap-3 sm:grid-cols-2">
-        {CONNECTORS.map((c) => (
-          <div key={c.id} className="flex flex-col gap-2 rounded-lg border p-4">
-            <div>
-              <p className="font-medium capitalize">{c.label}</p>
-              <p className="text-xs text-muted-foreground">{c.blurb}</p>
+        {CONNECTORS.map((c) => {
+          const connected = connectedSet.has(c.id);
+          return (
+            <div key={c.id} className="flex flex-col gap-2 rounded-lg border p-4">
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <p className="font-medium capitalize">{c.label}</p>
+                  <p className="text-xs text-muted-foreground">{c.blurb}</p>
+                </div>
+                {connected ? (
+                  <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-emerald-600">
+                    Connected
+                  </span>
+                ) : null}
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => connect(c.id)}
+                disabled={pending !== null || connected}
+              >
+                {pending === c.id ? 'Redirecting…' : connected ? 'Connected' : 'Connect'}
+              </Button>
             </div>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => connect(c.id)}
-              disabled={pending !== null}
-            >
-              {pending === c.id ? 'Redirecting…' : 'Connect'}
-            </Button>
-          </div>
-        ))}
+          );
+        })}
         {error ? (
           <p className="col-span-full text-sm text-destructive" role="alert">
             {error}

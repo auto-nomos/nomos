@@ -3,6 +3,7 @@ import { agentsRouter } from './routers/agents.js';
 import { apiKeysRouter } from './routers/api-keys.js';
 import { auditRouter } from './routers/audit.js';
 import { customersRouter } from './routers/customers.js';
+import { oauthRouter } from './routers/oauth.js';
 import { policiesRouter } from './routers/policies.js';
 import { schemasRouter } from './routers/schemas.js';
 import { stepupRouter } from './routers/stepup.js';
@@ -17,6 +18,7 @@ export const appRouter = router({
   ucans: ucansRouter,
   audit: auditRouter,
   stepup: stepupRouter,
+  oauth: oauthRouter,
 });
 
 export type AppRouter = typeof appRouter;

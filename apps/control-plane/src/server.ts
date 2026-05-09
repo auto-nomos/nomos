@@ -1,5 +1,6 @@
 import { generateKeypair } from '@credential-broker/crypto';
 import { Hono } from 'hono';
+import { cors } from 'hono/cors';
 import { secureHeaders } from 'hono/secure-headers';
 import type { Auth } from './auth/index.js';
 import type { Config } from './config.js';
@@ -53,6 +54,30 @@ export function createServer(deps: ServerDeps): Hono {
   const app = new Hono();
   const signing = deps.signing ?? ephemeralSigning();
 
+  // CORS — dashboard (3000) and tunnel callbacks need cross-origin POST + cookies.
+  // Better-Auth's trustedOrigins gates the auth flow itself; CORS headers here
+  // satisfy the browser preflight.
+  app.use(
+    '*',
+    cors({
+      origin: (origin) => {
+        if (!origin) return origin;
+        if (
+          origin === 'http://localhost:3000' ||
+          origin === 'http://127.0.0.1:3000' ||
+          origin.endsWith('.trycloudflare.com') ||
+          origin.endsWith('.ngrok-free.app')
+        ) {
+          return origin;
+        }
+        return null;
+      },
+      credentials: true,
+      allowHeaders: ['content-type', 'authorization', 'cookie', 'x-cb-customer'],
+      allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+      maxAge: 600,
+    }),
+  );
   app.use('*', secureHeaders());
   app.use('*', requestId());
   app.use('*', loggerMiddleware(deps.logger));
