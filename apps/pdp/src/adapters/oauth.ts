@@ -1,0 +1,109 @@
+/**
+ * PDP-side OAuth proxy adapter (Sprint 5.5).
+ *
+ * Given an allow decision + a UCAN carrying `meta.oauth_connection_id`, the
+ * PDP fetches the upstream access token from the control plane (the only
+ * place that can decrypt it), then makes the SaaS call on behalf of the
+ * agent. The agent never holds the upstream token — that is the wedge.
+ *
+ * Per-provider routing is intentionally thin here: only the API base URL +
+ * a small set of static headers needed for vanity / versioning. The full
+ * connector code in `apps/control-plane/src/oauth/connectors/*` owns the
+ * OAuth lifecycle (authorize / exchange / refresh); the PDP only needs a
+ * bearer fetch that respects each provider's expectations. Sprint 10
+ * unifies these via schema packs.
+ */
+
+export type ProviderId = 'github' | 'slack' | 'google' | 'notion';
+
+export interface ProviderApiConfig {
+  base: string;
+  staticHeaders?: Record<string, string>;
+  /**
+   * Slack accepts JSON request bodies but expects `content-type:
+   * application/json; charset=utf-8`; everything else is plain `application/json`.
+   */
+  jsonContentType?: string;
+}
+
+export const PROVIDER_API: Record<ProviderId, ProviderApiConfig> = {
+  github: {
+    base: 'https://api.github.com',
+    staticHeaders: {
+      accept: 'application/vnd.github+json',
+      'x-github-api-version': '2022-11-28',
+      'user-agent': 'credential-broker-pdp',
+    },
+  },
+  slack: {
+    base: 'https://slack.com/api',
+    jsonContentType: 'application/json; charset=utf-8',
+  },
+  google: { base: 'https://www.googleapis.com' },
+  notion: {
+    base: 'https://api.notion.com/v1',
+    staticHeaders: { 'notion-version': '2022-06-28' },
+  },
+};
+
+export interface ProxyRequest {
+  method: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
+  path: string;
+  query?: Record<string, string>;
+  body?: unknown;
+  headers?: Record<string, string>;
+}
+
+export interface ProxyResponse {
+  status: number;
+  body: unknown;
+  headers: Record<string, string>;
+}
+
+export interface ProxyAdapterDeps {
+  fetch?: typeof fetch;
+}
+
+export function isKnownProvider(id: string): id is ProviderId {
+  return id === 'github' || id === 'slack' || id === 'google' || id === 'notion';
+}
+
+export async function proxyApiCall(
+  provider: ProviderId,
+  accessToken: string,
+  req: ProxyRequest,
+  deps: ProxyAdapterDeps = {},
+): Promise<ProxyResponse> {
+  const cfg = PROVIDER_API[provider];
+  const url = new URL(`${cfg.base}${req.path}`);
+  if (req.query) {
+    for (const [k, v] of Object.entries(req.query)) url.searchParams.set(k, v);
+  }
+  const headers: Record<string, string> = {
+    authorization: `Bearer ${accessToken}`,
+    accept: 'application/json',
+    ...(cfg.staticHeaders ?? {}),
+    ...(req.headers ?? {}),
+  };
+  let body: string | undefined;
+  if (req.body !== undefined && req.method !== 'GET') {
+    body = JSON.stringify(req.body);
+    headers['content-type'] = cfg.jsonContentType ?? 'application/json';
+  }
+  const f = deps.fetch ?? globalThis.fetch;
+  const res = await f(url.toString(), { method: req.method, headers, body });
+  const text = await res.text();
+  let parsed: unknown = text;
+  if (text.length > 0 && (res.headers.get('content-type') ?? '').includes('json')) {
+    try {
+      parsed = JSON.parse(text);
+    } catch {
+      parsed = text;
+    }
+  }
+  const headerObj: Record<string, string> = {};
+  res.headers.forEach((v, k) => {
+    headerObj[k] = v;
+  });
+  return { status: res.status, body: parsed, headers: headerObj };
+}

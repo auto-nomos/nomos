@@ -46,9 +46,29 @@ export interface ControlPlaneClientOptions {
   onSignatureFailure?: (err: Error) => void;
 }
 
+export interface OAuthTokenResponse {
+  connectionId: string;
+  customerId: string;
+  connector: string;
+  accountId: string;
+  accessToken: string;
+  accessTokenExpiresAt: string | null;
+  scopesGranted: string[];
+}
+
 export interface ControlPlaneClient {
   fetchBundle(customerId: string): Promise<string | undefined>;
   fetchRevocations(customerId: string): Promise<string[] | undefined>;
+  fetchOAuthToken(customerId: string, connectionId: string): Promise<OAuthTokenResponse>;
+}
+
+export class OAuthTokenFetchError extends Error {
+  readonly status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = 'OAuthTokenFetchError';
+    this.status = status;
+  }
 }
 
 const encoder = new TextEncoder();
@@ -107,5 +127,22 @@ export function createControlPlaneClient(opts: ControlPlaneClientOptions): Contr
     return body.revoked;
   }
 
-  return { fetchBundle, fetchRevocations };
+  async function fetchOAuthToken(
+    customerId: string,
+    connectionId: string,
+  ): Promise<OAuthTokenResponse> {
+    const res = await fetchImpl(
+      `${opts.baseUrl}/v1/internal/oauth-tokens/${connectionId}?customerId=${encodeURIComponent(customerId)}`,
+      { headers: { authorization: `Bearer ${opts.serviceToken}` } },
+    );
+    if (!res.ok) {
+      throw new OAuthTokenFetchError(
+        `oauth token fetch HTTP ${res.status} for connection ${connectionId}`,
+        res.status,
+      );
+    }
+    return (await res.json()) as OAuthTokenResponse;
+  }
+
+  return { fetchBundle, fetchRevocations, fetchOAuthToken };
 }

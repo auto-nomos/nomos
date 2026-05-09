@@ -6,6 +6,9 @@ export type {
   AuthorizeDecision,
   AuthorizeRequestInput,
   FailureMode,
+  ProxyApiCall,
+  ProxyInput,
+  ProxyResult,
   ReceiptInput,
 } from './auth-guard.js';
 export { createAuthGuard } from './auth-guard.js';

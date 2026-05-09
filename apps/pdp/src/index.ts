@@ -85,6 +85,9 @@ async function main(): Promise<void> {
     emitReceipt: async (ev) => {
       await appendReceipt(config.AUDIT_LOG_PATH, ev);
     },
+    oauthProxy: {
+      fetchOAuthToken: cpClient.fetchOAuthToken,
+    },
   });
 
   const server = serve({ fetch: app.fetch, port: config.PORT }, (info) => {

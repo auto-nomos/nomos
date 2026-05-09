@@ -151,4 +151,44 @@ describe('control-plane client', () => {
     });
     await expect(client.fetchRevocations('c')).rejects.toThrow(/revocations fetch 502/);
   });
+
+  it('fetchOAuthToken returns the connector + access token', async () => {
+    const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(
+      jsonResponse({
+        connectionId: 'conn-1',
+        customerId: 'cust-1',
+        connector: 'github',
+        accountId: 'octocat',
+        accessToken: 'gho_resolved',
+        accessTokenExpiresAt: null,
+        scopesGranted: ['repo'],
+      }),
+    );
+    const client = createControlPlaneClient({
+      baseUrl: 'http://cp',
+      serviceToken: 't',
+      logger,
+      fetchImpl,
+    });
+    const token = await client.fetchOAuthToken('cust-1', 'conn-1');
+    expect(token.accessToken).toBe('gho_resolved');
+    expect(fetchImpl).toHaveBeenCalledWith(
+      'http://cp/v1/internal/oauth-tokens/conn-1?customerId=cust-1',
+      expect.objectContaining({ headers: { authorization: 'Bearer t' } }),
+    );
+  });
+
+  it('fetchOAuthToken throws OAuthTokenFetchError on non-2xx', async () => {
+    const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(new Response(null, { status: 404 }));
+    const client = createControlPlaneClient({
+      baseUrl: 'http://cp',
+      serviceToken: 't',
+      logger,
+      fetchImpl,
+    });
+    await expect(client.fetchOAuthToken('cust-1', 'missing')).rejects.toMatchObject({
+      name: 'OAuthTokenFetchError',
+      status: 404,
+    });
+  });
 });

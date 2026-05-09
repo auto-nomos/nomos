@@ -34,10 +34,48 @@ export interface ReceiptInput {
   metadata?: Record<string, unknown>;
 }
 
+export interface ProxyApiCall {
+  method: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
+  path: string;
+  query?: Record<string, string>;
+  body?: unknown;
+  headers?: Record<string, string>;
+}
+
+export interface ProxyResult {
+  /**
+   * Whether the PDP allowed the call. When false, the PDP did NOT make the
+   * upstream request — this carries the same shape as authorize() for parity
+   * but with no `upstream` block.
+   */
+  allow: boolean;
+  decision: AuthorizeDecision;
+  /** Present only when allow=true and the upstream call ran. */
+  upstream?: { status: number; body: unknown; headers: Record<string, string> };
+  /** Set when the PDP allowed the request but the proxy/upstream step failed. */
+  error?: string;
+  /** Provider id (github / slack / google / notion) on success. */
+  connector?: string;
+}
+
+export interface ProxyInput extends AuthorizeRequestInput {
+  apiCall: ProxyApiCall;
+}
+
 export interface AuthGuard {
   readonly customerId: string;
   authorize(req: AuthorizeRequestInput): Promise<AuthorizeDecision>;
   emitReceipt(receiptId: string, input: ReceiptInput): Promise<void>;
+  /**
+   * Sprint 5.5 — proxy mode. Sends UCAN + apiCall to the PDP's
+   * `/v1/proxy/:command`; the PDP runs authorize and, on allow, calls the
+   * upstream SaaS with the customer's OAuth token. The agent never sees the
+   * upstream token.
+   *
+   * Failure semantics mirror `authorize()`: PDP unreachable / 5xx falls
+   * back to the configured failureMode and surfaces a synthetic decision.
+   */
+  proxy(req: ProxyInput): Promise<ProxyResult>;
 }
 
 const FAIL_CLOSED: AuthorizeDecision = {
@@ -116,6 +154,76 @@ export function createAuthGuard(opts: AuthGuardOptions): AuthGuard {
         throw new Error(`receipt rejected: HTTP ${res.status}`);
       }
     },
+
+    async proxy(req) {
+      const { apiCall, ...authReq } = req;
+      const path = `${baseUrl}/v1/proxy${authReq.command}`;
+      const failClosedDecision = failureMode === 'open' ? FAIL_OPEN : FAIL_CLOSED;
+      let res: Response;
+      try {
+        res = await fetchWithRetry(
+          path,
+          {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({ ucan: authReq.ucan, request: authReq, apiCall }),
+          },
+          { ...(opts.fetchFn !== undefined ? { fetchFn: opts.fetchFn } : {}), ...opts.retry },
+        );
+      } catch {
+        return { allow: failClosedDecision.allow, decision: failClosedDecision };
+      }
+      if (res.status >= 500) {
+        return { allow: failClosedDecision.allow, decision: failClosedDecision };
+      }
+      let body: unknown;
+      try {
+        body = await res.json();
+      } catch {
+        return {
+          allow: false,
+          decision: {
+            allow: false,
+            reason: 'pdp_invalid_response',
+            receiptId: 'sdk-invalid-response',
+          },
+        };
+      }
+      return parseProxyResponse(body);
+    },
+  };
+}
+
+function parseProxyResponse(body: unknown): ProxyResult {
+  if (typeof body !== 'object' || body === null) {
+    return {
+      allow: false,
+      decision: {
+        allow: false,
+        reason: 'pdp_invalid_response',
+        receiptId: 'sdk-invalid-response',
+      },
+    };
+  }
+  const r = body as Record<string, unknown>;
+  if (!isAuthorizeDecision(r.decision)) {
+    return {
+      allow: false,
+      decision: {
+        allow: false,
+        reason: 'pdp_invalid_response',
+        receiptId: 'sdk-invalid-response',
+      },
+    };
+  }
+  return {
+    allow: typeof r.allow === 'boolean' ? r.allow : r.decision.allow,
+    decision: r.decision,
+    ...(typeof r.upstream === 'object' && r.upstream !== null
+      ? { upstream: r.upstream as ProxyResult['upstream'] }
+      : {}),
+    ...(typeof r.error === 'string' ? { error: r.error } : {}),
+    ...(typeof r.connector === 'string' ? { connector: r.connector } : {}),
   };
 }
 
