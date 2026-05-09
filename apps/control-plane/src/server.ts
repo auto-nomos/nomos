@@ -68,7 +68,10 @@ export function createServer(deps: ServerDeps): Hono {
         signKey: signing.signKey,
         signerDid: signing.signerDid,
         serviceToken: deps.internal.serviceToken,
-        encryptionKey: deps.oauth?.encryptionKey,
+        ...(deps.oauth?.encryptionKey ? { encryptionKey: deps.oauth.encryptionKey } : {}),
+        ...(deps.oauth?.config ? { config: deps.oauth.config } : {}),
+        ...(deps.oauth?.fetch ? { fetch: deps.oauth.fetch } : {}),
+        logger: deps.logger,
       }),
     );
   }

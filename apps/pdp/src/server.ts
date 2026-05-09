@@ -23,6 +23,8 @@ export interface ServerDeps {
    */
   oauthProxy?: {
     fetchOAuthToken: (customerId: string, connectionId: string) => Promise<OAuthTokenResponse>;
+    /** Sprint 5.6 — refresh-on-401. Optional; route falls back to 502 without it. */
+    refreshOAuthToken?: (customerId: string, connectionId: string) => Promise<OAuthTokenResponse>;
     /** Injectable upstream fetch — defaults to global fetch. */
     upstreamFetch?: typeof fetch;
   };
@@ -57,6 +59,9 @@ export function createServer(deps: ServerDeps): Hono {
         policyCache: deps.policyCache,
         revocationCache: deps.revocationCache,
         fetchOAuthToken: deps.oauthProxy.fetchOAuthToken,
+        ...(deps.oauthProxy.refreshOAuthToken !== undefined
+          ? { refreshOAuthToken: deps.oauthProxy.refreshOAuthToken }
+          : {}),
         ...(deps.emitAudit !== undefined ? { emitAudit: deps.emitAudit } : {}),
         ...(deps.oauthProxy.upstreamFetch !== undefined
           ? { upstreamFetch: deps.oauthProxy.upstreamFetch }

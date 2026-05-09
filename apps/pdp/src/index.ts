@@ -87,6 +87,7 @@ async function main(): Promise<void> {
     },
     oauthProxy: {
       fetchOAuthToken: cpClient.fetchOAuthToken,
+      refreshOAuthToken: cpClient.refreshOAuthToken,
     },
   });
 

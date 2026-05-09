@@ -191,4 +191,44 @@ describe('control-plane client', () => {
       status: 404,
     });
   });
+
+  it('refreshOAuthToken POSTs to the refresh endpoint and parses the response', async () => {
+    const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(
+      jsonResponse({
+        connectionId: 'conn-2',
+        customerId: 'cust-1',
+        connector: 'github',
+        accountId: 'octocat',
+        accessToken: 'gho_refreshed',
+        accessTokenExpiresAt: '2026-08-01T00:00:00.000Z',
+        scopesGranted: ['repo'],
+      }),
+    );
+    const client = createControlPlaneClient({
+      baseUrl: 'http://cp',
+      serviceToken: 't',
+      logger,
+      fetchImpl,
+    });
+    const tok = await client.refreshOAuthToken('cust-1', 'conn-2');
+    expect(tok.accessToken).toBe('gho_refreshed');
+    expect(fetchImpl).toHaveBeenCalledWith(
+      'http://cp/v1/internal/oauth-tokens/conn-2/refresh?customerId=cust-1',
+      expect.objectContaining({ method: 'POST' }),
+    );
+  });
+
+  it('refreshOAuthToken throws OAuthTokenFetchError on 401 (refresh rejected)', async () => {
+    const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(new Response(null, { status: 401 }));
+    const client = createControlPlaneClient({
+      baseUrl: 'http://cp',
+      serviceToken: 't',
+      logger,
+      fetchImpl,
+    });
+    await expect(client.refreshOAuthToken('cust-1', 'conn-x')).rejects.toMatchObject({
+      name: 'OAuthTokenFetchError',
+      status: 401,
+    });
+  });
 });

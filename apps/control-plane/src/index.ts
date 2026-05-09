@@ -6,6 +6,7 @@ import { type Config, loadConfig } from './config.js';
 import { createDb } from './db/index.js';
 import { createLogger, type Logger } from './logger.js';
 import { createServer } from './server.js';
+import { createOAuthSweep } from './services/oauth-sweep.js';
 
 function loadOAuthEncryptionKey(config: Config, logger: Logger): Uint8Array {
   const isDevPlaceholder = config.OAUTH_TOKEN_ENCRYPTION_KEY === '00'.repeat(32);
@@ -61,12 +62,22 @@ async function main(): Promise<void> {
     oauth: { config, encryptionKey },
   });
 
+  const sweep = createOAuthSweep({
+    db: db.drizzle,
+    encryptionKey,
+    config,
+    logger,
+  });
+  sweep.start();
+  logger.info('oauth refresh sweep started (interval=1h, lookahead=24h)');
+
   const server = serve({ fetch: app.fetch, port: config.PORT }, (info) => {
     logger.info({ port: info.port }, 'control-plane listening');
   });
 
   const shutdown = async (signal: string): Promise<void> => {
     logger.info({ signal }, 'shutting down');
+    sweep.stop();
     server.close();
     await db.pool.end();
     process.exit(0);

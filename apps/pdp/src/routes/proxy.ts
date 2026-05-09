@@ -49,6 +49,12 @@ export interface ProxyRouteDeps {
   revocationCache: RevocationCache;
   schemaForCustomer?: (customerId: string) => Schema | undefined;
   fetchOAuthToken: (customerId: string, connectionId: string) => Promise<OAuthTokenResponse>;
+  /**
+   * Force-refresh path. When upstream returns 401 the route calls this and
+   * retries the upstream call once. Refresh failure → 502 with reason
+   * `oauth_token_invalid` so the SDK / downstream surfaces the right deny.
+   */
+  refreshOAuthToken?: (customerId: string, connectionId: string) => Promise<OAuthTokenResponse>;
   emitAudit?: (event: AuditEmitInput) => Promise<void> | void;
   /** Injectable upstream fetch — defaults to global fetch. */
   upstreamFetch?: typeof fetch;
@@ -166,6 +172,34 @@ export function createProxyRoutes(deps: ProxyRouteDeps): Hono {
     } catch (err) {
       log.error({ err, connectionId, provider }, 'upstream proxy call failed');
       return c.json({ error: 'upstream_call_failed', decision }, 502);
+    }
+
+    // 401 from upstream + refresh capability available → refresh + retry once.
+    if (upstream.status === 401 && deps.refreshOAuthToken) {
+      try {
+        const refreshed = await deps.refreshOAuthToken(customerId, connectionId);
+        upstream = await proxyApiCall(provider, refreshed.accessToken, apiCall, {
+          fetch: deps.upstreamFetch,
+        });
+        log.info(
+          { customerId, connectionId, retriedStatus: upstream.status },
+          'proxy: refreshed token after 401 and retried',
+        );
+      } catch (err) {
+        log.warn(
+          { err, customerId, connectionId, provider },
+          'proxy: refresh after 401 failed — denying with oauth_token_invalid',
+        );
+        return c.json(
+          {
+            error: 'oauth_token_invalid',
+            decision,
+            connectionId,
+            connector: provider,
+          },
+          502,
+        );
+      }
     }
 
     log.info(

@@ -60,6 +60,13 @@ export interface ControlPlaneClient {
   fetchBundle(customerId: string): Promise<string | undefined>;
   fetchRevocations(customerId: string): Promise<string[] | undefined>;
   fetchOAuthToken(customerId: string, connectionId: string): Promise<OAuthTokenResponse>;
+  /**
+   * Force-refresh the access token for a connection. PDP calls this after a
+   * 401 from upstream so the next retry uses a fresh token. Throws
+   * OAuthTokenFetchError when the control plane refuses (refresh token
+   * itself rejected by provider — caller should deny `oauth_token_invalid`).
+   */
+  refreshOAuthToken(customerId: string, connectionId: string): Promise<OAuthTokenResponse>;
 }
 
 export class OAuthTokenFetchError extends Error {
@@ -144,5 +151,25 @@ export function createControlPlaneClient(opts: ControlPlaneClientOptions): Contr
     return (await res.json()) as OAuthTokenResponse;
   }
 
-  return { fetchBundle, fetchRevocations, fetchOAuthToken };
+  async function refreshOAuthToken(
+    customerId: string,
+    connectionId: string,
+  ): Promise<OAuthTokenResponse> {
+    const res = await fetchImpl(
+      `${opts.baseUrl}/v1/internal/oauth-tokens/${connectionId}/refresh?customerId=${encodeURIComponent(customerId)}`,
+      {
+        method: 'POST',
+        headers: { authorization: `Bearer ${opts.serviceToken}` },
+      },
+    );
+    if (!res.ok) {
+      throw new OAuthTokenFetchError(
+        `oauth token refresh HTTP ${res.status} for connection ${connectionId}`,
+        res.status,
+      );
+    }
+    return (await res.json()) as OAuthTokenResponse;
+  }
+
+  return { fetchBundle, fetchRevocations, fetchOAuthToken, refreshOAuthToken };
 }
