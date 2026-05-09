@@ -6,12 +6,19 @@ import type { Logger } from './logger.js';
 import { loggerMiddleware } from './middleware/logger.js';
 import { requestId } from './middleware/request-id.js';
 import { createHealthRoutes } from './routes/health.js';
+import { createInternalRoutes } from './routes/internal.js';
 import { handleTrpc } from './trpc/handler.js';
 
 export interface ServerDeps {
   logger: Logger;
   db: Db;
   auth: Auth;
+  /** Internal-route deps. When omitted, /v1/internal/* is not mounted. */
+  internal?: {
+    signKey: Uint8Array;
+    signerDid: string;
+    serviceToken: string;
+  };
 }
 
 export function createServer(deps: ServerDeps): Hono {
@@ -23,15 +30,26 @@ export function createServer(deps: ServerDeps): Hono {
 
   app.route('/', createHealthRoutes({ db: deps.db }));
 
-  // Better-Auth handles all /auth/* routes itself (sign-up, sign-in, sign-out,
-  // get-session, etc.). It expects the raw Request and returns a Response.
+  // Better-Auth handles all /auth/* routes itself.
   app.all('/auth/*', (c) => deps.auth.handler(c.req.raw));
 
-  // tRPC under /trpc — every procedure resolves session via Better-Auth and
-  // attaches the authenticated user's active customerId to the context.
+  // tRPC under /trpc — every procedure resolves session via Better-Auth.
   app.all('/trpc/*', (c) =>
     handleTrpc(c.req.raw, { db: deps.db, auth: deps.auth, logger: deps.logger }),
   );
+
+  // Service-to-service endpoints (PDP polls these for signed bundle + revocations).
+  if (deps.internal) {
+    app.route(
+      '/',
+      createInternalRoutes({
+        db: deps.db,
+        signKey: deps.internal.signKey,
+        signerDid: deps.internal.signerDid,
+        serviceToken: deps.internal.serviceToken,
+      }),
+    );
+  }
 
   app.onError((err, c) => {
     deps.logger.error({ err }, 'unhandled error');
