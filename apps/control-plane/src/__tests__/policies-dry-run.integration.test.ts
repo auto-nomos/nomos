@@ -139,7 +139,7 @@ describe.skipIf(!RUN)('policies.dryRun (requires postgres)', () => {
       context: {},
     });
     expect(result.allow).toBe(false);
-    expect(result.reason).toBe('command_mismatch');
+    expect(result.reason).toBe('policy_denied');
   });
 
   it('returns NOT_FOUND when the policy belongs to a different customer', async () => {
