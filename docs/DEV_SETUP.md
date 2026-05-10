@@ -97,7 +97,7 @@ Each subsection covers one feature. Skip the ones you do not plan to test.
 ### 1.A Cloudflare tunnel (required for any OAuth provider in dev)
 
 OAuth providers cannot redirect to `localhost`. The tunnel exposes
-`http://localhost:8788` at `https://<random>.trycloudflare.com`.
+`http://localhost:8788` at a public HTTPS URL the providers can hit.
 
 **Install** (one-time):
 
@@ -106,20 +106,68 @@ brew install cloudflare/cloudflare/cloudflared       # macOS
 cloudflared --version
 ```
 
-**Run** (every time you start an OAuth dev session — URL rotates per run):
+You have two options. Pick one and stick with it.
+
+#### Option 1 — Quick tunnel (default, URL rotates per run)
+
+Easiest to start. The pain: the URL changes on every restart, so all
+four OAuth apps' callback URLs need updating each time, plus
+`CONTROL_PLANE_PUBLIC_URL` in `.env.local`.
 
 ```bash
 pnpm tunnel
 # look for: https://something-something.trycloudflare.com
 ```
 
-Keep the terminal open. Copy the printed URL — you paste it into each
-OAuth provider's callback URL config (1.B–1.E).
+Keep the terminal open. Copy the printed URL into each OAuth provider's
+callback config (1.B–1.E) and into `.env.local` as
+`CONTROL_PLANE_PUBLIC_URL`.
 
-No env var; the URL changes each run, so OAuth apps need their callback
-updated whenever the tunnel restarts. For longer-lived dev URLs, set up
-a named tunnel with a Cloudflare account (free) — outside the scope of
-this guide.
+#### Option 2 — Named tunnel (stable URL, ~10min one-time setup)
+
+Recommended once you've connected more than one OAuth provider — the
+URL never changes, so callback configs stay valid across restarts.
+Requires a domain on Cloudflare (free Cloudflare account works; Workers
+trial domains do **not** support tunnel DNS).
+
+```bash
+# 1. Authenticate (opens browser; pick the zone that owns your domain)
+cloudflared tunnel login
+
+# 2. Create the tunnel — a UUID + creds file land in ~/.cloudflared/
+cloudflared tunnel create cb-dev
+
+# 3. Map a hostname on your zone to the tunnel
+cloudflared tunnel route dns cb-dev cb.dev.example.com
+```
+
+Write `~/.cloudflared/config.yml`:
+
+```yaml
+tunnel: cb-dev
+credentials-file: /Users/me/.cloudflared/<TUNNEL_UUID>.json
+ingress:
+  - hostname: cb.dev.example.com
+    service: http://localhost:8788
+  - service: http_status:404
+```
+
+Run it:
+
+```bash
+cloudflared tunnel run cb-dev
+```
+
+Pin the hostname in `.env.local` once and never touch it again:
+
+```
+CONTROL_PLANE_PUBLIC_URL=https://cb.dev.example.com
+OAUTH_NOTION_AUTHORIZATION_URL=https://api.notion.com/v1/oauth/authorize?client_id=<id>&response_type=code&owner=user&redirect_uri=https%3A%2F%2Fcb.dev.example.com%2Fv1%2Foauth%2Fcallback%2Fnotion
+```
+
+OAuth provider callbacks (1.B–1.E) get the same hostname — set them
+once and they survive every restart of the broker, postgres, and the
+tunnel itself.
 
 ---
 
