@@ -18,6 +18,7 @@
     "@credential-broker/cedar": "workspace:*",
     "@credential-broker/core": "workspace:*",
     "@credential-broker/crypto": "workspace:*",
+    "@credential-broker/schema-packs": "workspace:*",
     "@credential-broker/shared-types": "workspace:*",
     "@credential-broker/ucan": "workspace:*",
     "@hono/node-server": "1.13.7",

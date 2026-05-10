@@ -12,6 +12,7 @@
  */
 import type { Schema } from '@credential-broker/cedar';
 import { type DecideInput, decide } from '@credential-broker/core';
+import { actionsFor, PACKS } from '@credential-broker/schema-packs';
 import { AuthorizeRequest as AuthorizeRequestSchema } from '@credential-broker/shared-types';
 import { parseUcanJwt } from '@credential-broker/ucan';
 import { Hono } from 'hono';
@@ -93,6 +94,18 @@ export function createProxyRoutes(deps: ProxyRouteDeps): Hono {
           bodyCommand: request.command,
         },
         400,
+      );
+    }
+
+    if (!isKnownCommand(request.command)) {
+      log.warn({ command: request.command, customerId }, 'unknown command rejected');
+      return c.json(
+        {
+          allow: false,
+          decision: { allow: false, reason: 'unknown_command' },
+          error_code: 'unknown_command',
+        },
+        403,
       );
     }
 
@@ -256,6 +269,22 @@ export function createProxyRoutes(deps: ProxyRouteDeps): Hono {
   });
 
   return app;
+}
+
+/** Cached set of every command the schema-packs declare. Commands of the
+ *  shape `/integration/*` map to actionsFor(integration); anything not in
+ *  the union is rejected as `unknown_command` before decide() runs.
+ *  Unknown integrations (unmapped first segment) pass through so generic
+ *  Cedar policies can still match arbitrary action namespaces in tests. */
+const KNOWN_COMMANDS: ReadonlySet<string> = new Set(PACKS.flatMap((pack) => actionsFor(pack.id)));
+const KNOWN_INTEGRATIONS: ReadonlySet<string> = new Set(PACKS.map((p) => p.id));
+
+function isKnownCommand(command: string): boolean {
+  if (KNOWN_COMMANDS.has(command)) return true;
+  const seg = command.split('/')[1];
+  if (!seg) return false;
+  // Integrations the schema-packs don't ship for: leave the call to Cedar.
+  return !KNOWN_INTEGRATIONS.has(seg);
 }
 
 function leafUcan(jwts: string | string[]) {

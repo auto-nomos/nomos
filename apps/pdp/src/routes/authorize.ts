@@ -1,6 +1,7 @@
 import type { Schema } from '@credential-broker/cedar';
 import { type DecideInput, decide } from '@credential-broker/core';
 import { sha256Hex } from '@credential-broker/crypto';
+import { actionsFor, PACKS } from '@credential-broker/schema-packs';
 import {
   type AuthorizeDecision,
   type AuthorizeRequest,
@@ -68,6 +69,16 @@ function extractAgentDid(jwt: string): string {
   return parsed.payload.aud;
 }
 
+const KNOWN_COMMANDS: ReadonlySet<string> = new Set(PACKS.flatMap((pack) => actionsFor(pack.id)));
+const KNOWN_INTEGRATIONS: ReadonlySet<string> = new Set(PACKS.map((p) => p.id));
+
+function isKnownCommand(command: string): boolean {
+  if (KNOWN_COMMANDS.has(command)) return true;
+  const seg = command.split('/')[1];
+  if (!seg) return false;
+  return !KNOWN_INTEGRATIONS.has(seg);
+}
+
 export function createAuthorizeRoutes(deps: AuthorizeRouteDeps): Hono {
   const app = new Hono();
 
@@ -88,6 +99,26 @@ export function createAuthorizeRoutes(deps: AuthorizeRouteDeps): Hono {
       return c.json({ error: 'invalid request shape', issues: parsed.error.issues }, 400);
     }
     const request = parsed.data;
+
+    if (!isKnownCommand(request.command)) {
+      log.warn({ command: request.command, customerId }, 'unknown command rejected');
+      const denyDecision: AuthorizeDecision = {
+        allow: false,
+        reason: 'unknown_command',
+        receiptId: sha256Hex(`unknown-command|${request.command}`),
+      };
+      recordAuthorize(decisionToAudit(denyDecision), denyDecision.reason);
+      if (deps.emitAudit) {
+        await deps.emitAudit({
+          customerId,
+          request,
+          decision: { ...denyDecision },
+          ts: Date.now(),
+          agentDid: extractAgentDid(request.ucan),
+        });
+      }
+      return c.json(denyDecision, 200);
+    }
 
     const policies = deps.policyCache.getPolicies(customerId);
     if (policies === undefined) {

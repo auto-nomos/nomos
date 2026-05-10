@@ -33,6 +33,7 @@ export const DenyReason = z.enum([
   'policy_denied',
   'oauth_token_invalid',
   'unknown_customer',
+  'unknown_command',
   'malformed_ucan',
   'untrusted_issuer',
   'step_up_required',
