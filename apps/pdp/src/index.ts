@@ -54,13 +54,46 @@ async function main(): Promise<void> {
     );
   }
 
-  // Customers the PDP services. In dev: comma-separated env list.
-  // Sprint 8 push-revocation will let the control plane register customers
-  // dynamically; for now an explicit allow-list keeps the cache scoped.
-  const knownCustomers = (config.PDP_CUSTOMER_IDS ?? '')
+  // Customers the PDP services. Discovered from the control plane at boot
+  // and refreshed on a slow timer; PDP_CUSTOMER_IDS still works as an
+  // override for offline dev (skip the boot fetch when it's set).
+  const envCustomers = (config.PDP_CUSTOMER_IDS ?? '')
     .split(',')
     .map((s) => s.trim())
     .filter((s) => s.length > 0);
+  let knownCustomers: string[] = envCustomers;
+  if (envCustomers.length === 0) {
+    try {
+      knownCustomers = await cpClient.fetchCustomerIds();
+      logger.info({ count: knownCustomers.length }, 'discovered customers from control plane');
+    } catch (err) {
+      logger.warn({ err }, 'customer discovery failed at boot — caches will start empty');
+    }
+  } else {
+    logger.info(
+      { count: envCustomers.length },
+      'PDP_CUSTOMER_IDS override active — skipping CP discovery',
+    );
+  }
+  const CUSTOMER_DISCOVERY_INTERVAL_MS = 60_000;
+  if (envCustomers.length === 0) {
+    setInterval(() => {
+      cpClient
+        .fetchCustomerIds()
+        .then((ids) => {
+          if (ids.length !== knownCustomers.length) {
+            logger.info(
+              { before: knownCustomers.length, after: ids.length },
+              'customer set changed',
+            );
+          }
+          knownCustomers = ids;
+        })
+        .catch((err) => {
+          logger.warn({ err }, 'customer discovery refresh failed; keeping last known set');
+        });
+    }, CUSTOMER_DISCOVERY_INTERVAL_MS).unref();
+  }
 
   const policyCache = createPolicyCache({
     fetchBundle: cpClient.fetchBundle,

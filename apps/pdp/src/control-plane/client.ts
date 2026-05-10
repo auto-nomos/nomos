@@ -75,6 +75,9 @@ export interface StepUpStateResponse {
 }
 
 export interface ControlPlaneClient {
+  /** Discover all customers the control plane knows about. PDP polls this
+   *  on a slow interval so a new tenant doesn't need a PDP restart. */
+  fetchCustomerIds(): Promise<string[]>;
   fetchBundle(customerId: string): Promise<string | undefined>;
   fetchRevocations(customerId: string): Promise<string[] | undefined>;
   fetchOAuthToken(customerId: string, connectionId: string): Promise<OAuthTokenResponse>;
@@ -264,7 +267,19 @@ export function createControlPlaneClient(opts: ControlPlaneClientOptions): Contr
     };
   }
 
+  async function fetchCustomerIds(): Promise<string[]> {
+    const res = await fetchImpl(`${opts.baseUrl}/v1/internal/customers`, {
+      headers: { authorization: `Bearer ${opts.serviceToken}` },
+    });
+    if (!res.ok) {
+      throw new Error(`customers fetch ${res.status}`);
+    }
+    const body = (await res.json()) as { customers?: { id: string }[] };
+    return (body.customers ?? []).map((c) => c.id);
+  }
+
   return {
+    fetchCustomerIds,
     fetchBundle,
     fetchRevocations,
     fetchOAuthToken,

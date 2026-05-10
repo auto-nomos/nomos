@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import type { Config } from '../config.js';
 import type { Db } from '../db/index.js';
+import * as schema from '../db/schema.js';
 import type { Logger } from '../logger.js';
 import { internalAuth } from '../middleware/internal-auth.js';
 import { loadConnectionById } from '../oauth/tokens.js';
@@ -38,6 +39,16 @@ export function createInternalRoutes(deps: InternalDeps): Hono {
   // (e.g. /v1/oauth/callback, mounted on the same parent app) don't get
   // intercepted with 401 by this sub-app's middleware.
   app.use('/v1/internal/*', internalAuth(deps.serviceToken));
+
+  // Discoverable customer list — replaces PDP_CUSTOMER_IDS env var.
+  // Returns id + createdAt; PDP polls this on a slow interval to learn
+  // about new tenants without a redeploy.
+  app.get('/v1/internal/customers', async (c) => {
+    const rows = await deps.db.drizzle
+      .select({ id: schema.customers.id, createdAt: schema.customers.createdAt })
+      .from(schema.customers);
+    return c.json({ customers: rows });
+  });
 
   app.get('/v1/internal/bundles/:customerId', async (c) => {
     const customerId = c.req.param('customerId');
