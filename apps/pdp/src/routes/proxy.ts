@@ -123,6 +123,7 @@ export function createProxyRoutes(deps: ProxyRouteDeps): Hono {
     recordAuthorize(decisionToAudit(decision), decision.reason);
 
     if (deps.emitAudit) {
+      const leafForAudit = leafUcan(parsed.data.ucan);
       await deps.emitAudit({
         customerId,
         request,
@@ -132,7 +133,7 @@ export function createProxyRoutes(deps: ProxyRouteDeps): Hono {
           receiptId: decision.receiptId,
         },
         ts: Date.now(),
-        agentDid: 'unknown',
+        agentDid: leafForAudit?.payload.aud ?? 'unknown',
       });
     }
 

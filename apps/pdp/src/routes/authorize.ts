@@ -62,6 +62,12 @@ function extractAgentId(jwt: string): string | undefined {
   return typeof meta?.agent_id === 'string' ? meta.agent_id : undefined;
 }
 
+function extractAgentDid(jwt: string): string {
+  const parsed = parseUcanJwt(jwt);
+  if ('error' in parsed) return 'unknown';
+  return parsed.payload.aud;
+}
+
 export function createAuthorizeRoutes(deps: AuthorizeRouteDeps): Hono {
   const app = new Hono();
 
@@ -121,7 +127,7 @@ export function createAuthorizeRoutes(deps: AuthorizeRouteDeps): Hono {
             request,
             decision: { ...denyDecision },
             ts: Date.now(),
-            agentDid: 'unknown',
+            agentDid: extractAgentDid(request.ucan),
           });
         }
         log.info(
@@ -196,7 +202,7 @@ export function createAuthorizeRoutes(deps: AuthorizeRouteDeps): Hono {
           receiptId: decision.receiptId,
         },
         ts: Date.now(),
-        agentDid: 'unknown', // populated by validation in core in future iterations
+        agentDid: extractAgentDid(request.ucan),
       });
     }
 
