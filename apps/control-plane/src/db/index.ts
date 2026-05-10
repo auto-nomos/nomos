@@ -1,3 +1,4 @@
+import { PACKS } from '@credential-broker/schema-packs';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import pg from 'pg';
 import type { Config } from '../config.js';
@@ -21,4 +22,20 @@ export async function pingDb(db: Db): Promise<void> {
   if (result.rows[0]?.ok !== 1) {
     throw new Error('db ping returned unexpected result');
   }
+}
+
+/**
+ * Seed one row per schema-pack integration. The `policies.integration_id`
+ * FK references `schemas.id`, so without these rows a fresh DB rejects
+ * every policy save with a foreign-key violation. `definition` and
+ * `schemaHash` stay empty until P2.6 wires schema-pack runtime enforcement.
+ */
+export async function seedSchemas(db: Db): Promise<void> {
+  const rows = PACKS.map((pack) => ({
+    id: pack.id,
+    version: 'v1',
+    definition: {},
+    schemaHash: '',
+  }));
+  await db.drizzle.insert(schema.schemas).values(rows).onConflictDoNothing();
 }

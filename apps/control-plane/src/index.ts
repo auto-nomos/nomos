@@ -3,7 +3,7 @@ import { serve } from '@hono/node-server';
 import { hexToBytes } from '@noble/hashes/utils';
 import { createAuth } from './auth/index.js';
 import { type Config, loadConfig } from './config.js';
-import { createDb } from './db/index.js';
+import { createDb, seedSchemas } from './db/index.js';
 import { createLogger, type Logger } from './logger.js';
 import { createServer } from './server.js';
 import { createOAuthSweep } from './services/oauth-sweep.js';
@@ -74,6 +74,7 @@ async function main(): Promise<void> {
   const logger = createLogger(config);
 
   const db = createDb(config);
+  await seedSchemas(db);
   const auth = createAuth({ db: db.drizzle, config, logger });
   const { signKey, signerDid } = loadSigningKey(config, logger);
   const encryptionKey = loadOAuthEncryptionKey(config, logger);
