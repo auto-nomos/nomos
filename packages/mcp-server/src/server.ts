@@ -14,7 +14,10 @@ export function createMcpServer(deps: McpServerDeps): McpServer {
     version: '0.0.0',
   });
   for (const tool of toolsFor(deps.integrations)) {
-    server.registerTool(
+    // Cast to any: zod-version drift between the MCP SDK and our pin makes
+    // the registerTool overload inference recurse to TS2589. The runtime
+    // contract is unchanged.
+    (server.registerTool as unknown as (...args: unknown[]) => unknown)(
       tool.name,
       {
         title: tool.title,

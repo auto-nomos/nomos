@@ -35,6 +35,11 @@
       "biome check --write --no-errors-on-unmatched"
     ]
   },
+  "pnpm": {
+    "overrides": {
+      "zod": "^3.25.0"
+    }
+  },
   "devDependencies": {
     "@biomejs/biome": "2.4.14",
     "@changesets/cli": "2.27.11",
