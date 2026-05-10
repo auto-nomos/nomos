@@ -1,0 +1,57 @@
+# Customer-edge PDP — runs near the customer's data, fetches signed
+# policy bundles from a remote control plane over HTTPS, never holds
+# customer secrets except OAuth tokens it already had to fetch.
+#
+# Use this when:
+#   - You want PDP latency in your VPC (auth check on every API call).
+#   - You don't want decisions/audit to leave your perimeter.
+#   - The control plane is hosted by us; you self-host this PDP only.
+#
+# Required env (paste a real .env next to this file):
+#   CONTROL_PLANE_URL=https://api.credentialbroker.dev
+#   CONTROL_PLANE_SERVICE_TOKEN=<service token for your tenant>
+#   CONTROL_PLANE_BUNDLE_VERIFY_KEY=<hex pubkey from control-plane>
+#   AUDIT_BACKEND=jsonl                 # postgres requires DATABASE_URL
+#   AUDIT_LOG_PATH=/var/audit/pdp.log   # mounted volume below
+#   PDP_CUSTOMER_IDS=<your-customer-uuid>
+#
+# Build the image once locally (or pull from your registry):
+#   docker build -t cb-pdp:edge -f apps/pdp/Dockerfile .
+#
+# Run:
+#   docker compose -f infrastructure/docker/docker-compose.edge.yml --env-file .env.edge up -d
+
+services:
+  pdp:
+    image: cb-pdp:edge
+    container_name: cb-pdp-edge
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 8787
+      LOG_LEVEL: info
+      CONTROL_PLANE_URL: ${CONTROL_PLANE_URL:?required}
+      CONTROL_PLANE_SERVICE_TOKEN: ${CONTROL_PLANE_SERVICE_TOKEN:?required}
+      CONTROL_PLANE_BUNDLE_VERIFY_KEY: ${CONTROL_PLANE_BUNDLE_VERIFY_KEY:?required}
+      AUDIT_BACKEND: ${AUDIT_BACKEND:-jsonl}
+      AUDIT_LOG_PATH: ${AUDIT_LOG_PATH:-/var/audit/pdp.log}
+      AUDIT_FLUSH_INTERVAL_MS: "100"
+      AUDIT_BATCH_SIZE_MAX: "100"
+      POLICY_REFRESH_MS: "60000"
+      REVOCATION_REFRESH_MS: "5000"
+      # Optional override; omit to let the PDP discover from CP.
+      PDP_CUSTOMER_IDS: ${PDP_CUSTOMER_IDS:-}
+      OTEL_SERVICE_NAME: cb-pdp-edge
+    ports:
+      - "8787:8787"
+    volumes:
+      - cb_audit:/var/audit
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8787/healthz || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  cb_audit:
+    name: cb_audit

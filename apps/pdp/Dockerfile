@@ -23,6 +23,7 @@ COPY packages/crypto/package.json packages/crypto/
 COPY packages/ucan/package.json packages/ucan/
 COPY packages/cedar/package.json packages/cedar/
 COPY packages/core/package.json packages/core/
+COPY packages/schema-packs/package.json packages/schema-packs/
 COPY apps/pdp/package.json apps/pdp/
 
 # Install dependencies (workspace-scoped to PDP and its transitive deps)
@@ -35,6 +36,7 @@ COPY packages/crypto packages/crypto/
 COPY packages/ucan packages/ucan/
 COPY packages/cedar packages/cedar/
 COPY packages/core packages/core/
+COPY packages/schema-packs packages/schema-packs/
 COPY apps/pdp apps/pdp/
 
 # Build PDP and its workspace dependencies

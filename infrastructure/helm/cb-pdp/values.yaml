@@ -1,0 +1,99 @@
+# Default values for cb-pdp.
+# Required: image.repository + the controlPlane block + secret block.
+
+replicaCount: 2
+
+image:
+  repository: ghcr.io/varendra007/cb-pdp
+  pullPolicy: IfNotPresent
+  tag: ""  # default to .Chart.AppVersion
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: [ALL]
+
+service:
+  type: ClusterIP
+  port: 8787
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: pdp.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    memory: 512Mi
+
+autoscaling:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+
+# Required: where the control plane lives + service token + signed-bundle pubkey.
+# secret.* values flow into a generated Secret consumed via env.
+controlPlane:
+  url: "https://api.credentialbroker.dev"
+
+secret:
+  # Service token issued for this customer (Bearer auth on /v1/internal/*).
+  controlPlaneServiceToken: ""
+  # Hex Ed25519 pubkey the control-plane signs bundles with. PDP refuses
+  # bundles that don't verify against this key.
+  bundleVerifyKey: ""
+
+# Audit backend. `jsonl` writes to a tmpfs volume (lost on pod restart);
+# `postgres` requires DATABASE_URL pointing at your own DB.
+audit:
+  backend: jsonl
+  logPath: /var/audit/pdp.log
+  databaseUrl: ""
+
+# Optional: pin the customer set for offline operation. Leave empty to
+# let the PDP discover from the control plane at boot + every 60s.
+customerIdsOverride: ""
+
+env:
+  POLICY_REFRESH_MS: "60000"
+  REVOCATION_REFRESH_MS: "5000"
+  LOG_LEVEL: "info"
+  OTEL_SERVICE_NAME: "cb-pdp"
+
+# OTel: set when shipping traces. Leave commented for off.
+# otelExporterEndpoint: "https://otlp.example.com"
+# otelExporterHeaders: "authorization=Bearer ..."
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+# Tighten if your network policy whitelists egress.
+egress:
+  allowControlPlane: true
+  allowOAuthProviders: true  # PDP doesn't directly talk to providers; CP does

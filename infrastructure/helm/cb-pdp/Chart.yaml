@@ -1,0 +1,17 @@
+apiVersion: v2
+name: cb-pdp
+description: Customer-edge Credential Broker PDP. Stateless except for an audit JSONL volume; fetches signed policy bundles from a remote control plane.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+keywords:
+  - credential-broker
+  - oauth
+  - cedar
+  - ucan
+  - policy-decision-point
+home: https://github.com/varendra007/agent-credential-broker
+sources:
+  - https://github.com/varendra007/agent-credential-broker
+maintainers:
+  - name: credential-broker
