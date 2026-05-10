@@ -3,6 +3,7 @@
 import { Copy, KeyRound, Trash2 } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { use, useEffect, useState } from 'react';
+import { AgentAuditPanel } from '../../../../components/agent-audit-panel';
 import { Badge } from '../../../../components/ui/badge';
 import { Button } from '../../../../components/ui/button';
 import {
@@ -198,50 +199,7 @@ export default function AgentDetailPage({ params }: { params: Promise<{ id: stri
         </Card>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Recent audit</CardTitle>
-          <CardDescription>Last 50 decisions involving this DID.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {audit.isPending ? (
-            <p className="text-sm text-muted-foreground">Loading…</p>
-          ) : audit.data && audit.data.length > 0 ? (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Time</TableHead>
-                  <TableHead>Command</TableHead>
-                  <TableHead>Decision</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {audit.data.map((row) => (
-                  <TableRow key={row.eventId}>
-                    <TableCell className="text-xs">{formatDate(row.ts)}</TableCell>
-                    <TableCell className="font-mono text-xs">{row.command ?? '—'}</TableCell>
-                    <TableCell>
-                      <Badge
-                        variant={
-                          row.decision === 'allow'
-                            ? 'success'
-                            : row.decision === 'stepup'
-                              ? 'warning'
-                              : 'destructive'
-                        }
-                      >
-                        {row.decision}
-                      </Badge>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          ) : (
-            <p className="text-sm text-muted-foreground">No audit events yet.</p>
-          )}
-        </CardContent>
-      </Card>
+      <AgentAuditPanel rows={audit.data ?? []} isPending={audit.isPending} />
 
       <RevealedKeyDialog secret={revealedKey} onClose={() => setRevealedKey(null)} />
 
