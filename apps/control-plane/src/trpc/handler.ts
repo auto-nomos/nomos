@@ -1,5 +1,6 @@
 import { fetchRequestHandler } from '@trpc/server/adapters/fetch';
 import type { Auth } from '../auth/index.js';
+import type { Config } from '../config.js';
 import type { Db } from '../db/index.js';
 import type { Logger } from '../logger.js';
 import type { RevocationPublisher } from '../services/revocation-publisher.js';
@@ -14,6 +15,7 @@ export interface TrpcHandlerDeps {
   signing: { signKey: Uint8Array; signerDid: string };
   revocationPublisher?: RevocationPublisher;
   webauthn?: WebAuthnConfig;
+  oauth?: { config: Config; encryptionKey: Uint8Array };
 }
 
 export function handleTrpc(req: Request, deps: TrpcHandlerDeps): Promise<Response> {
@@ -29,6 +31,7 @@ export function handleTrpc(req: Request, deps: TrpcHandlerDeps): Promise<Respons
         signing: deps.signing,
         ...(deps.revocationPublisher ? { revocationPublisher: deps.revocationPublisher } : {}),
         ...(deps.webauthn ? { webauthn: deps.webauthn } : {}),
+        ...(deps.oauth ? { oauth: deps.oauth } : {}),
       }),
     onError: ({ error, path }) => {
       deps.logger.error({ err: error, path }, 'trpc error');

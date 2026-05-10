@@ -1,5 +1,6 @@
 import { eq } from 'drizzle-orm';
 import type { Auth } from '../auth/index.js';
+import type { Config } from '../config.js';
 import type { Db } from '../db/index.js';
 import * as schema from '../db/schema.js';
 import type { Logger } from '../logger.js';
@@ -19,6 +20,8 @@ export interface ContextDeps {
   revocationPublisher?: RevocationPublisher;
   /** Sprint 9 — passkey origin/rpId. Required for stepup router. */
   webauthn?: WebAuthnConfig;
+  /** OAuth refresh deps. Required for oauth.refresh / oauth.disconnect. */
+  oauth?: { config: Config; encryptionKey: Uint8Array };
 }
 
 export interface Context {
@@ -27,6 +30,7 @@ export interface Context {
   signing: { signKey: Uint8Array; signerDid: string };
   revocationPublisher: RevocationPublisher;
   webauthn: WebAuthnConfig | null;
+  oauth: { config: Config; encryptionKey: Uint8Array } | null;
   session: {
     user: { id: string; email: string; name: string | null };
     token: string;
@@ -73,6 +77,7 @@ export async function createContext(req: Request, deps: ContextDeps): Promise<Co
     signing: deps.signing,
     revocationPublisher: deps.revocationPublisher ?? noopRevocationPublisher(),
     webauthn: deps.webauthn ?? null,
+    oauth: deps.oauth ?? null,
     session: userPayload,
     customerId,
   };

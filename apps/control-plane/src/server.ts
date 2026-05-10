@@ -101,6 +101,9 @@ export function createServer(deps: ServerDeps): Hono {
       signing: signing,
       ...(deps.revocationPublisher ? { revocationPublisher: deps.revocationPublisher } : {}),
       ...(deps.webauthn ? { webauthn: deps.webauthn } : {}),
+      ...(deps.oauth
+        ? { oauth: { config: deps.oauth.config, encryptionKey: deps.oauth.encryptionKey } }
+        : {}),
     }),
   );
 
