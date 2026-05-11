@@ -2,10 +2,10 @@
 const nextConfig = {
   reactStrictMode: true,
   transpilePackages: [
-    '@credential-broker/cedar',
-    '@credential-broker/policy-builder',
-    '@credential-broker/schema-packs',
-    '@credential-broker/shared-types',
+    '@auto-nomos/cedar',
+    '@auto-nomos/policy-builder',
+    '@auto-nomos/schema-packs',
+    '@auto-nomos/shared-types',
   ],
   experimental: {
     typedRoutes: false,

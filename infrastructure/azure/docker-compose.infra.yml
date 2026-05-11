@@ -1,0 +1,31 @@
+# Postgres + Redis only — apps run via systemd.
+# Start: docker compose -f infrastructure/azure/docker-compose.infra.yml up -d --wait
+# POSTGRES_PASSWORD must be in environment (sourced from .env.local by deploy.sh).
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: cb
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: cb_prod
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "cb", "-d", "cb_prod"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:6379:6379"
+    command: redis-server --save "" --appendonly no --maxmemory 64mb --maxmemory-policy allkeys-lru
+
+volumes:
+  postgres_data:

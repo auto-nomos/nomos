@@ -10,7 +10,7 @@
  */
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { generateKeypair } from '@credential-broker/crypto';
+import { generateKeypair } from '@auto-nomos/crypto';
 import { bytesToHex } from '@noble/hashes/utils';
 
 const ENV_FILE = resolve(process.cwd(), '.env.local');

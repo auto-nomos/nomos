@@ -28,7 +28,7 @@ COPY apps/pdp/package.json apps/pdp/
 
 # Install dependencies (workspace-scoped to PDP and its transitive deps)
 RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
-    pnpm install --frozen-lockfile --filter=@credential-broker/pdp...
+    pnpm install --frozen-lockfile --filter=@auto-nomos/pdp...
 
 # Copy source
 COPY packages/shared-types packages/shared-types/
@@ -40,10 +40,10 @@ COPY packages/schema-packs packages/schema-packs/
 COPY apps/pdp apps/pdp/
 
 # Build PDP and its workspace dependencies
-RUN pnpm --filter @credential-broker/pdp... build
+RUN pnpm --filter @auto-nomos/pdp... build
 
 # Prune to production deps and create a minimal deploy artifact at /deploy
-RUN pnpm --filter @credential-broker/pdp deploy --prod --legacy /deploy
+RUN pnpm --filter @auto-nomos/pdp deploy --prod --legacy /deploy
 
 ####################
 # Stage 2: runtime #

@@ -255,7 +255,7 @@ export function createTelegramBot(opts: TelegramBotOptions): TelegramBot {
         if (text === '/start' || text === '/help') {
           await sendMessage({
             chatId: chat.id,
-            text: 'credential-broker bot. Open the dashboard → Settings → Connect Telegram to link.',
+            text: 'Nomos bot. Open the dashboard → Settings → Connect Telegram to link.',
           });
           return;
         }
