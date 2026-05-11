@@ -1,7 +1,7 @@
-import { parsePolicy } from '@credential-broker/cedar';
-import { decide } from '@credential-broker/core';
-import { parseToIr } from '@credential-broker/policy-builder';
-import { issueUcan } from '@credential-broker/ucan';
+import { parsePolicy } from '@auto-nomos/cedar';
+import { decide } from '@auto-nomos/core';
+import { parseToIr } from '@auto-nomos/policy-builder';
+import { issueUcan } from '@auto-nomos/ucan';
 import { TRPCError } from '@trpc/server';
 import { and, desc, eq } from 'drizzle-orm';
 import { z } from 'zod';

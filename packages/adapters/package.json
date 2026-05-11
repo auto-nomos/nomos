@@ -1,0 +1,46 @@
+{
+  "name": "@auto-nomos/adapters",
+  "version": "0.0.1",
+  "private": false,
+  "description": "YAML-driven adapter framework for SaaS integrations. Spec defines actions/scopes/risk/transforms/sanitize; TS executor calls existing Connector.callApi.",
+  "license": "MIT",
+  "homepage": "https://github.com/auto-nomos/nomos/tree/main/packages/adapters#readme",
+  "bugs": {
+    "url": "https://github.com/auto-nomos/nomos/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/auto-nomos/nomos.git",
+    "directory": "packages/adapters"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "spec",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "clean": "rm -rf dist .turbo"
+  },
+  "dependencies": {
+    "yaml": "2.6.1",
+    "zod": "3.25.76"
+  },
+  "devDependencies": {
+    "@types/node": "22.10.5",
+    "typescript": "5.7.2",
+    "vitest": "4.1.5"
+  }
+}

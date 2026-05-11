@@ -1,0 +1,58 @@
+id: twilio
+name: Twilio
+version: 1.0.0
+description: Twilio REST API — SMS, voice, lookup.
+homepage: https://www.twilio.com/docs/usage/api
+
+# Account SID + Auth Token; basic auth header at runtime.
+# api_base path includes the account SID; param `account_sid` carries it.
+api_base: https://api.twilio.com/2010-04-01
+
+auth:
+  kind: basic
+  setup_url: https://console.twilio.com
+
+actions:
+  - id: send_sms
+    description: Send a text message.
+    expected_use: Notify a user via SMS.
+    auto_execute: false
+    risk: { category: write, sensitivity: high }
+    http:
+      method: POST
+      path: "/Accounts/{account_sid}/Messages.json"
+    params:
+      - { name: account_sid, in: path, required: true, type: string }
+      - { name: To, in: form, required: true, type: string }
+      - { name: From, in: form, required: true, type: string }
+      - { name: Body, in: form, required: true, type: string }
+
+  - id: list_messages
+    description: List recent messages on the account.
+    expected_use: Audit outbound traffic.
+    auto_execute: true
+    risk: { category: read, sensitivity: medium }
+    http:
+      method: GET
+      path: "/Accounts/{account_sid}/Messages.json"
+    params:
+      - { name: account_sid, in: path, required: true, type: string }
+      - { name: PageSize, in: query, type: integer, default: 50 }
+    response:
+      type: object
+      sanitize:
+        - { field: "messages[].to", hash: true }
+        - { field: "messages[].from_", hash: true }
+
+  - id: lookup_phone
+    description: Look up phone number metadata (carrier / type).
+    expected_use: Validate a phone number before calling.
+    auto_execute: true
+    risk: { category: read, sensitivity: medium }
+    http:
+      method: GET
+      path: "/v2/PhoneNumbers/{phone}"
+      base_url_override: https://lookups.twilio.com
+    params:
+      - { name: phone, in: path, required: true, type: string }
+      - { name: Type, in: query, type: array }

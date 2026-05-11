@@ -14,7 +14,7 @@
  *      and the stored `cosigner_attestation_jwt` matches what we received
  *      bit-for-bit. Re-using a stale or rolled-back JWT fails here.
  */
-import { computeCid, parseUcanJwt, validateUcan } from '@credential-broker/ucan';
+import { computeCid, parseUcanJwt, validateUcan } from '@auto-nomos/ucan';
 import type { StepUpStateResponse } from '../control-plane/client.js';
 
 export type CosignerValidationFailure =

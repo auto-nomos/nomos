@@ -1,7 +1,7 @@
 'use client';
 
-import { emitPolicySet, type VisualPolicy } from '@credential-broker/policy-builder/browser';
-import { PolicyBuilder } from '@credential-broker/policy-builder/components';
+import { emitPolicySet, type VisualPolicy } from '@auto-nomos/policy-builder/browser';
+import { PolicyBuilder } from '@auto-nomos/policy-builder/components';
 import { CheckCircle2, XCircle } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { trpc } from '../lib/trpc';

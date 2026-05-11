@@ -2,59 +2,292 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --background: 0 0% 100%;
-  --foreground: 240 10% 3.9%;
-  --card: 0 0% 100%;
-  --card-foreground: 240 10% 3.9%;
-  --popover: 0 0% 100%;
-  --popover-foreground: 240 10% 3.9%;
-  --primary: 240 5.9% 10%;
-  --primary-foreground: 0 0% 98%;
-  --secondary: 240 4.8% 95.9%;
-  --secondary-foreground: 240 5.9% 10%;
-  --muted: 240 4.8% 95.9%;
-  --muted-foreground: 240 3.8% 46.1%;
-  --accent: 240 4.8% 95.9%;
-  --accent-foreground: 240 5.9% 10%;
-  --destructive: 0 84.2% 60.2%;
-  --destructive-foreground: 0 0% 98%;
-  --border: 240 5.9% 90%;
-  --input: 240 5.9% 90%;
-  --ring: 240 5.9% 10%;
-  --radius: 0.5rem;
-  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system;
-  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
-}
+/* ======================================================================
+   NOMOS — design tokens
+   ----------------------------------------------------------------------
+   Brand: authorization layer for AI agents. The aesthetic borrows from
+   instrumentation / aviation panels and editorial print. Deep ink canvas,
+   parchment-warm text, electric chartreuse signal. Hairline rules. Sharp
+   corners. Mono metadata. The whole product feels *measured*.
+   ====================================================================== */
 
+:root,
+[data-theme="aegis"],
 .dark {
-  --background: 240 10% 3.9%;
-  --foreground: 0 0% 98%;
-  --card: 240 10% 3.9%;
-  --card-foreground: 0 0% 98%;
-  --popover: 240 10% 3.9%;
-  --popover-foreground: 0 0% 98%;
-  --primary: 0 0% 98%;
-  --primary-foreground: 240 5.9% 10%;
-  --secondary: 240 3.7% 15.9%;
-  --secondary-foreground: 0 0% 98%;
-  --muted: 240 3.7% 15.9%;
-  --muted-foreground: 240 5% 64.9%;
-  --accent: 240 3.7% 15.9%;
-  --accent-foreground: 0 0% 98%;
-  --destructive: 0 62.8% 30.6%;
-  --destructive-foreground: 0 0% 98%;
-  --border: 240 3.7% 15.9%;
-  --input: 240 3.7% 15.9%;
-  --ring: 240 4.9% 83.9%;
+  /* Nomos signal palette — single dark canvas for the entire product. */
+  --aegis-ink: 222 24% 6%; /* canvas */
+  --aegis-surface: 222 18% 9%; /* card */
+  --aegis-surface-2: 222 16% 12%; /* raised */
+  --aegis-line: 222 14% 18%; /* hairline */
+  --aegis-line-strong: 222 14% 26%;
+  --aegis-paper: 36 28% 92%; /* primary text — warm parchment */
+  --aegis-mute: 220 8% 56%; /* secondary text */
+  --aegis-faint: 220 8% 38%; /* tertiary text */
+  --aegis-signal: 75 86% 68%; /* chartreuse accent */
+  --aegis-signal-soft: 75 60% 30%; /* dim accent for fills */
+  --aegis-coral: 6 86% 64%; /* deny / danger */
+  --aegis-amber: 36 92% 60%; /* step-up / warning */
+  --aegis-iris: 248 64% 70%; /* informational */
+
+  /* shadcn token map — every value points to an Nomos dark token. */
+  --background: var(--aegis-ink);
+  --foreground: var(--aegis-paper);
+  --card: var(--aegis-surface);
+  --card-foreground: var(--aegis-paper);
+  --popover: var(--aegis-surface-2);
+  --popover-foreground: var(--aegis-paper);
+  --primary: var(--aegis-paper);
+  --primary-foreground: var(--aegis-ink);
+  --secondary: var(--aegis-surface-2);
+  --secondary-foreground: var(--aegis-paper);
+  --muted: var(--aegis-surface-2);
+  --muted-foreground: var(--aegis-mute);
+  --accent: var(--aegis-signal);
+  --accent-foreground: var(--aegis-ink);
+  --destructive: var(--aegis-coral);
+  --destructive-foreground: var(--aegis-paper);
+  --border: var(--aegis-line);
+  --input: var(--aegis-line);
+  --ring: var(--aegis-signal);
+  --radius: 0.25rem;
+
+  --font-display: "Fraunces", ui-serif, Georgia, serif;
+  --font-sans: "Hanken Grotesk", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", monospace;
+
+  color-scheme: dark;
 }
 
 * {
   border-color: hsl(var(--border));
 }
 
+html,
 body {
   background-color: hsl(var(--background));
   color: hsl(var(--foreground));
-  font-feature-settings: 'rlig' 1, 'calt' 1;
+}
+
+body {
+  font-family: var(--font-sans);
+  font-feature-settings:
+    "ss01",
+    "ss02",
+    "cv11",
+    "rlig" 1,
+    "calt" 1;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* Nomos canvas is dark everywhere. Two overlays keep large flat surfaces
+   alive without resorting to the obvious purple-gradient cliché:
+     ::before — twin radial vignettes pulling chartreuse + iris
+     ::after  — sub-perceptual procedural noise (1px grain) */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(ellipse 80% 60% at 70% -10%, hsl(var(--aegis-signal) / 0.06), transparent 60%),
+    radial-gradient(ellipse 60% 50% at 0% 100%, hsl(var(--aegis-iris) / 0.05), transparent 60%);
+}
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.04;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1   0 0 0 0 1   0 0 0 0 1   0 0 0 0.9 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+}
+
+/* Editorial display headlines — italics + soft axis pull from Fraunces. */
+.display {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-variation-settings:
+    "opsz" 144,
+    "SOFT" 50,
+    "WONK" 0;
+  letter-spacing: -0.02em;
+  line-height: 0.95;
+}
+.display em {
+  font-style: italic;
+  font-variation-settings:
+    "opsz" 144,
+    "SOFT" 100,
+    "WONK" 1;
+  color: hsl(var(--aegis-signal));
+}
+
+/* Micro labels — uppercase, tracked, mono. Used as section eyebrows
+   and instrumentation captions. */
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: hsl(var(--aegis-mute));
+}
+
+/* Hairline between two values inside a row. */
+.tickrow {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+}
+.tickrow > * + * {
+  border-left: 1px solid hsl(var(--aegis-line));
+  padding-left: 1.25rem;
+}
+
+/* Live status pulse — never green/red traffic-light cliché. Uses brand
+   signal for OK and coral for fail. */
+.pulse {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: hsl(var(--aegis-signal));
+  box-shadow: 0 0 0 0 hsl(var(--aegis-signal) / 0.6);
+  animation: pulse 2.4s ease-out infinite;
+}
+.pulse[data-state="deny"] {
+  background: hsl(var(--aegis-coral));
+  box-shadow: 0 0 0 0 hsl(var(--aegis-coral) / 0.6);
+}
+.pulse[data-state="warn"] {
+  background: hsl(var(--aegis-amber));
+  box-shadow: 0 0 0 0 hsl(var(--aegis-amber) / 0.6);
+}
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 hsl(var(--aegis-signal) / 0.6);
+  }
+  100% {
+    box-shadow: 0 0 0 10px hsl(var(--aegis-signal) / 0);
+  }
+}
+
+/* Animated reveal on first paint — staggered via animation-delay on
+   children of [data-stagger]. */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+[data-stagger] > * {
+  opacity: 0;
+  animation: rise 600ms cubic-bezier(0.2, 0.7, 0, 1) forwards;
+}
+[data-stagger] > *:nth-child(1) {
+  animation-delay: 60ms;
+}
+[data-stagger] > *:nth-child(2) {
+  animation-delay: 140ms;
+}
+[data-stagger] > *:nth-child(3) {
+  animation-delay: 220ms;
+}
+[data-stagger] > *:nth-child(4) {
+  animation-delay: 300ms;
+}
+[data-stagger] > *:nth-child(5) {
+  animation-delay: 380ms;
+}
+[data-stagger] > *:nth-child(6) {
+  animation-delay: 460ms;
+}
+[data-stagger] > *:nth-child(7) {
+  animation-delay: 540ms;
+}
+[data-stagger] > *:nth-child(8) {
+  animation-delay: 620ms;
+}
+
+/* Selection in chartreuse — subtle delight, on-brand. */
+::selection {
+  background: hsl(var(--aegis-signal) / 0.32);
+  color: hsl(var(--aegis-paper));
+}
+
+/* Scrollbar restraint — thin, on-canvas, applied globally now that
+   the entire product is on the dark canvas. */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--aegis-line-strong));
+  border-radius: 999px;
+  border: 2px solid hsl(var(--aegis-ink));
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Marquee strip used on the public homepage to scroll integration logos.
+   Pure CSS — never JS. Pauses on hover to be inspectable. */
+@keyframes marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+.marquee {
+  display: flex;
+  width: max-content;
+  animation: marquee 38s linear infinite;
+}
+.marquee:hover {
+  animation-play-state: paused;
+}
+
+/* Hairline rule used as section separator on marketing pages. */
+.rule {
+  height: 1px;
+  background: linear-gradient(
+    to right,
+    transparent,
+    hsl(var(--aegis-line-strong)) 30%,
+    hsl(var(--aegis-line-strong)) 70%,
+    transparent
+  );
+}
+
+/* Diagonal corner accents for decorative panels. */
+.corners {
+  position: relative;
+}
+.corners::before,
+.corners::after {
+  content: "";
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border-color: hsl(var(--aegis-signal));
+  border-style: solid;
+}
+.corners::before {
+  top: -1px;
+  left: -1px;
+  border-width: 1px 0 0 1px;
+}
+.corners::after {
+  bottom: -1px;
+  right: -1px;
+  border-width: 0 1px 1px 0;
 }

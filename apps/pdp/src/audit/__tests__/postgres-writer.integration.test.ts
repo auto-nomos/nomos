@@ -4,7 +4,7 @@
  *
  * Requires postgres. SKIP_DB_TESTS=1 to skip.
  */
-import type { AuditEvent } from '@credential-broker/shared-types';
+import type { AuditEvent } from '@auto-nomos/shared-types';
 import pg from 'pg';
 import pino from 'pino';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';

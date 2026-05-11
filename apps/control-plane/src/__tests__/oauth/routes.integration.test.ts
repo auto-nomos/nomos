@@ -6,7 +6,7 @@
  * SKIP_DB_TESTS=1 skips.
  */
 
-import { generateSecretboxKeyHex, openString } from '@credential-broker/crypto';
+import { generateSecretboxKeyHex, openString } from '@auto-nomos/crypto';
 import { hexToBytes } from '@noble/hashes/utils';
 import { eq } from 'drizzle-orm';
 import { pino } from 'pino';
@@ -149,7 +149,7 @@ describe.skipIf(!RUN)('OAuth routes (requires postgres)', () => {
     });
 
     it('returns 404 for an unknown connector', async () => {
-      const res = await app.request('/v1/oauth/connect/linear', {
+      const res = await app.request('/v1/oauth/connect/salesforce', {
         method: 'POST',
         headers: { cookie: alice.cookie },
       });
@@ -276,7 +276,7 @@ describe.skipIf(!RUN)('OAuth routes (requires postgres)', () => {
     });
 
     it('returns 404 for an unknown connector id', async () => {
-      const res = await app.request('/v1/oauth/callback/linear?code=x&state=y');
+      const res = await app.request('/v1/oauth/callback/salesforce?code=x&state=y');
       expect(res.status).toBe(404);
     });
   });

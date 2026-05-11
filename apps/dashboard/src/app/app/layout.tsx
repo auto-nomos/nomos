@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
-import { AppNav } from '../../components/nav';
+import { NomosShell } from '../../components/nomos/shell';
 import { useSession } from '../../lib/auth-client';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
@@ -17,17 +17,15 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   if (session.isPending) {
     return (
-      <main className="flex min-h-screen items-center justify-center text-sm text-muted-foreground">
-        Loading…
+      <main data-theme="aegis" className="grid min-h-screen place-items-center bg-aegis-ink">
+        <div className="flex items-center gap-3 font-mono text-xs uppercase tracking-[0.18em] text-aegis-mute">
+          <span className="pulse" />
+          loading
+        </div>
       </main>
     );
   }
   if (!session.data) return null;
 
-  return (
-    <div className="min-h-screen bg-background">
-      <AppNav />
-      <div className="container py-8">{children}</div>
-    </div>
-  );
+  return <NomosShell>{children}</NomosShell>;
 }

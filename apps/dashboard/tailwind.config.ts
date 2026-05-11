@@ -27,6 +27,21 @@ const config: Config = {
         },
         accent: { DEFAULT: 'hsl(var(--accent))', foreground: 'hsl(var(--accent-foreground))' },
         card: { DEFAULT: 'hsl(var(--card))', foreground: 'hsl(var(--card-foreground))' },
+        // Aegis brand tokens — addressable as `aegis-signal`, `aegis-coral` etc.
+        // when shadcn's accent/destructive don't fit (e.g. status badges).
+        'aegis-ink': 'hsl(var(--aegis-ink))',
+        'aegis-surface': 'hsl(var(--aegis-surface))',
+        'aegis-surface-2': 'hsl(var(--aegis-surface-2))',
+        'aegis-line': 'hsl(var(--aegis-line))',
+        'aegis-line-strong': 'hsl(var(--aegis-line-strong))',
+        'aegis-paper': 'hsl(var(--aegis-paper))',
+        'aegis-mute': 'hsl(var(--aegis-mute))',
+        'aegis-faint': 'hsl(var(--aegis-faint))',
+        'aegis-signal': 'hsl(var(--aegis-signal))',
+        'aegis-signal-soft': 'hsl(var(--aegis-signal-soft))',
+        'aegis-coral': 'hsl(var(--aegis-coral))',
+        'aegis-amber': 'hsl(var(--aegis-amber))',
+        'aegis-iris': 'hsl(var(--aegis-iris))',
       },
       borderRadius: {
         lg: 'var(--radius)',
@@ -36,6 +51,7 @@ const config: Config = {
       fontFamily: {
         sans: ['var(--font-sans)', 'system-ui', 'sans-serif'],
         mono: ['var(--font-mono)', 'ui-monospace', 'monospace'],
+        display: ['var(--font-display)', 'ui-serif', 'Georgia', 'serif'],
       },
     },
   },

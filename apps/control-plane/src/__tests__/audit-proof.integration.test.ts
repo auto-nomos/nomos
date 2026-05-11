@@ -5,9 +5,9 @@
  *
  * Requires postgres. SKIP_DB_TESTS=1 to skip.
  */
-import { type AuditBundle, verifyBundle } from '@credential-broker/audit-verify';
-import { generateKeypair, sha256Hex } from '@credential-broker/crypto';
-import { canonicalize } from '@credential-broker/ucan';
+import { type AuditBundle, verifyBundle } from '@auto-nomos/audit-verify';
+import { generateKeypair, sha256Hex } from '@auto-nomos/crypto';
+import { canonicalize } from '@auto-nomos/ucan';
 import { bytesToHex } from '@noble/hashes/utils';
 import { createTRPCClient, httpBatchLink } from '@trpc/client';
 import { eq } from 'drizzle-orm';

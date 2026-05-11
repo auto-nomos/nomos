@@ -1,6 +1,6 @@
-import { generateKeypair } from '@credential-broker/crypto';
-import type { UcanPayload } from '@credential-broker/shared-types';
-import { issueUcan } from '@credential-broker/ucan';
+import { generateKeypair } from '@auto-nomos/crypto';
+import type { UcanPayload } from '@auto-nomos/shared-types';
+import { issueUcan } from '@auto-nomos/ucan';
 import pino from 'pino';
 import { describe, expect, it } from 'vitest';
 import { createPolicyCache } from '../cache/policies.js';

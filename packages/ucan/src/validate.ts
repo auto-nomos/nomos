@@ -1,5 +1,5 @@
-import { publicKeyFromDid, verifyDetached } from '@credential-broker/crypto';
-import type { UcanPayload } from '@credential-broker/shared-types';
+import { publicKeyFromDid, verifyDetached } from '@auto-nomos/crypto';
+import type { UcanPayload } from '@auto-nomos/shared-types';
 import { parseUcanJwt } from './parse.js';
 
 export type ValidationError =

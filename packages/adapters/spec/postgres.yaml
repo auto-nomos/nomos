@@ -1,0 +1,72 @@
+id: postgres
+name: Postgres
+version: 1.0.0
+description: Direct Postgres access via DSN. Read-only by default; write actions require explicit policy grant.
+homepage: https://www.postgresql.org/docs/current/
+
+# Postgres has no HTTP API; the connector wraps a `pg` driver. The "http"
+# fields below are conventions: method=POST means write, method=GET means
+# read, and the path identifies the SQL kind. The executor at the
+# control-plane bridges them to actual queries.
+api_base: https://placeholder-postgres.invalid
+
+auth:
+  kind: dsn
+  fields:
+    - host
+    - port
+    - database
+    - user
+    - password
+    - sslmode
+
+actions:
+  - id: query
+    description: Run a SELECT statement.
+    expected_use: Read structured data for analysis.
+    auto_execute: true
+    risk: { category: read, sensitivity: high }
+    http:
+      method: GET
+      path: "/query"
+    params:
+      - { name: sql, in: body, required: true, type: string, description: "SELECT-only SQL." }
+      - { name: params, in: body, type: array, description: "Positional bind params." }
+
+  - id: list_tables
+    description: List tables in the public schema.
+    expected_use: Discover schema before querying.
+    auto_execute: true
+    risk: { category: read, sensitivity: low }
+    http:
+      method: GET
+      path: "/tables"
+  - id: describe_table
+    description: List columns for a table.
+    expected_use: Inspect schema before composing a query.
+    auto_execute: true
+    risk: { category: read, sensitivity: low }
+    http:
+      method: GET
+      path: "/describe"
+    params:
+      - { name: table, in: query, required: true, type: string }
+
+  - id: execute
+    description: Run a write statement (INSERT/UPDATE/DELETE).
+    expected_use: Modify data; only when the policy explicitly grants the table.
+    auto_execute: false
+    risk: { category: write, sensitivity: high }
+    http:
+      method: POST
+      path: "/execute"
+    params:
+      - { name: sql, in: body, required: true, type: string }
+      - { name: params, in: body, type: array }
+
+notes: |
+  The adapter executor for `postgres` is the `pg` Node driver, not HTTP.
+  The control-plane connector layer routes these actions through the
+  driver while keeping the YAML metadata (risk, scopes, sanitize) in scope.
+  Per-row sanitize is best-effort: the connector applies it to result rows
+  by column name; nested JSON columns are sanitized as deep dotted paths.

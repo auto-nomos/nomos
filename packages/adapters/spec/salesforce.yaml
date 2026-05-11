@@ -1,0 +1,86 @@
+id: salesforce
+name: Salesforce
+version: 1.0.0
+description: Salesforce REST API — objects (Account, Lead, Opportunity, …).
+homepage: https://developer.salesforce.com/docs/atlas.en-us.api_rest.meta/api_rest/
+
+# Salesforce returns instance_url with the OAuth token (e.g.
+# https://acme.my.salesforce.com); the connector substitutes it as the
+# request base. api_base here is a placeholder; per-call base_url_override
+# pulls the stored instance_url.
+api_base: https://login.salesforce.com
+
+auth:
+  kind: oauth2
+  authorize_url: https://login.salesforce.com/services/oauth2/authorize
+  token_url: https://login.salesforce.com/services/oauth2/token
+  default_scopes:
+    - api
+    - refresh_token
+  pkce: true
+
+actions:
+  - id: query_soql
+    description: Run a SOQL query.
+    expected_use: Look up records by criteria.
+    auto_execute: true
+    required_scopes: [api]
+    risk: { category: search, sensitivity: medium }
+    http:
+      method: GET
+      path: "/services/data/v59.0/query"
+    params:
+      - { name: q, in: query, required: true, type: string }
+
+  - id: get_record
+    description: Fetch a record by sobject + id.
+    expected_use: Inspect full record details.
+    auto_execute: true
+    required_scopes: [api]
+    risk: { category: read, sensitivity: medium }
+    http:
+      method: GET
+      path: "/services/data/v59.0/sobjects/{sobject}/{id}"
+    params:
+      - { name: sobject, in: path, required: true, type: string }
+      - { name: id, in: path, required: true, type: string }
+
+  - id: create_record
+    description: Create a record.
+    expected_use: Add a new lead, opportunity, or task.
+    auto_execute: false
+    required_scopes: [api]
+    risk: { category: write, sensitivity: medium }
+    http:
+      method: POST
+      path: "/services/data/v59.0/sobjects/{sobject}"
+    params:
+      - { name: sobject, in: path, required: true, type: string }
+      - { name: fields, in: body, required: true, type: object }
+
+  - id: update_record
+    description: Update fields on a record.
+    expected_use: Edit a lead's status or add a note.
+    auto_execute: false
+    required_scopes: [api]
+    risk: { category: write, sensitivity: medium }
+    http:
+      method: PATCH
+      path: "/services/data/v59.0/sobjects/{sobject}/{id}"
+    params:
+      - { name: sobject, in: path, required: true, type: string }
+      - { name: id, in: path, required: true, type: string }
+      - { name: fields, in: body, required: true, type: object }
+
+  - id: delete_record
+    description: Delete a record.
+    expected_use: Remove a duplicate or test record.
+    auto_execute: false
+    required_scopes: [api]
+    risk: { category: delete, sensitivity: high }
+    http:
+      method: DELETE
+      path: "/services/data/v59.0/sobjects/{sobject}/{id}"
+    params:
+      - { name: sobject, in: path, required: true, type: string }
+      - { name: id, in: path, required: true, type: string }

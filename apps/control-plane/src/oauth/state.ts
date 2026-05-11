@@ -11,7 +11,7 @@
  * the callback can verify it matches the request and is fresh.
  */
 
-import { base64urlToString, bytesToBase64url, stringToBase64url } from '@credential-broker/ucan';
+import { base64urlToString, bytesToBase64url, stringToBase64url } from '@auto-nomos/ucan';
 import { hmac } from '@noble/hashes/hmac';
 import { sha256 } from '@noble/hashes/sha256';
 

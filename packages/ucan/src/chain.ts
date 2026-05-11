@@ -1,4 +1,5 @@
-import type { UcanPayload } from '@credential-broker/shared-types';
+import type { UcanPayload } from '@auto-nomos/shared-types';
+import { constraintCovers, extractResourceConstraint } from './constraint.js';
 import { actionMatchesGranted, type ValidationError, validateUcan } from './validate.js';
 
 export type ChainError = ValidationError | 'broken_delegation' | 'over_attenuated' | 'empty_chain';
@@ -48,6 +49,14 @@ export function validateChain(jwts: string[], opts: ValidateChainOptions = {}): 
     }
     if (child.nbf < parent.nbf) {
       return { valid: false, error: 'over_attenuated' };
+    }
+
+    const parentConstraint = extractResourceConstraint(parent.meta);
+    if (parentConstraint) {
+      const childConstraint = extractResourceConstraint(child.meta) ?? parentConstraint;
+      if (!constraintCovers(parentConstraint, childConstraint)) {
+        return { valid: false, error: 'over_attenuated' };
+      }
     }
   }
 

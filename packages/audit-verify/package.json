@@ -1,7 +1,17 @@
 {
-  "name": "@credential-broker/audit-verify",
-  "version": "0.0.0",
-  "private": true,
+  "name": "@auto-nomos/audit-verify",
+  "version": "0.0.1",
+  "private": false,
+  "license": "MIT",
+  "homepage": "https://github.com/auto-nomos/nomos/tree/main/packages/audit-verify#readme",
+  "bugs": {
+    "url": "https://github.com/auto-nomos/nomos/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/auto-nomos/nomos.git",
+    "directory": "packages/audit-verify"
+  },
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -26,9 +36,9 @@
     "clean": "rm -rf dist .turbo"
   },
   "dependencies": {
-    "@credential-broker/crypto": "workspace:*",
-    "@credential-broker/shared-types": "workspace:*",
-    "@credential-broker/ucan": "workspace:*",
+    "@auto-nomos/crypto": "workspace:*",
+    "@auto-nomos/shared-types": "workspace:*",
+    "@auto-nomos/ucan": "workspace:*",
     "@noble/hashes": "1.6.1"
   },
   "devDependencies": {

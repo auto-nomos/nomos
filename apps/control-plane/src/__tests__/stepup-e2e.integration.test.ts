@@ -11,8 +11,8 @@
  *
  * Skipped when SKIP_DB_TESTS=1.
  */
-import { generateKeypair } from '@credential-broker/crypto';
-import { issueUcan } from '@credential-broker/ucan';
+import { generateKeypair } from '@auto-nomos/crypto';
+import { issueUcan } from '@auto-nomos/ucan';
 import { eq } from 'drizzle-orm';
 import { pino } from 'pino';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
@@ -37,7 +37,7 @@ const SERVICE_TOKEN = 'sprint9-e2e-token';
 const cosignerPolicy = `
 permit(
   principal,
-  action == Action::"/stripe/charge",
+  action == Action::"/example/charge",
   resource
 )
 when {
@@ -46,7 +46,7 @@ when {
 
 permit(
   principal,
-  action == Action::"/stripe/charge",
+  action == Action::"/example/charge",
   resource
 )
 when {
@@ -197,7 +197,7 @@ describe.skipIf(!RUN)('Sprint 9 e2e: step-up across control-plane + PDP', () => 
       payload: {
         iss: cpSigning.did,
         aud: agentDid,
-        cmd: '/stripe/charge',
+        cmd: '/example/charge',
         pol: [],
         nonce: 'e2e-1',
         nbf: nowSec - 60,
@@ -213,7 +213,7 @@ describe.skipIf(!RUN)('Sprint 9 e2e: step-up across control-plane + PDP', () => 
       headers: { 'content-type': 'application/json', 'x-cb-customer': customerId },
       body: JSON.stringify({
         ucan: ucan.jwt,
-        command: '/stripe/charge',
+        command: '/example/charge',
         resource: { amount: 250 },
         context: {},
       }),
@@ -249,7 +249,7 @@ describe.skipIf(!RUN)('Sprint 9 e2e: step-up across control-plane + PDP', () => 
       headers: { 'content-type': 'application/json', 'x-cb-customer': customerId },
       body: JSON.stringify({
         ucan: ucan.jwt,
-        command: '/stripe/charge',
+        command: '/example/charge',
         resource: { amount: 250 },
         context: {},
         cosignerJwt: cosigner.cosignerJwt,
@@ -265,7 +265,7 @@ describe.skipIf(!RUN)('Sprint 9 e2e: step-up across control-plane + PDP', () => 
       headers: { 'content-type': 'application/json', 'x-cb-customer': customerId },
       body: JSON.stringify({
         ucan: ucan.jwt,
-        command: '/stripe/charge',
+        command: '/example/charge',
         resource: { amount: 250 },
         context: {},
       }),
@@ -280,7 +280,7 @@ describe.skipIf(!RUN)('Sprint 9 e2e: step-up across control-plane + PDP', () => 
       payload: {
         iss: cpSigning.did,
         aud: agentDid,
-        cmd: '/stripe/charge',
+        cmd: '/example/charge',
         pol: [],
         nonce: 'e2e-low',
         nbf: nowSec - 60,
@@ -294,7 +294,7 @@ describe.skipIf(!RUN)('Sprint 9 e2e: step-up across control-plane + PDP', () => 
       headers: { 'content-type': 'application/json', 'x-cb-customer': customerId },
       body: JSON.stringify({
         ucan: ucan.jwt,
-        command: '/stripe/charge',
+        command: '/example/charge',
         resource: { amount: 50 },
         context: {},
       }),

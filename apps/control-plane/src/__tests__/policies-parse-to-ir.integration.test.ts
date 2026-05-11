@@ -6,8 +6,8 @@
  *
  * Requires postgres (tRPC ctx wants a session). SKIP_DB_TESTS=1 to skip.
  */
-import { generateKeypair } from '@credential-broker/crypto';
-import { listTemplates } from '@credential-broker/schema-packs';
+import { generateKeypair } from '@auto-nomos/crypto';
+import { listTemplates } from '@auto-nomos/schema-packs';
 import { createTRPCClient, httpBatchLink } from '@trpc/client';
 import { eq } from 'drizzle-orm';
 import { pino } from 'pino';

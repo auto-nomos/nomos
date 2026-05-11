@@ -1,7 +1,8 @@
 {
-  "name": "@credential-broker/schema-packs",
-  "version": "0.0.0",
-  "private": true,
+  "name": "@auto-nomos/schema-packs",
+  "version": "0.0.1",
+  "license": "MIT",
+  "private": false,
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -39,10 +40,10 @@
     "clean": "rm -rf dist .turbo"
   },
   "dependencies": {
-    "@credential-broker/cedar": "workspace:*"
+    "@auto-nomos/cedar": "workspace:*"
   },
   "devDependencies": {
-    "@credential-broker/policy-builder": "workspace:*",
+    "@auto-nomos/policy-builder": "workspace:*",
     "@types/node": "22.10.5",
     "typescript": "5.7.2",
     "vitest": "4.1.5"

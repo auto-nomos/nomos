@@ -1,6 +1,6 @@
-# @credential-broker/ucan
+# @auto-nomos/ucan
 
-UCAN-v1.0 JWT envelope (issue, validate, chain) built on `@credential-broker/crypto`.
+UCAN-v1.0 JWT envelope (issue, validate, chain) built on `@auto-nomos/crypto`.
 
 ## Purpose
 
@@ -9,7 +9,7 @@ Mints and verifies UCANs that flow between agents and our PDP. Issues a UCAN as 
 ## Install (workspace)
 
 ```ts
-import { issueUcan, validateUcan, validateChain, computeCid } from '@credential-broker/ucan';
+import { issueUcan, validateUcan, validateChain, computeCid } from '@auto-nomos/ucan';
 ```
 
 ## Public API
@@ -86,7 +86,7 @@ const b64 = bytesToBase64url(bytes);           // jwt-style base64url (Node Buff
 ## Tests
 
 ```bash
-pnpm --filter @credential-broker/ucan test
+pnpm --filter @auto-nomos/ucan test
 ```
 
 100% line+branch+function coverage required.

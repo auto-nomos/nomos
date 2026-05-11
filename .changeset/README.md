@@ -10,8 +10,8 @@ We have a quick list of common questions to get you started engaging with this p
 ## How we use changesets
 
 The Credential Broker repo uses changesets only for the **public packages** —
-`@credential-broker/sdk` (and, eventually, `@credential-broker/audit-verify`).
-Apps (`@credential-broker/control-plane`, `@credential-broker/pdp`) and
+`@auto-nomos/sdk` (and, eventually, `@auto-nomos/audit-verify`).
+Apps (`@auto-nomos/control-plane`, `@auto-nomos/pdp`) and
 examples are explicitly ignored in `config.json`.
 
 Per the v2 build plan, **publishing is deferred to Sprint 11.** During Sprints

@@ -1,5 +1,5 @@
 import { appendFile } from 'node:fs/promises';
-import { didFromPublicKey } from '@credential-broker/crypto';
+import { didFromPublicKey } from '@auto-nomos/crypto';
 import { serve } from '@hono/node-server';
 import { hexToBytes } from '@noble/hashes/utils';
 import { createAuditEmitter, decisionToAudit } from './audit/emit.js';

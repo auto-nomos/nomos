@@ -13,7 +13,7 @@ We also need the wire format to be a compact string the SDK can put in an HTTP h
 
 ## Decision
 
-Phase 1 implements a thin UCAN-v1.0 JWT envelope in `packages/ucan` built directly on `@credential-broker/crypto` (`@noble/curves` ed25519 + sha256). The envelope is compact JWT: `base64url(canonical(header)).base64url(canonical(payload)).base64url(signature)`. Signature is detached ed25519 over the utf-8 of `header.payload`. Content ID is sha256-hex of the full JWT.
+Phase 1 implements a thin UCAN-v1.0 JWT envelope in `packages/ucan` built directly on `@auto-nomos/crypto` (`@noble/curves` ed25519 + sha256). The envelope is compact JWT: `base64url(canonical(header)).base64url(canonical(payload)).base64url(signature)`. Signature is detached ed25519 over the utf-8 of `header.payload`. Content ID is sha256-hex of the full JWT.
 
 We do **not** roll our own crypto — the underlying primitives come from audited `@noble` libraries. We do roll our own *envelope*, which is straight JWT.
 

@@ -1,0 +1,46 @@
+id: imessage
+name: iMessage (macOS local)
+version: 1.0.0
+description: Local-only adapter that reads ~/Library/Messages/chat.db on macOS. No network auth.
+homepage: https://support.apple.com/guide/messages/
+
+# Local adapter — no HTTP. The connector implementation reads the SQLite db.
+# api_base is a placeholder so the spec validates; real path resolution
+# happens in the connector.
+api_base: https://placeholder-imessage.invalid
+
+auth:
+  kind: local
+
+actions:
+  - id: list_recent_chats
+    description: List recent conversations.
+    expected_use: See who I've been messaging recently.
+    auto_execute: true
+    risk: { category: read, sensitivity: high }
+    http:
+      method: GET
+      path: "/chats"
+    params:
+      - { name: limit, in: query, type: integer, default: 25 }
+
+  - id: list_messages_in_chat
+    description: List messages from a chat.
+    expected_use: Read recent traffic in a conversation.
+    auto_execute: true
+    risk: { category: read, sensitivity: high }
+    http:
+      method: GET
+      path: "/chats/{chat_id}/messages"
+    params:
+      - { name: chat_id, in: path, required: true, type: string }
+      - { name: limit, in: query, type: integer, default: 50 }
+    response:
+      type: array
+      sanitize:
+        - { field: "messages[].sender_phone", hash: true }
+
+notes: |
+  iMessage adapter does not run inside docker compose dev — it requires
+  filesystem access to the host's ~/Library/Messages/chat.db. Ship the
+  spec for completeness so the dashboard can show "available on macOS".

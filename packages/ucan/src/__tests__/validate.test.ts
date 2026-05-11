@@ -1,5 +1,5 @@
-import { generateKeypair } from '@credential-broker/crypto';
-import type { UcanPayload } from '@credential-broker/shared-types';
+import { generateKeypair } from '@auto-nomos/crypto';
+import type { UcanPayload } from '@auto-nomos/shared-types';
 import { describe, expect, it } from 'vitest';
 import { stringToBase64url } from '../base64url.js';
 import { issueUcan } from '../issue.js';

@@ -1,4 +1,4 @@
-import type { AuthGuard, AuthorizeDecision } from '@credential-broker/sdk';
+import type { AuthGuard, AuthorizeDecision } from '@auto-nomos/sdk';
 import type { Octokit } from 'octokit';
 import { z } from 'zod';
 

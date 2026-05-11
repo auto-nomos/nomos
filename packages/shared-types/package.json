@@ -1,7 +1,8 @@
 {
-  "name": "@credential-broker/shared-types",
-  "version": "0.0.0",
-  "private": true,
+  "name": "@auto-nomos/shared-types",
+  "version": "0.0.1",
+  "license": "MIT",
+  "private": false,
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

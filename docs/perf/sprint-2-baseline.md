@@ -13,7 +13,7 @@ Recorded 2026-05-09 on the dev machine (Apple Silicon M-series, Node 22.18.0).
 Run command:
 
 ```bash
-BENCH_DURATION=10 BENCH_CONNECTIONS=50 pnpm --filter @credential-broker/pdp bench
+BENCH_DURATION=10 BENCH_CONNECTIONS=50 pnpm --filter @auto-nomos/pdp bench
 ```
 
 ## Numbers (50 conn × 10s, single instance)

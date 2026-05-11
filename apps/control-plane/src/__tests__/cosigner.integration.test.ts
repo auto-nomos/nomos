@@ -4,8 +4,8 @@
  *
  * Requires postgres. SKIP_DB_TESTS=1 to skip.
  */
-import { generateKeypair } from '@credential-broker/crypto';
-import { computeCid, parseUcanJwt, validateUcan } from '@credential-broker/ucan';
+import { generateKeypair } from '@auto-nomos/crypto';
+import { computeCid, parseUcanJwt, validateUcan } from '@auto-nomos/ucan';
 import { eq } from 'drizzle-orm';
 import { pino } from 'pino';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';

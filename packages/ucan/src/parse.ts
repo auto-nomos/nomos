@@ -1,7 +1,4 @@
-import {
-  type UcanPayload,
-  UcanPayload as UcanPayloadSchema,
-} from '@credential-broker/shared-types';
+import { type UcanPayload, UcanPayload as UcanPayloadSchema } from '@auto-nomos/shared-types';
 import { base64urlToBytes, base64urlToString } from './base64url.js';
 
 export interface ParsedUcan {

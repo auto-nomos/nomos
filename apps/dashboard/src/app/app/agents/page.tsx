@@ -1,6 +1,6 @@
 'use client';
 
-import { Plus } from 'lucide-react';
+import { Check, Plug, Plus, X } from 'lucide-react';
 import Link from 'next/link';
 import { Badge } from '../../../components/ui/badge';
 import { Button } from '../../../components/ui/button';
@@ -24,6 +24,20 @@ import { formatDate, shortId } from '../../../lib/utils';
 
 export default function AgentsPage() {
   const list = trpc.agents.list.useQuery();
+  const pending = trpc.agents.pendingConnections.useQuery();
+  const utils = trpc.useUtils();
+  const approve = trpc.agents.approveConnection.useMutation({
+    onSuccess: () => {
+      utils.agents.pendingConnections.invalidate();
+      utils.agents.list.invalidate();
+    },
+  });
+  const deny = trpc.agents.denyConnection.useMutation({
+    onSuccess: () => {
+      utils.agents.pendingConnections.invalidate();
+      utils.agents.list.invalidate();
+    },
+  });
 
   return (
     <div className="space-y-6">
@@ -35,12 +49,64 @@ export default function AgentsPage() {
             MCP server, script, or service. Each App has a stable DID + API key (revealed once).
           </p>
         </div>
-        <Button asChild>
-          <Link href="/app/agents/new">
-            <Plus className="h-4 w-4" /> New App
-          </Link>
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button asChild variant="outline">
+            <Link href="/app/agents/connect">
+              <Plug className="h-4 w-4" /> Connect an agent
+            </Link>
+          </Button>
+          <Button asChild>
+            <Link href="/app/agents/new">
+              <Plus className="h-4 w-4" /> New App
+            </Link>
+          </Button>
+        </div>
       </header>
+
+      {pending.data && pending.data.length > 0 ? (
+        <Card className="border-amber-500/40 bg-amber-500/5">
+          <CardHeader>
+            <CardTitle className="text-base">Pending connections</CardTitle>
+            <CardDescription>
+              {pending.data.length} agent{pending.data.length === 1 ? '' : 's'} waiting for
+              first-time approval. Approve to allow the agent to mint UCANs; deny to disable it.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {pending.data.map((a) => (
+              <div
+                key={a.id}
+                className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-border bg-background p-4"
+              >
+                <div className="min-w-0">
+                  <div className="font-medium text-foreground">{a.name}</div>
+                  <div className="font-mono text-xs text-muted-foreground">
+                    {shortId(a.did, 16, 8)} · created {formatDate(a.createdAt)}
+                    {a.lastActiveAt ? ` · first call ${formatDate(a.lastActiveAt)}` : ''}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => deny.mutate({ id: a.id })}
+                    disabled={deny.isPending}
+                  >
+                    <X className="h-3.5 w-3.5" /> Deny
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={() => approve.mutate({ id: a.id })}
+                    disabled={approve.isPending}
+                  >
+                    <Check className="h-3.5 w-3.5" /> Approve
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      ) : null}
 
       <Card>
         <CardHeader>

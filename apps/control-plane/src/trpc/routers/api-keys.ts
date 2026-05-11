@@ -1,4 +1,4 @@
-import { sha256Hex } from '@credential-broker/crypto';
+import { sha256Hex } from '@auto-nomos/crypto';
 import { TRPCError } from '@trpc/server';
 import { and, desc, eq, isNull } from 'drizzle-orm';
 import { z } from 'zod';

@@ -1,4 +1,4 @@
-# @credential-broker/crypto
+# @auto-nomos/crypto
 
 Audited cryptographic primitives wrapped for our use. All implementations delegate to `@noble/*` libraries.
 
@@ -17,7 +17,7 @@ import {
   publicKeyFromDid,
   sha256,
   sha256Hex,
-} from '@credential-broker/crypto';
+} from '@auto-nomos/crypto';
 ```
 
 ## Public API
@@ -68,7 +68,7 @@ If you find yourself reaching for `crypto.subtle`, `node:crypto`, or rolling a c
 ## Tests
 
 ```bash
-pnpm --filter @credential-broker/crypto test
+pnpm --filter @auto-nomos/crypto test
 ```
 
 100% line+branch+function coverage required, including paths that handle invalid inputs.

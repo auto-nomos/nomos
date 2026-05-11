@@ -1,0 +1,301 @@
+# Dev stack — one-command boot for credential-broker.
+#
+# Usage (root-level wrappers):
+#   pnpm dev:setup    # one-shot: setup wizard + db migrations
+#   pnpm dev:up       # boots all services (foreground)
+#   pnpm dev:up -d    # detached
+#   pnpm dev:tunnel   # adds cloudflared quick-tunnel
+#   pnpm dev:down     # stops; keeps volumes
+#   pnpm dev:reset    # stops + drops volumes
+#   pnpm dev:logs     # tail all service logs
+#
+# What runs:
+#   postgres        :5433 (host) -> :5432 (container)
+#   redis           :6379
+#   setup-wizard    init profile — generates secrets, .env.local
+#   migrate         init profile — drizzle-kit migrate
+#   control-plane   :8788
+#   pdp             :8787
+#   dashboard       :3000
+#   cloudflared     tunnel profile — quick tunnel exposing control-plane
+#
+# Volumes:
+#   cb_pgdata_dev   postgres data
+#   cb_redis_dev    redis data
+#
+# Hot reload:
+#   Source mounted from host. node_modules masked by anonymous volumes so
+#   darwin-built binaries do not leak into alpine containers.
+#   tsx --watch + next dev use polling (CHOKIDAR_USEPOLLING=true) for
+#   reliable cross-platform file events.
+
+name: credential-broker-dev
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: cb-postgres-dev
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: cb
+      POSTGRES_PASSWORD: cb
+      POSTGRES_DB: cb_dev
+    ports:
+      - "5433:5432"
+    volumes:
+      - cb_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cb -d cb_dev"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: cb-redis-dev
+    restart: unless-stopped
+    # No host port — services access via redis://redis:6379 on internal net.
+    # Add `ports: ["6380:6379"]` if you need redis-cli from host.
+    volumes:
+      - cb_redis:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep -q PONG"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  setup-wizard:
+    profiles: ["init"]
+    build:
+      context: ../..
+      dockerfile: apps/control-plane/Dockerfile.dev
+    image: cb-control-plane-dev
+    container_name: cb-setup-wizard
+    working_dir: /repo
+    environment:
+      CB_REPO_ROOT: /repo
+      CI: "true"
+    volumes:
+      - ../..:/repo:cached
+      - /repo/node_modules
+      - /repo/apps/control-plane/node_modules
+      - /repo/apps/dashboard/node_modules
+      - /repo/apps/pdp/node_modules
+      - /repo/packages/audit-verify/node_modules
+      - /repo/packages/cedar/node_modules
+      - /repo/packages/core/node_modules
+      - /repo/packages/crypto/node_modules
+      - /repo/packages/mcp-server/node_modules
+      - /repo/packages/policy-builder/node_modules
+      - /repo/packages/schema-packs/node_modules
+      - /repo/packages/sdk-typescript/node_modules
+      - /repo/packages/shared-types/node_modules
+      - /repo/packages/ucan/node_modules
+    command: ["pnpm", "tsx", "scripts/setup-wizard.mts"]
+
+  migrate:
+    profiles: ["init"]
+    build:
+      context: ../..
+      dockerfile: apps/control-plane/Dockerfile.dev
+    image: cb-control-plane-dev
+    container_name: cb-migrate
+    working_dir: /repo/apps/control-plane
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://cb:cb@postgres:5432/cb_dev
+      DATABASE_DIRECT_URL: postgres://cb:cb@postgres:5432/cb_dev
+      CI: "true"
+    volumes:
+      - ../..:/repo:cached
+      - /repo/node_modules
+      - /repo/apps/control-plane/node_modules
+      - /repo/packages/audit-verify/node_modules
+      - /repo/packages/cedar/node_modules
+      - /repo/packages/core/node_modules
+      - /repo/packages/crypto/node_modules
+      - /repo/packages/policy-builder/node_modules
+      - /repo/packages/schema-packs/node_modules
+      - /repo/packages/shared-types/node_modules
+      - /repo/packages/ucan/node_modules
+    command: ["pnpm", "db:migrate"]
+
+  control-plane:
+    build:
+      context: ../..
+      dockerfile: apps/control-plane/Dockerfile.dev
+    image: cb-control-plane-dev
+    container_name: cb-control-plane-dev
+    restart: unless-stopped
+    ports:
+      - "8788:8788"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file:
+      - path: ../../.env.local
+        required: false
+    environment:
+      NODE_ENV: development
+      PORT: "8788"
+      HOSTNAME: 0.0.0.0
+      DATABASE_URL: postgres://cb:cb@postgres:5432/cb_dev
+      DATABASE_DIRECT_URL: postgres://cb:cb@postgres:5432/cb_dev
+      REDIS_URL: redis://redis:6379
+      CONTROL_PLANE_URL: http://control-plane:8788
+      # CONTROL_PLANE_PUBLIC_URL + DASHBOARD_PUBLIC_URL come from .env.local
+      # so tunnel rotation does not require compose edits.
+      CHOKIDAR_USEPOLLING: "true"
+      CI: "true"
+    volumes:
+      - ../..:/repo:cached
+      - /repo/node_modules
+      - /repo/apps/control-plane/node_modules
+      - /repo/apps/dashboard/node_modules
+      - /repo/apps/pdp/node_modules
+      - /repo/packages/audit-verify/node_modules
+      - /repo/packages/cedar/node_modules
+      - /repo/packages/core/node_modules
+      - /repo/packages/crypto/node_modules
+      - /repo/packages/mcp-server/node_modules
+      - /repo/packages/policy-builder/node_modules
+      - /repo/packages/schema-packs/node_modules
+      - /repo/packages/sdk-typescript/node_modules
+      - /repo/packages/shared-types/node_modules
+      - /repo/packages/ucan/node_modules
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:8788/healthz || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 45s
+
+  pdp:
+    build:
+      context: ../..
+      dockerfile: apps/pdp/Dockerfile.dev
+    image: cb-pdp-dev
+    container_name: cb-pdp-dev
+    restart: unless-stopped
+    ports:
+      - "8787:8787"
+    depends_on:
+      control-plane:
+        condition: service_healthy
+    env_file:
+      - path: ../../.env.local
+        required: false
+    environment:
+      NODE_ENV: development
+      PORT: "8787"
+      HOSTNAME: 0.0.0.0
+      CONTROL_PLANE_URL: http://control-plane:8788
+      DATABASE_URL: postgres://cb:cb@postgres:5432/cb_dev
+      AUDIT_BACKEND: postgres
+      CHOKIDAR_USEPOLLING: "true"
+      CI: "true"
+    volumes:
+      - ../..:/repo:cached
+      - /repo/node_modules
+      - /repo/apps/pdp/node_modules
+      - /repo/packages/cedar/node_modules
+      - /repo/packages/core/node_modules
+      - /repo/packages/crypto/node_modules
+      - /repo/packages/schema-packs/node_modules
+      - /repo/packages/shared-types/node_modules
+      - /repo/packages/ucan/node_modules
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:8787/healthz || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 45s
+
+  dashboard:
+    build:
+      context: ../..
+      dockerfile: apps/dashboard/Dockerfile.dev
+    image: cb-dashboard-dev
+    container_name: cb-dashboard-dev
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    depends_on:
+      control-plane:
+        condition: service_healthy
+    env_file:
+      - path: ../../.env.local
+        required: false
+    environment:
+      NODE_ENV: development
+      PORT: "3000"
+      HOSTNAME: 0.0.0.0
+      NEXT_TELEMETRY_DISABLED: "1"
+      WATCHPACK_POLLING: "true"
+      CHOKIDAR_USEPOLLING: "true"
+      CI: "true"
+      NEXT_PUBLIC_CONTROL_PLANE_URL: http://localhost:8788
+      NEXT_PUBLIC_PDP_URL: http://localhost:8787
+    volumes:
+      - ../..:/repo:cached
+      - /repo/node_modules
+      - /repo/apps/dashboard/node_modules
+      - /repo/apps/dashboard/.next
+      - /repo/packages/cedar/node_modules
+      - /repo/packages/policy-builder/node_modules
+      - /repo/packages/schema-packs/node_modules
+      - /repo/packages/shared-types/node_modules
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:3000 || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 60s
+
+  # M8 — observe-only egress proxy. Listens on 25290; agents set
+  # HTTPS_PROXY=http://localhost:25290 to route through. Logs CONNECT +
+  # plain-HTTP target to control-plane (HTTP wiring P2; stdout for now).
+  egress-proxy:
+    profiles: ["egress"]
+    build:
+      context: ../..
+      dockerfile: apps/egress-proxy/Dockerfile.dev
+    image: cb-egress-proxy-dev
+    container_name: cb-egress-proxy-dev
+    restart: unless-stopped
+    ports:
+      - "25290:25290"
+    environment:
+      EGRESS_PROXY_HOST: 0.0.0.0
+      EGRESS_PROXY_PORT: "25290"
+      LOG_LEVEL: info
+    volumes:
+      - ../..:/repo:cached
+      - /repo/node_modules
+      - /repo/apps/egress-proxy/node_modules
+
+  # Quick-tunnel via cloudflared. Rotates URL each restart.
+  # For stable hostname use named tunnel: see infrastructure/docker/cloudflared/config.yml
+  cloudflared:
+    profiles: ["tunnel"]
+    image: cloudflare/cloudflared:latest
+    container_name: cb-cloudflared-dev
+    restart: unless-stopped
+    depends_on:
+      control-plane:
+        condition: service_healthy
+    command:
+      - tunnel
+      - --no-autoupdate
+      - --url
+      - http://control-plane:8788
+
+volumes:
+  cb_pgdata:
+    name: cb_pgdata_dev
+  cb_redis:
+    name: cb_redis_dev

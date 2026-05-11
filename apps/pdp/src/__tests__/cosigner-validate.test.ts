@@ -1,6 +1,6 @@
-import { generateKeypair } from '@credential-broker/crypto';
-import type { UcanPayload } from '@credential-broker/shared-types';
-import { computeCid, issueUcan } from '@credential-broker/ucan';
+import { generateKeypair } from '@auto-nomos/crypto';
+import type { UcanPayload } from '@auto-nomos/shared-types';
+import { computeCid, issueUcan } from '@auto-nomos/ucan';
 import { describe, expect, it } from 'vitest';
 import type { StepUpStateResponse } from '../control-plane/client.js';
 import { validateCosigner } from '../services/cosigner-validate.js';
@@ -16,7 +16,7 @@ function makePayload(
   return {
     iss,
     aud,
-    cmd: '/stripe/charge',
+    cmd: '/example/charge',
     pol: [],
     nonce: `n-${Math.random()}`,
     nbf: now - 60,
@@ -37,7 +37,7 @@ function approvalRow(args: {
     id: args.id,
     customerId: args.customerId ?? 'cust',
     agentId: args.agentId ?? 'ag',
-    command: '/stripe/charge',
+    command: '/example/charge',
     resource: { amount: 250 },
     state: args.state ?? 'approved',
     expiresAt: new Date(Date.now() + 60_000).toISOString(),
@@ -53,7 +53,7 @@ describe('validateCosigner', () => {
     payload: {
       iss: cp.did,
       aud: agent.did,
-      cmd: '/stripe/charge',
+      cmd: '/example/charge',
       pol: [],
       nonce: 'orig',
       nbf: Math.floor(Date.now() / 1000) - 60,
@@ -72,7 +72,7 @@ describe('validateCosigner', () => {
     const result = await validateCosigner({
       cosignerJwt: cosigner.jwt,
       requestUcan: requestUcan.jwt,
-      command: '/stripe/charge',
+      command: '/example/charge',
       fetchApproval: async () => approval,
     });
     expect(result).toEqual({ ok: true, approvalId: 'aprv-1' });
@@ -86,7 +86,7 @@ describe('validateCosigner', () => {
     const result = await validateCosigner({
       cosignerJwt: cosigner.jwt,
       requestUcan: requestUcan.jwt,
-      command: '/stripe/charge',
+      command: '/example/charge',
       fetchApproval: async () => approvalRow({ id: 'aprv-2', cosignerJwt: cosigner.jwt }),
     });
     expect(result).toEqual({ ok: false, reason: 'cosigner_mismatch' });
@@ -100,7 +100,7 @@ describe('validateCosigner', () => {
     const result = await validateCosigner({
       cosignerJwt: cosigner.jwt,
       requestUcan: requestUcan.jwt,
-      command: '/stripe/charge',
+      command: '/example/charge',
       fetchApproval: async () => approvalRow({ id: 'aprv-3', cosignerJwt: 'something-else' }),
     });
     expect(result).toEqual({ ok: false, reason: 'cosigner_mismatch' });
@@ -114,7 +114,7 @@ describe('validateCosigner', () => {
     const result = await validateCosigner({
       cosignerJwt: cosigner.jwt,
       requestUcan: requestUcan.jwt,
-      command: '/stripe/charge',
+      command: '/example/charge',
       fetchApproval: async () =>
         approvalRow({ id: 'aprv-4', state: 'denied', cosignerJwt: cosigner.jwt }),
     });
@@ -131,7 +131,7 @@ describe('validateCosigner', () => {
     const result = await validateCosigner({
       cosignerJwt: cosigner.jwt,
       requestUcan: requestUcan.jwt,
-      command: '/stripe/charge',
+      command: '/example/charge',
       fetchApproval: async () => approvalRow({ id: 'aprv-5', cosignerJwt: cosigner.jwt }),
     });
     expect(result).toEqual({ ok: false, reason: 'cosigner_expired' });
@@ -141,7 +141,7 @@ describe('validateCosigner', () => {
     const result = await validateCosigner({
       cosignerJwt: 'not.a.jwt',
       requestUcan: requestUcan.jwt,
-      command: '/stripe/charge',
+      command: '/example/charge',
       fetchApproval: async () => undefined,
     });
     expect(result).toEqual({ ok: false, reason: 'cosigner_invalid' });
@@ -155,7 +155,7 @@ describe('validateCosigner', () => {
     const result = await validateCosigner({
       cosignerJwt: cosigner.jwt,
       requestUcan: requestUcan.jwt,
-      command: '/stripe/charge',
+      command: '/example/charge',
       fetchApproval: async () => undefined,
     });
     expect(result).toEqual({ ok: false, reason: 'cosigner_invalid' });

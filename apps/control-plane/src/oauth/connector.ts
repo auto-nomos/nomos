@@ -37,9 +37,21 @@ export type ConnectorId =
   | 'stripe'
   | 'jira'
   | 'google_calendar'
-  | 'postgres';
+  | 'postgres'
+  // M3 — YAML-driven adapters. Manual-token path works for all of these
+  // today; OAuth executor coverage is per-connector and rolls out across P1.
+  | 'google_gmail'
+  | 'google_drive'
+  | 'google_contacts'
+  | 'discord'
+  | 'telegram'
+  | 'dropbox'
+  | 'twilio'
+  | 'granola'
+  | 'perplexity'
+  | 'imessage';
 
-export type ImplementedConnectorId = 'github' | 'slack' | 'google' | 'notion';
+export type ImplementedConnectorId = 'github' | 'slack' | 'google' | 'notion' | 'linear' | 'stripe';
 
 export interface OAuthTokens {
   accessToken: string;

@@ -234,6 +234,44 @@ describe('evaluate (no schema)', () => {
     expect(res.decision).toBe('deny');
   });
 
+  it('supports `like` operator for path-prefix glob matching', () => {
+    const text = `
+      permit(principal, action, resource)
+      when { resource.path like "finance/2026/*" };
+    `;
+    const allow = evaluate({
+      policies: text,
+      principal: alice,
+      action: readAction,
+      resource: { type: 'File', id: 'f1' },
+      context: {},
+      entities: [
+        {
+          uid: { type: 'File', id: 'f1' },
+          attrs: { path: 'finance/2026/q1/report.pdf' },
+          parents: [],
+        },
+      ],
+    });
+    expect(allow.decision).toBe('allow');
+
+    const deny = evaluate({
+      policies: text,
+      principal: alice,
+      action: readAction,
+      resource: { type: 'File', id: 'f2' },
+      context: {},
+      entities: [
+        {
+          uid: { type: 'File', id: 'f2' },
+          attrs: { path: 'finance/2025/q4/report.pdf' },
+          parents: [],
+        },
+      ],
+    });
+    expect(deny.decision).toBe('deny');
+  });
+
   it('canonical billing-agent example: ACME 2026 invoices', () => {
     const billingAgent: EntityUid = { type: 'BillingAgent', id: 'billing-1' };
     const invoice2026: EntityUid = { type: 'Invoice', id: 'inv-1' };

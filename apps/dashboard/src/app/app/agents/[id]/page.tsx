@@ -1,6 +1,6 @@
 'use client';
 
-import { Copy, KeyRound, Trash2 } from 'lucide-react';
+import { Copy, KeyRound, ShieldCheck, Trash2 } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { use, useEffect, useState } from 'react';
 import { AgentAuditPanel } from '../../../../components/agent-audit-panel';
@@ -32,6 +32,7 @@ import {
   TableHeader,
   TableRow,
 } from '../../../../components/ui/table';
+import { formatEnvelopeAsk } from '../../../../lib/format-envelope';
 import { trpc } from '../../../../lib/trpc';
 import { formatDate, shortId } from '../../../../lib/utils';
 
@@ -45,6 +46,7 @@ export default function AgentDetailPage({ params }: { params: Promise<{ id: stri
   const agent = list.data?.find((a) => a.id === id);
 
   const apiKeys = trpc.apiKeys.list.useQuery({ agentId: id });
+  const envelopes = trpc.envelopes.list.useQuery({ agentId: id });
   const audit = trpc.audit.list.useQuery({ agent: agent?.did, limit: 50 }, { enabled: !!agent });
 
   const [revealedKey, setRevealedKey] = useState<string | null>(null);
@@ -67,6 +69,12 @@ export default function AgentDetailPage({ params }: { params: Promise<{ id: stri
       utils.agents.list.invalidate();
       router.push('/app/agents');
     },
+  });
+  const setMode = trpc.agents.setMode.useMutation({
+    onSuccess: () => utils.agents.list.invalidate(),
+  });
+  const revokeEnvelope = trpc.envelopes.revoke.useMutation({
+    onSuccess: () => utils.envelopes.list.invalidate({ agentId: id }),
   });
 
   useEffect(() => {
@@ -185,6 +193,26 @@ export default function AgentDetailPage({ params }: { params: Promise<{ id: stri
             <Row label="DID">
               <span className="font-mono text-xs">{shortId(agent.did, 16, 6)}</span>
             </Row>
+            <Row label="Mode">
+              <div className="flex items-center gap-2">
+                <Badge variant={agent.mode === 'dynamic' ? 'success' : 'default'}>
+                  {agent.mode}
+                </Badge>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() =>
+                    setMode.mutate({
+                      id,
+                      mode: agent.mode === 'dynamic' ? 'static' : 'dynamic',
+                    })
+                  }
+                  disabled={setMode.isPending}
+                >
+                  Switch to {agent.mode === 'dynamic' ? 'static' : 'dynamic'}
+                </Button>
+              </div>
+            </Row>
           </CardContent>
           <CardFooter>
             <Button
@@ -198,6 +226,81 @@ export default function AgentDetailPage({ params }: { params: Promise<{ id: stri
           </CardFooter>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <ShieldCheck className="h-4 w-4" /> Active grants
+          </CardTitle>
+          <CardDescription>
+            Approval Envelopes minted for this agent. Each entry permits silent UCAN mints inside
+            its constraint until it expires or you revoke it.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {envelopes.data && envelopes.data.length > 0 ? (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Scope</TableHead>
+                  <TableHead>Actions</TableHead>
+                  <TableHead>Expires</TableHead>
+                  <TableHead />
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {envelopes.data.map((e) => (
+                  <TableRow key={e.id}>
+                    <TableCell className="font-mono text-xs">
+                      {formatEnvelopeAsk({
+                        constraint: e.constraint as Parameters<
+                          typeof formatEnvelopeAsk
+                        >[0]['constraint'],
+                        actions: e.actions as string[],
+                        ttlSeconds: e.expiresAt
+                          ? Math.max(
+                              0,
+                              Math.floor((new Date(e.expiresAt).getTime() - Date.now()) / 1000),
+                            )
+                          : null,
+                      })}
+                      {e.isStanding ? (
+                        <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-amber-900">
+                          standing
+                        </span>
+                      ) : null}
+                    </TableCell>
+                    <TableCell className="font-mono text-xs">
+                      {(e.actions as string[]).join(', ')}
+                    </TableCell>
+                    <TableCell className="text-xs text-muted-foreground">
+                      {e.expiresAt ? formatDate(e.expiresAt) : 'until revoked'}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => revokeEnvelope.mutate({ id: e.id })}
+                        disabled={revokeEnvelope.isPending}
+                      >
+                        Revoke
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              No active grants. Switch this agent to dynamic mode and call
+              <code className="mx-1 rounded bg-muted px-1 py-0.5 font-mono text-xs">
+                /v1/intent
+              </code>
+              to create one via passkey approval.
+            </p>
+          )}
+        </CardContent>
+      </Card>
 
       <AgentAuditPanel rows={audit.data ?? []} isPending={audit.isPending} />
 

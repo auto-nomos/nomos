@@ -8,8 +8,10 @@
   "baseBranch": "main",
   "updateInternalDependencies": "patch",
   "ignore": [
-    "@credential-broker/control-plane",
-    "@credential-broker/pdp",
-    "@credential-broker/example-mcp-github"
+    "@auto-nomos/control-plane",
+    "@auto-nomos/pdp",
+    "@auto-nomos/dashboard",
+    "@auto-nomos/egress-proxy",
+    "@auto-nomos/example-mcp-github"
   ]
 }

@@ -127,7 +127,7 @@ pnpm install
 pnpm db:up
 cp .env.example .env.local
 pnpm gen-keys
-pnpm --filter @credential-broker/control-plane db:migrate
+pnpm --filter @auto-nomos/control-plane db:migrate
 pnpm dev
 ```
 

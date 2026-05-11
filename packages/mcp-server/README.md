@@ -1,4 +1,4 @@
-# @credential-broker/mcp-server
+# @auto-nomos/mcp-server
 
 Distributable MCP server backed by Credential Broker. Wire it into Claude
 Desktop, Cursor, or any MCP-speaking client. The agent never holds the OAuth
@@ -10,11 +10,11 @@ PDP, which holds the customer's OAuth grants.
 ```
 Claude Desktop / Cursor
         ↓ stdio
-@credential-broker/mcp-server
+@auto-nomos/mcp-server
         ↓ POST /v1/mint-ucan        (Bearer cb_… api key)
 Credential Broker control plane
         ↓ short-lived UCAN
-@credential-broker/mcp-server
+@auto-nomos/mcp-server
         ↓ POST /v1/proxy/<command>  (UCAN, no api key)
 Credential Broker PDP
         ↓ injects your OAuth token
@@ -34,7 +34,7 @@ the upstream response — never your OAuth token.
       "command": "npx",
       "args": [
         "-y",
-        "@credential-broker/mcp-server",
+        "@auto-nomos/mcp-server",
         "--config",
         "/Users/me/.cb-mcp.json"
       ]

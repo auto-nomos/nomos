@@ -1,7 +1,7 @@
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { AuditEvent } from '@credential-broker/shared-types';
+import type { AuditEvent } from '@auto-nomos/shared-types';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createAuditEmitter, decisionToAudit, ZERO_HASH } from '../emit.js';
 import { verifyAuditChain } from '../verify.js';

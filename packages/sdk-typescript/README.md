@@ -1,4 +1,4 @@
-# @credential-broker/sdk
+# @auto-nomos/sdk
 
 TypeScript SDK for the Credential Broker authorization layer. Wrap any
 upstream call (GitHub, Slack, Stripe, your own API) in `guard.authorize()` and
@@ -11,14 +11,14 @@ the call only runs if your customer's policy says it can.
 ## Install
 
 ```bash
-npm install @credential-broker/sdk
+npm install @auto-nomos/sdk
 # or pnpm / yarn / bun equivalent
 ```
 
 ## 3-line integration
 
 ```ts
-import { createAuthGuard } from '@credential-broker/sdk';
+import { createAuthGuard } from '@auto-nomos/sdk';
 
 const guard = createAuthGuard({ apiKey: process.env.CB_API_KEY!, pdpUrl: process.env.CB_PDP_URL! });
 const decision = await guard.authorize({ ucan, command: '/github/issue/create', resource: { repo: 'acme/billing' }, context: {} });

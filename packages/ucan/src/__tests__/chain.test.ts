@@ -1,5 +1,5 @@
-import { generateKeypair } from '@credential-broker/crypto';
-import type { UcanPayload } from '@credential-broker/shared-types';
+import { generateKeypair } from '@auto-nomos/crypto';
+import type { UcanPayload } from '@auto-nomos/shared-types';
 import { describe, expect, it } from 'vitest';
 import { validateChain } from '../chain.js';
 import { issueUcan } from '../issue.js';
@@ -97,6 +97,50 @@ describe('validateChain', () => {
     const a = makeUcan(root, mid.did, { exp: NOW - 10 });
     const res = validateChain([a.jwt], { now: NOW });
     expect(res).toEqual({ valid: false, error: 'expired' });
+  });
+
+  it('accepts child constraint that is a path-prefix subset of parent', () => {
+    const root = generateKeypair();
+    const mid = generateKeypair();
+    const a = makeUcan(root, mid.did, {
+      cmd: '/filesystem/read',
+      meta: { resource_constraint: { provider: 'filesystem', path_prefix: '/Users/x/finance/' } },
+    });
+    const b = makeUcan(mid, mid.did, {
+      cmd: '/filesystem/read',
+      meta: {
+        resource_constraint: { provider: 'filesystem', path_prefix: '/Users/x/finance/2026/' },
+      },
+    });
+    const res = validateChain([a.jwt, b.jwt], { now: NOW });
+    expect(res.valid).toBe(true);
+  });
+
+  it('rejects child constraint that escapes parent prefix', () => {
+    const root = generateKeypair();
+    const mid = generateKeypair();
+    const a = makeUcan(root, mid.did, {
+      cmd: '/filesystem/read',
+      meta: { resource_constraint: { provider: 'filesystem', path_prefix: '/Users/x/finance/' } },
+    });
+    const b = makeUcan(mid, mid.did, {
+      cmd: '/filesystem/read',
+      meta: { resource_constraint: { provider: 'filesystem', path_prefix: '/Users/x/' } },
+    });
+    const res = validateChain([a.jwt, b.jwt], { now: NOW });
+    expect(res).toEqual({ valid: false, error: 'over_attenuated' });
+  });
+
+  it('child without constraint inherits parent constraint', () => {
+    const root = generateKeypair();
+    const mid = generateKeypair();
+    const a = makeUcan(root, mid.did, {
+      cmd: '/filesystem/read',
+      meta: { resource_constraint: { provider: 'filesystem', path_prefix: '/Users/x/finance/' } },
+    });
+    const b = makeUcan(mid, mid.did, { cmd: '/filesystem/read' });
+    const res = validateChain([a.jwt, b.jwt], { now: NOW });
+    expect(res.valid).toBe(true);
   });
 
   it('only enforces audience and expectedCommand on the leaf', () => {

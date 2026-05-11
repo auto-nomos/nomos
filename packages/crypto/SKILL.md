@@ -1,4 +1,4 @@
-# SKILL: working in @credential-broker/crypto
+# SKILL: working in @auto-nomos/crypto
 
 Read this before touching anything in this package.
 

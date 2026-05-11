@@ -1,5 +1,5 @@
-import { sha256Hex, signDetached } from '@credential-broker/crypto';
-import { bytesToBase64url, canonicalize } from '@credential-broker/ucan';
+import { sha256Hex, signDetached } from '@auto-nomos/crypto';
+import { bytesToBase64url, canonicalize } from '@auto-nomos/ucan';
 import { eq } from 'drizzle-orm';
 import type { DrizzleClient } from '../db/index.js';
 import * as schema from '../db/schema.js';

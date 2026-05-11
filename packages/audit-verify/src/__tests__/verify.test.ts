@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
-import { generateKeypair, sha256Hex, signDetached } from '@credential-broker/crypto';
-import { canonicalize } from '@credential-broker/ucan';
+import { generateKeypair, sha256Hex, signDetached } from '@auto-nomos/crypto';
+import { canonicalize } from '@auto-nomos/ucan';
 import { bytesToHex } from '@noble/hashes/utils';
 import { describe, expect, it } from 'vitest';
 import { type AuditBundle, type AuditBundleEvent, verifyBundle } from '../verify.js';

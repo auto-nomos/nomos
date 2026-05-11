@@ -1,5 +1,5 @@
 {
-  "name": "@credential-broker/pdp",
+  "name": "@auto-nomos/pdp",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -15,12 +15,12 @@
     "clean": "rm -rf dist .turbo"
   },
   "dependencies": {
-    "@credential-broker/cedar": "workspace:*",
-    "@credential-broker/core": "workspace:*",
-    "@credential-broker/crypto": "workspace:*",
-    "@credential-broker/schema-packs": "workspace:*",
-    "@credential-broker/shared-types": "workspace:*",
-    "@credential-broker/ucan": "workspace:*",
+    "@auto-nomos/cedar": "workspace:*",
+    "@auto-nomos/core": "workspace:*",
+    "@auto-nomos/crypto": "workspace:*",
+    "@auto-nomos/schema-packs": "workspace:*",
+    "@auto-nomos/shared-types": "workspace:*",
+    "@auto-nomos/ucan": "workspace:*",
     "@hono/node-server": "1.13.7",
     "@opentelemetry/api": "^1.9.1",
     "@opentelemetry/exporter-metrics-otlp-http": "^0.217.0",

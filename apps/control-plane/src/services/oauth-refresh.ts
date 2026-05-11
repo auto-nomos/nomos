@@ -59,6 +59,8 @@ function connectorCredentials(
     slack: [config.OAUTH_SLACK_CLIENT_ID, config.OAUTH_SLACK_CLIENT_SECRET],
     google: [config.OAUTH_GOOGLE_CLIENT_ID, config.OAUTH_GOOGLE_CLIENT_SECRET],
     notion: [config.OAUTH_NOTION_CLIENT_ID, config.OAUTH_NOTION_CLIENT_SECRET],
+    linear: [config.OAUTH_LINEAR_CLIENT_ID, config.OAUTH_LINEAR_CLIENT_SECRET],
+    stripe: [config.OAUTH_STRIPE_CLIENT_ID, config.OAUTH_STRIPE_CLIENT_SECRET],
   };
   const [cid, sec] = map[id];
   if (!cid || !sec) return null;

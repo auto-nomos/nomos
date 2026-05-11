@@ -1,0 +1,56 @@
+id: google_contacts
+name: Google Contacts
+version: 1.0.0
+description: People API — contacts and contact groups.
+homepage: https://developers.google.com/people
+
+api_base: https://people.googleapis.com/v1
+
+auth:
+  kind: oauth2
+  authorize_url: https://accounts.google.com/o/oauth2/v2/auth
+  token_url: https://oauth2.googleapis.com/token
+  default_scopes:
+    - https://www.googleapis.com/auth/contacts.readonly
+  pkce: true
+
+actions:
+  - id: list_contacts
+    description: List the user's connections.
+    expected_use: Look up emails or phone numbers before composing a message.
+    auto_execute: true
+    required_scopes: [https://www.googleapis.com/auth/contacts.readonly]
+    risk: { category: read, sensitivity: medium }
+    http:
+      method: GET
+      path: "/people/me/connections"
+    params:
+      - { name: pageSize, in: query, type: integer, default: 100 }
+      - { name: personFields, in: query, type: string, default: "names,emailAddresses,phoneNumbers" }
+
+  - id: search_contacts
+    description: Search contacts by name or email substring.
+    expected_use: Resolve a partial name to a full contact record.
+    auto_execute: true
+    required_scopes: [https://www.googleapis.com/auth/contacts.readonly]
+    risk: { category: search, sensitivity: medium }
+    http:
+      method: GET
+      path: "/people:searchContacts"
+    params:
+      - { name: query, in: query, required: true, type: string }
+      - { name: pageSize, in: query, type: integer, default: 25 }
+      - { name: readMask, in: query, type: string, default: "names,emailAddresses,phoneNumbers" }
+
+  - id: get_contact
+    description: Fetch a contact by resource name.
+    expected_use: Read full contact record.
+    auto_execute: true
+    required_scopes: [https://www.googleapis.com/auth/contacts.readonly]
+    risk: { category: read, sensitivity: medium }
+    http:
+      method: GET
+      path: "/{resourceName}"
+    params:
+      - { name: resourceName, in: path, required: true, type: string }
+      - { name: personFields, in: query, type: string, default: "names,emailAddresses,phoneNumbers,addresses" }

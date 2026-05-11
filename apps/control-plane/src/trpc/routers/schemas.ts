@@ -1,4 +1,4 @@
-import { actionsFor, PACKS } from '@credential-broker/schema-packs';
+import { actionsFor, PACKS } from '@auto-nomos/schema-packs';
 import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 import { router, tenantProcedure } from '../index.js';

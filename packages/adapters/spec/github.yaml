@@ -1,0 +1,255 @@
+# GitHub adapter — pilot spec for M2 framework, also serves as the canonical
+# example for porting the existing TS connector at apps/control-plane/src/oauth/connectors/github.ts
+# to the YAML-driven model. Keeps GitHub OAuth Apps as the dev path; bot-token GitHub Apps work
+# via the same auth.kind=oauth2 because GitHub returns the same fields.
+
+id: github
+name: GitHub
+version: 1.0.0
+description: GitHub REST API — issues, repos, users.
+homepage: https://docs.github.com/en/rest
+
+api_base: https://api.github.com
+
+auth:
+  kind: oauth2
+  authorize_url: https://github.com/login/oauth/authorize
+  token_url: https://github.com/login/oauth/access_token
+  default_scopes:
+    - repo
+    - read:user
+  pkce: false
+
+actions:
+  - id: list_issues
+    description: List issues for a repository.
+    expected_use: Browse issues for triage or context before deciding what to act on.
+    auto_execute: true
+    required_scopes:
+      - repo
+    risk:
+      category: read
+      sensitivity: low
+    http:
+      method: GET
+      path: "/repos/{owner}/{repo}/issues"
+    params:
+      - name: owner
+        in: path
+        required: true
+        type: string
+        description: Repository owner (user or org).
+      - name: repo
+        in: path
+        required: true
+        type: string
+        description: Repository name.
+      - name: state
+        in: query
+        type: string
+        default: open
+        enum: [open, closed, all]
+        description: Filter by issue state.
+      - name: per_page
+        in: query
+        type: integer
+        default: 30
+        description: Items per page (max 100).
+    response:
+      type: array
+      sanitize:
+        - field: items[].user.email
+          redact: true
+
+  - id: get_issue
+    description: Fetch a single issue.
+    expected_use: Read full issue body to inform a triage decision or summary.
+    auto_execute: true
+    required_scopes:
+      - repo
+    risk:
+      category: read
+      sensitivity: low
+    http:
+      method: GET
+      path: "/repos/{owner}/{repo}/issues/{issue_number}"
+    params:
+      - name: owner
+        in: path
+        required: true
+        type: string
+      - name: repo
+        in: path
+        required: true
+        type: string
+      - name: issue_number
+        in: path
+        required: true
+        type: integer
+
+  - id: create_issue
+    description: Open a new issue.
+    expected_use: File a bug or task as part of triage.
+    auto_execute: false
+    required_scopes:
+      - repo
+    risk:
+      category: write
+      sensitivity: medium
+    http:
+      method: POST
+      path: "/repos/{owner}/{repo}/issues"
+    params:
+      - name: owner
+        in: path
+        required: true
+        type: string
+      - name: repo
+        in: path
+        required: true
+        type: string
+      - name: title
+        in: body
+        required: true
+        type: string
+      - name: body
+        in: body
+        type: string
+      - name: labels
+        in: body
+        type: array
+      - name: assignees
+        in: body
+        type: array
+
+  - id: comment_on_issue
+    description: Add a comment to an existing issue.
+    expected_use: Reply to triage discussion or post a status update.
+    auto_execute: false
+    required_scopes:
+      - repo
+    risk:
+      category: write
+      sensitivity: medium
+    http:
+      method: POST
+      path: "/repos/{owner}/{repo}/issues/{issue_number}/comments"
+    params:
+      - name: owner
+        in: path
+        required: true
+        type: string
+      - name: repo
+        in: path
+        required: true
+        type: string
+      - name: issue_number
+        in: path
+        required: true
+        type: integer
+      - name: body
+        in: body
+        required: true
+        type: string
+
+  - id: list_repos
+    description: List repositories for the authenticated user.
+    expected_use: Discover which repos the user owns / collaborates on.
+    auto_execute: true
+    required_scopes:
+      - repo
+      - read:user
+    risk:
+      category: read
+      sensitivity: low
+    http:
+      method: GET
+      path: /user/repos
+    params:
+      - name: visibility
+        in: query
+        type: string
+        default: all
+        enum: [all, public, private]
+      - name: per_page
+        in: query
+        type: integer
+        default: 50
+
+  - id: get_user
+    description: Get the authenticated user's profile.
+    expected_use: Identify which GitHub account the agent is acting as.
+    auto_execute: true
+    required_scopes:
+      - read:user
+    risk:
+      category: read
+      sensitivity: low
+    http:
+      method: GET
+      path: /user
+    response:
+      type: object
+      sanitize:
+        - field: email
+          redact: true
+
+  - id: close_issue
+    description: Close an existing issue.
+    expected_use: Resolve an issue that has been handled.
+    auto_execute: false
+    required_scopes:
+      - repo
+    risk:
+      category: write
+      sensitivity: medium
+    http:
+      method: PATCH
+      path: "/repos/{owner}/{repo}/issues/{issue_number}"
+    params:
+      - name: owner
+        in: path
+        required: true
+        type: string
+      - name: repo
+        in: path
+        required: true
+        type: string
+      - name: issue_number
+        in: path
+        required: true
+        type: integer
+      - name: state
+        in: body
+        required: true
+        type: string
+        default: closed
+        enum: [closed]
+
+  - id: delete_repo
+    description: Permanently delete a repository.
+    expected_use: Reserved for housekeeping; almost never invoked by an agent.
+    auto_execute: false
+    required_scopes:
+      - delete_repo
+    risk:
+      category: delete
+      sensitivity: high
+    http:
+      method: DELETE
+      path: "/repos/{owner}/{repo}"
+    params:
+      - name: owner
+        in: path
+        required: true
+        type: string
+      - name: repo
+        in: path
+        required: true
+        type: string
+
+notes: |
+  - Issue numbering: GitHub uses sequential per-repo integers, not the global node_id.
+  - Rate limit: 5000 req/hr authenticated; surface 403 + X-RateLimit-Remaining header.
+  - Refresh: GitHub OAuth Apps issue non-expiring tokens with no refresh_token.
+    GitHub Apps issue refresh tokens (treated transparently by the OAuth executor).

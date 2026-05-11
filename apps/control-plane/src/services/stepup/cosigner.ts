@@ -11,7 +11,7 @@
  * poll once more and retry, short enough that a leaked cosigner can't
  * unlock unrelated requests far in the future.
  */
-import { issueUcan } from '@credential-broker/ucan';
+import { issueUcan } from '@auto-nomos/ucan';
 import { and, eq } from 'drizzle-orm';
 import type { DrizzleClient } from '../../db/index.js';
 import * as schema from '../../db/schema.js';
@@ -36,6 +36,9 @@ export interface MintCosignerInput {
   decidingUserId: string;
   ttlSeconds?: number;
   nonce: string;
+  /** Standing approvals create a durable envelope on /v1/intent retry.
+   *  Default 'session' preserves the existing TTL behavior. */
+  mode?: 'session' | 'standing';
 }
 
 export interface MintCosignerDeps {
@@ -115,6 +118,7 @@ export async function mintCosignerForApproval(
         cosigner_for: approval.originalUcanCid,
         approval_id: approval.id,
         decided_by: input.decidingUserId,
+        mode: input.mode ?? 'session',
       },
     },
     privateKey: deps.signKey,

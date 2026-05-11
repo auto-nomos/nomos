@@ -1,0 +1,90 @@
+id: jira
+name: Jira
+version: 1.0.0
+description: Atlassian Jira REST API v3 — issues, projects, comments.
+homepage: https://developer.atlassian.com/cloud/jira/platform/rest/v3/
+
+# Atlassian cloud routes through api.atlassian.com/ex/jira/{cloudId}; the
+# connector layer resolves cloudId at OAuth callback and stores it alongside
+# the token. The api_base here is the prefix before {cloudId}.
+api_base: https://api.atlassian.com
+
+auth:
+  kind: oauth2
+  authorize_url: https://auth.atlassian.com/authorize
+  token_url: https://auth.atlassian.com/oauth/token
+  default_scopes:
+    - read:jira-work
+    - write:jira-work
+    - read:jira-user
+    - offline_access
+  pkce: true
+
+actions:
+  - id: search_issues
+    description: Search issues with JQL.
+    expected_use: Find a specific issue or filter by status.
+    auto_execute: true
+    required_scopes: [read:jira-work]
+    risk: { category: search, sensitivity: low }
+    http:
+      method: GET
+      path: "/ex/jira/{cloudId}/rest/api/3/search"
+    params:
+      - { name: cloudId, in: path, required: true, type: string }
+      - { name: jql, in: query, required: true, type: string }
+      - { name: maxResults, in: query, type: integer, default: 25 }
+
+  - id: get_issue
+    description: Fetch a single issue.
+    expected_use: Read issue full details.
+    auto_execute: true
+    required_scopes: [read:jira-work]
+    risk: { category: read, sensitivity: low }
+    http:
+      method: GET
+      path: "/ex/jira/{cloudId}/rest/api/3/issue/{issueIdOrKey}"
+    params:
+      - { name: cloudId, in: path, required: true, type: string }
+      - { name: issueIdOrKey, in: path, required: true, type: string }
+
+  - id: create_issue
+    description: Create a new issue.
+    expected_use: File a bug or task.
+    auto_execute: false
+    required_scopes: [write:jira-work]
+    risk: { category: write, sensitivity: medium }
+    http:
+      method: POST
+      path: "/ex/jira/{cloudId}/rest/api/3/issue"
+    params:
+      - { name: cloudId, in: path, required: true, type: string }
+      - { name: fields, in: body, required: true, type: object }
+
+  - id: comment_on_issue
+    description: Post a comment on an issue.
+    expected_use: Add a status update or reply.
+    auto_execute: false
+    required_scopes: [write:jira-work]
+    risk: { category: write, sensitivity: low }
+    http:
+      method: POST
+      path: "/ex/jira/{cloudId}/rest/api/3/issue/{issueIdOrKey}/comment"
+    params:
+      - { name: cloudId, in: path, required: true, type: string }
+      - { name: issueIdOrKey, in: path, required: true, type: string }
+      - { name: body, in: body, required: true, type: object }
+
+  - id: transition_issue
+    description: Move an issue between statuses (e.g., to Done).
+    expected_use: Mark a task complete.
+    auto_execute: false
+    required_scopes: [write:jira-work]
+    risk: { category: write, sensitivity: medium }
+    http:
+      method: POST
+      path: "/ex/jira/{cloudId}/rest/api/3/issue/{issueIdOrKey}/transitions"
+    params:
+      - { name: cloudId, in: path, required: true, type: string }
+      - { name: issueIdOrKey, in: path, required: true, type: string }
+      - { name: transition, in: body, required: true, type: object }

@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import { appendFile } from 'node:fs/promises';
-import { sha256Hex } from '@credential-broker/crypto';
-import type { AuditDecision, AuditEvent } from '@credential-broker/shared-types';
-import { canonicalize } from '@credential-broker/ucan';
+import { sha256Hex } from '@auto-nomos/crypto';
+import type { AuditDecision, AuditEvent } from '@auto-nomos/shared-types';
+import { canonicalize } from '@auto-nomos/ucan';
 
 export const ZERO_HASH = '0'.repeat(64);
 

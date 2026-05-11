@@ -34,6 +34,11 @@ const Config = z.object({
   OAUTH_GOOGLE_CLIENT_SECRET: z.string().optional(),
   OAUTH_NOTION_CLIENT_ID: z.string().optional(),
   OAUTH_NOTION_CLIENT_SECRET: z.string().optional(),
+  // P-CV3 — Linear + Stripe (Clawvisor parity).
+  OAUTH_LINEAR_CLIENT_ID: z.string().optional(),
+  OAUTH_LINEAR_CLIENT_SECRET: z.string().optional(),
+  OAUTH_STRIPE_CLIENT_ID: z.string().optional(),
+  OAUTH_STRIPE_CLIENT_SECRET: z.string().optional(),
 
   // Sprint 8 — push revocation. Comma-separated PDP webhook URLs the control
   // plane POSTs to on revoke (e.g. `http://localhost:8787/v1/internal/refresh-revocations`).
@@ -49,6 +54,21 @@ const Config = z.object({
   STEPUP_DEFAULT_TTL_MS: z.coerce.number().int().positive().default(60_000),
   DASHBOARD_PUBLIC_URL: z.string().url().default('http://localhost:3000'),
 
+  // P1 — M6 Telegram approval bot. Empty token = bot disabled (Knock /
+  // dashboard PWA still work). Username (without leading @) is used to
+  // build deep links: https://t.me/<username>?start=<token>.
+  TELEGRAM_BOT_TOKEN: z.string().optional(),
+  TELEGRAM_BOT_USERNAME: z.string().optional(),
+  /** Long-poll timeout for getUpdates (server-side, seconds). */
+  TELEGRAM_POLL_TIMEOUT_S: z.coerce.number().int().positive().default(30),
+
+  // P1 — M7 chain-context LLM intent verification.
+  // When ENABLED + ANTHROPIC_API_KEY set: per-request fact extraction
+  // (after allow) + per-request verify (before allow). Misaligned →
+  // step-up. Adds ~150-300ms latency per call; gated behind flag.
+  INTENT_CHAIN_CONTEXT_ENABLED: z.coerce.boolean().default(false),
+  INTENT_CHAIN_CONTEXT_TIMEOUT_MS: z.coerce.number().int().positive().default(3_000),
+
   // Sprint 8.3 / D-4 — env-managed Ed25519 root key over the audit hash chain.
   // Phase 1 default: one key per environment. Customer-managed-key is Phase 2.
   // Generate via `pnpm gen-keys`. AUDIT_VERIFY_KEY ships to the audit-verify CLI.
@@ -61,6 +81,16 @@ const Config = z.object({
     .int()
     .positive()
     .default(24 * 60 * 60 * 1_000),
+
+  // P-CV1 — LLM intent coherence verifier (Clawvisor parity).
+  // When enabled, /v1/intent runs an LLM check after heuristic + envelope
+  // pass; coherence_mismatch denies fall back to step-up. Fail-closed on
+  // timeout/error. Default OFF — opt in per environment.
+  ANTHROPIC_API_KEY: z.string().optional(),
+  INTENT_COHERENCE_ENABLED: z
+    .union([z.boolean(), z.string().transform((s) => s === 'true' || s === '1')])
+    .default(false),
+  INTENT_COHERENCE_TIMEOUT_MS: z.coerce.number().int().positive().default(1500),
 
   // Sprint 8.5 — Cloudflare R2 audit archive. When any of these are blank the
   // archive worker is disabled (the audit_events Postgres rows still keep

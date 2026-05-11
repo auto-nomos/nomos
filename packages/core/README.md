@@ -1,4 +1,4 @@
-# @credential-broker/core
+# @auto-nomos/core
 
 The end-to-end authorization decision function. Composes `shared-types` + `crypto` + `ucan` + `cedar` into a single `decide(input)` call.
 
@@ -9,13 +9,13 @@ The PDP runtime imports `decide` and calls it on every authorize request. Same f
 ## Install (workspace)
 
 ```ts
-import { decide } from '@credential-broker/core';
+import { decide } from '@auto-nomos/core';
 ```
 
 ## Public API
 
 ```ts
-import { decide } from '@credential-broker/core';
+import { decide } from '@auto-nomos/core';
 
 const decision = decide({
   ucan: jwtOrChain,           // string | string[]  (chain ordered root-first)
@@ -60,7 +60,7 @@ Full flow target: <50ms p99 locally on Node 22 (ARM/x86). Sprint-12 target: <50m
 ## Tests
 
 ```bash
-pnpm --filter @credential-broker/core test
+pnpm --filter @auto-nomos/core test
 ```
 
 100% line+branch+function coverage required. Includes the canonical billing-agent ACME 2026 example, delegation chain, revocation, malformed input, command mismatch, and expired UCAN paths.

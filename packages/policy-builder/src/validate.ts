@@ -5,7 +5,7 @@
  * user as Cedar (or saved), we emit and re-parse to make sure the
  * emitter didn't drift from cedar-wasm's grammar.
  */
-import { parsePolicy } from '@credential-broker/cedar';
+import { parsePolicy } from '@auto-nomos/cedar';
 import { emitPolicySet } from './emit.js';
 import type { VisualPolicy } from './ir.js';
 

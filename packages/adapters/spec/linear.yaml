@@ -1,0 +1,76 @@
+id: linear
+name: Linear
+version: 1.0.0
+description: Linear GraphQL API — issues, projects, teams.
+homepage: https://developers.linear.app
+
+api_base: https://api.linear.app/graphql
+
+auth:
+  kind: oauth2
+  authorize_url: https://linear.app/oauth/authorize
+  token_url: https://api.linear.app/oauth/token
+  default_scopes:
+    - read
+    - write
+  pkce: false
+
+actions:
+  - id: list_issues
+    description: List recent issues across teams.
+    expected_use: Browse open work for triage / context.
+    auto_execute: true
+    required_scopes: [read]
+    risk: { category: read, sensitivity: low }
+    http:
+      method: POST
+      path: "/"
+    params:
+      - name: query
+        in: body
+        required: true
+        type: string
+        default: |
+          query Issues($first: Int!) { issues(first: $first) { nodes { id identifier title state { name } assignee { name } } } }
+      - { name: variables, in: body, type: object, default: { first: 25 } }
+
+  - id: create_issue
+    description: Create a new issue in a team.
+    expected_use: File a bug or task as part of triage.
+    auto_execute: false
+    required_scopes: [write]
+    risk: { category: write, sensitivity: medium }
+    http:
+      method: POST
+      path: "/"
+    params:
+      - name: query
+        in: body
+        required: true
+        type: string
+        default: |
+          mutation CreateIssue($input: IssueCreateInput!) { issueCreate(input: $input) { issue { id identifier url } } }
+      - { name: variables, in: body, required: true, type: object }
+
+  - id: comment_on_issue
+    description: Post a comment on an issue.
+    expected_use: Add status updates or replies.
+    auto_execute: false
+    required_scopes: [write]
+    risk: { category: write, sensitivity: low }
+    http:
+      method: POST
+      path: "/"
+    params:
+      - name: query
+        in: body
+        required: true
+        type: string
+        default: |
+          mutation Comment($input: CommentCreateInput!) { commentCreate(input: $input) { comment { id } } }
+      - { name: variables, in: body, required: true, type: object }
+
+notes: |
+  Linear's API is GraphQL-only; every action POSTs to /graphql with
+  `query` + `variables`. The YAML wraps that with default queries so an
+  agent only has to provide variables.

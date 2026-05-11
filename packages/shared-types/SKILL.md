@@ -1,4 +1,4 @@
-# SKILL: working in @credential-broker/shared-types
+# SKILL: working in @auto-nomos/shared-types
 
 Read this before changing any schema in this package.
 
@@ -31,4 +31,4 @@ The wire shapes and storage shapes that flow across the system. Everything else 
 
 ## Coverage
 
-100% line + branch + function coverage on all schema files (excluding the index re-export). Tests run with `pnpm --filter @credential-broker/shared-types test`.
+100% line + branch + function coverage on all schema files (excluding the index re-export). Tests run with `pnpm --filter @auto-nomos/shared-types test`.

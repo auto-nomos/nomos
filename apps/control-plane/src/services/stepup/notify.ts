@@ -1,4 +1,12 @@
 import type { Logger } from '../../logger.js';
+import type { TelegramBot } from '../notify/telegram-bot.js';
+
+export interface NotificationChannelPrefs {
+  telegramChatId?: string | null;
+  telegramEnabled?: boolean;
+  emailEnabled?: boolean;
+  webPushEnabled?: boolean;
+}
 
 export interface StepUpNotifyArgs {
   approvalId: string;
@@ -10,6 +18,9 @@ export interface StepUpNotifyArgs {
   resource: Record<string, unknown>;
   deepLink: string;
   ttlSeconds?: number;
+  /** Resolved per-user preferences. Knock workflow branches on these
+   *  data fields; no client-side branching here. */
+  prefs?: NotificationChannelPrefs;
 }
 
 export interface StepUpNotifierOptions {
@@ -19,6 +30,11 @@ export interface StepUpNotifierOptions {
   workflow?: string;
   logger: Logger;
   fetch?: typeof fetch;
+  /**
+   * M6 — when set, fan out to Telegram directly (bypassing Knock) when
+   * prefs.telegramChatId is non-null and prefs.telegramEnabled is true.
+   */
+  telegramBot?: TelegramBot;
 }
 
 export type StepUpNotifier = (args: StepUpNotifyArgs) => Promise<void>;
@@ -30,6 +46,30 @@ export function createStepUpNotifier(opts: StepUpNotifierOptions): StepUpNotifie
   const workflow = opts.workflow ?? 'step-up-request';
 
   return async (args: StepUpNotifyArgs) => {
+    const prefs = args.prefs ?? {};
+
+    // M6 — direct Telegram path: short-circuit Knock when bot configured.
+    if (
+      opts.telegramBot &&
+      prefs.telegramEnabled !== false &&
+      prefs.telegramChatId &&
+      prefs.telegramChatId.length > 0
+    ) {
+      const sent = await opts.telegramBot.sendStepUp({
+        chatId: prefs.telegramChatId,
+        approvalId: args.approvalId,
+        command: args.command,
+        resource: args.resource,
+        deepLink: args.deepLink,
+        ttlSeconds: args.ttlSeconds ?? 60,
+      });
+      if (sent) return;
+      opts.logger.warn(
+        { approvalId: args.approvalId },
+        'telegram send failed; falling back to Knock / dev console',
+      );
+    }
+
     if (!opts.apiKey || opts.apiKey.length === 0) {
       opts.logger.info(
         {
@@ -43,7 +83,6 @@ export function createStepUpNotifier(opts: StepUpNotifierOptions): StepUpNotifie
       );
       return;
     }
-
     const body = JSON.stringify({
       recipients: [args.decidingUserId],
       data: {
@@ -54,6 +93,14 @@ export function createStepUpNotifier(opts: StepUpNotifierOptions): StepUpNotifie
         resource: args.resource,
         deepLink: args.deepLink,
         ttlSeconds: args.ttlSeconds ?? 60,
+        // Channel routing flags consumed by the Knock workflow.
+        // The workflow branches: web push + email default on,
+        // Telegram only fires when telegram_chat_id is non-null and
+        // telegram_enabled = true.
+        telegram_chat_id:
+          prefs.telegramEnabled && prefs.telegramChatId ? prefs.telegramChatId : null,
+        email_enabled: prefs.emailEnabled !== false,
+        web_push_enabled: prefs.webPushEnabled !== false,
       },
     });
 

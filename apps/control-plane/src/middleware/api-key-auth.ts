@@ -1,4 +1,4 @@
-import { sha256Hex } from '@credential-broker/crypto';
+import { sha256Hex } from '@auto-nomos/crypto';
 import { and, eq, isNull } from 'drizzle-orm';
 import type { MiddlewareHandler } from 'hono';
 import { createMiddleware } from 'hono/factory';
@@ -48,6 +48,31 @@ export const apiKeyAuth = (
         },
         403,
       );
+    }
+    const agent = await deps.db.drizzle.query.agents.findFirst({
+      where: eq(schema.agents.id, row.agentId),
+      columns: { id: true, status: true, connectionApprovedAt: true },
+    });
+    if (!agent || agent.status === 'deleted') {
+      return c.json({ error: 'unauthorized', error_code: 'agent_not_found' }, 401);
+    }
+    await deps.db.drizzle
+      .update(schema.agents)
+      .set({ lastActiveAt: new Date() })
+      .where(eq(schema.agents.id, row.agentId));
+    if (!agent.connectionApprovedAt) {
+      return c.json(
+        {
+          error:
+            'this agent has not been approved yet; approve it from the Nomos dashboard under Pending connections',
+          error_code: 'pending_approval',
+          agentId: agent.id,
+        },
+        403,
+      );
+    }
+    if (agent.status !== 'active') {
+      return c.json({ error: 'agent disabled', error_code: 'agent_not_active' }, 403);
     }
     c.set('customerId', row.customerId);
     c.set('agentId', row.agentId);

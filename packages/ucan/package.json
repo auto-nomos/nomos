@@ -1,7 +1,8 @@
 {
-  "name": "@credential-broker/ucan",
-  "version": "0.0.0",
-  "private": true,
+  "name": "@auto-nomos/ucan",
+  "version": "0.0.1",
+  "license": "MIT",
+  "private": false,
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -24,8 +25,8 @@
     "clean": "rm -rf dist .turbo"
   },
   "dependencies": {
-    "@credential-broker/crypto": "workspace:*",
-    "@credential-broker/shared-types": "workspace:*",
+    "@auto-nomos/crypto": "workspace:*",
+    "@auto-nomos/shared-types": "workspace:*",
     "zod": "3.25.76"
   },
   "devDependencies": {

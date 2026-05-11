@@ -1,7 +1,7 @@
 /* eslint-disable no-console */
-import { generateKeypair } from '@credential-broker/crypto';
-import type { UcanPayload } from '@credential-broker/shared-types';
-import { issueUcan } from '@credential-broker/ucan';
+import { generateKeypair } from '@auto-nomos/crypto';
+import type { UcanPayload } from '@auto-nomos/shared-types';
+import { issueUcan } from '@auto-nomos/ucan';
 import { serve } from '@hono/node-server';
 import autocannon from 'autocannon';
 import pino from 'pino';

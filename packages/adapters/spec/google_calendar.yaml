@@ -1,0 +1,94 @@
+id: google_calendar
+name: Google Calendar
+version: 1.0.0
+description: Google Calendar API — events and calendars.
+homepage: https://developers.google.com/calendar/api
+
+api_base: https://www.googleapis.com/calendar/v3
+
+auth:
+  kind: oauth2
+  authorize_url: https://accounts.google.com/o/oauth2/v2/auth
+  token_url: https://oauth2.googleapis.com/token
+  default_scopes:
+    - https://www.googleapis.com/auth/calendar.readonly
+    - https://www.googleapis.com/auth/calendar.events
+  pkce: true
+
+actions:
+  - id: list_events
+    description: List upcoming events on a calendar.
+    expected_use: See what's on the schedule before booking or summarizing.
+    auto_execute: true
+    required_scopes: [https://www.googleapis.com/auth/calendar.readonly]
+    risk: { category: read, sensitivity: medium }
+    http:
+      method: GET
+      path: "/calendars/{calendarId}/events"
+    params:
+      - { name: calendarId, in: path, required: true, type: string, default: primary }
+      - { name: timeMin, in: query, type: string, default_expr: "rfc3339(now())" }
+      - { name: maxResults, in: query, type: integer, default: 25 }
+      - { name: singleEvents, in: query, type: boolean, default: true }
+      - { name: orderBy, in: query, type: string, default: startTime }
+
+  - id: get_event
+    description: Fetch a single event.
+    expected_use: Inspect attendees, location, description.
+    auto_execute: true
+    required_scopes: [https://www.googleapis.com/auth/calendar.readonly]
+    risk: { category: read, sensitivity: medium }
+    http:
+      method: GET
+      path: "/calendars/{calendarId}/events/{eventId}"
+    params:
+      - { name: calendarId, in: path, required: true, type: string, default: primary }
+      - { name: eventId, in: path, required: true, type: string }
+
+  - id: create_event
+    description: Create a calendar event.
+    expected_use: Book a meeting or block focus time.
+    auto_execute: false
+    required_scopes: [https://www.googleapis.com/auth/calendar.events]
+    risk: { category: write, sensitivity: medium }
+    http:
+      method: POST
+      path: "/calendars/{calendarId}/events"
+    params:
+      - { name: calendarId, in: path, required: true, type: string, default: primary }
+      - { name: summary, in: body, required: true, type: string }
+      - { name: description, in: body, type: string }
+      - { name: start, in: body, required: true, type: object }
+      - { name: end, in: body, required: true, type: object }
+      - { name: attendees, in: body, type: array }
+      - { name: location, in: body, type: string }
+
+  - id: update_event
+    description: Modify an event.
+    expected_use: Reschedule or update details.
+    auto_execute: false
+    required_scopes: [https://www.googleapis.com/auth/calendar.events]
+    risk: { category: write, sensitivity: medium }
+    http:
+      method: PATCH
+      path: "/calendars/{calendarId}/events/{eventId}"
+    params:
+      - { name: calendarId, in: path, required: true, type: string, default: primary }
+      - { name: eventId, in: path, required: true, type: string }
+      - { name: summary, in: body, type: string }
+      - { name: start, in: body, type: object }
+      - { name: end, in: body, type: object }
+      - { name: attendees, in: body, type: array }
+
+  - id: delete_event
+    description: Delete a calendar event.
+    expected_use: Cancel a meeting.
+    auto_execute: false
+    required_scopes: [https://www.googleapis.com/auth/calendar.events]
+    risk: { category: delete, sensitivity: medium }
+    http:
+      method: DELETE
+      path: "/calendars/{calendarId}/events/{eventId}"
+    params:
+      - { name: calendarId, in: path, required: true, type: string, default: primary }
+      - { name: eventId, in: path, required: true, type: string }

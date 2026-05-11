@@ -4,7 +4,7 @@
  * so the coverage gate doesn't depend on which integration DB is reachable.
  */
 
-import { generateSecretboxKeyHex } from '@credential-broker/crypto';
+import { generateSecretboxKeyHex } from '@auto-nomos/crypto';
 import { hexToBytes } from '@noble/hashes/utils';
 import { describe, expect, it, vi } from 'vitest';
 import type { DrizzleClient } from '../../db/index.js';

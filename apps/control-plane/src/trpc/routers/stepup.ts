@@ -146,6 +146,11 @@ export const stepupRouter = router({
       z.object({
         approvalId: z.string().uuid(),
         response: AuthenticationResponseSchema,
+        /** Standing approvals create durable envelopes on /v1/intent
+         *  retry. Default 'session' preserves the TTL behavior. Only
+         *  meaningful for envelope-class approvals — ignored for
+         *  request-class step-ups. */
+        mode: z.enum(['session', 'standing']).optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -170,6 +175,7 @@ export const stepupRouter = router({
             customerId: ctx.customerId,
             decidingUserId: ctx.session.user.id,
             nonce: `cosign-${input.approvalId}-${Date.now()}`,
+            ...(input.mode ? { mode: input.mode } : {}),
           },
           {
             db: ctx.db.drizzle,

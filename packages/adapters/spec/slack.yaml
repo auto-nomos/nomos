@@ -1,0 +1,90 @@
+id: slack
+name: Slack
+version: 1.0.0
+description: Slack Web API — channels, messages, users.
+homepage: https://api.slack.com/web
+
+api_base: https://slack.com/api
+
+auth:
+  kind: oauth2
+  authorize_url: https://slack.com/oauth/v2/authorize
+  token_url: https://slack.com/api/oauth.v2.access
+  default_scopes:
+    - channels:read
+    - chat:write
+    - users:read
+  pkce: false
+
+actions:
+  - id: list_channels
+    description: List public channels in the workspace.
+    expected_use: Discover where to post / find context.
+    auto_execute: true
+    required_scopes: [channels:read]
+    risk: { category: read, sensitivity: low }
+    http:
+      method: GET
+      path: "/conversations.list"
+    params:
+      - { name: types, in: query, type: string, default: public_channel }
+      - { name: limit, in: query, type: integer, default: 100 }
+
+  - id: post_message
+    description: Post a message to a channel.
+    expected_use: Send notifications, status updates, or reply in a thread.
+    auto_execute: false
+    required_scopes: [chat:write]
+    risk: { category: write, sensitivity: medium }
+    http:
+      method: POST
+      path: "/chat.postMessage"
+    params:
+      - { name: channel, in: body, required: true, type: string }
+      - { name: text, in: body, required: true, type: string }
+      - { name: thread_ts, in: body, type: string }
+      - { name: blocks, in: body, type: array }
+
+  - id: get_user_info
+    description: Look up a Slack user by id.
+    expected_use: Resolve a user mention to a real identity.
+    auto_execute: true
+    required_scopes: [users:read]
+    risk: { category: read, sensitivity: low }
+    http:
+      method: GET
+      path: "/users.info"
+    params:
+      - { name: user, in: query, required: true, type: string }
+    response:
+      type: object
+      sanitize:
+        - { field: user.profile.email, redact: true }
+        - { field: user.profile.phone, redact: true }
+
+  - id: list_recent_messages
+    description: List recent messages in a channel.
+    expected_use: Read recent traffic to inform a reply.
+    auto_execute: true
+    required_scopes: [channels:history]
+    risk: { category: read, sensitivity: medium }
+    http:
+      method: GET
+      path: "/conversations.history"
+    params:
+      - { name: channel, in: query, required: true, type: string }
+      - { name: limit, in: query, type: integer, default: 50 }
+
+  - id: react_to_message
+    description: Add an emoji reaction to a message.
+    expected_use: Acknowledge a message without posting.
+    auto_execute: false
+    required_scopes: [reactions:write]
+    risk: { category: write, sensitivity: low }
+    http:
+      method: POST
+      path: "/reactions.add"
+    params:
+      - { name: channel, in: body, required: true, type: string }
+      - { name: name, in: body, required: true, type: string }
+      - { name: timestamp, in: body, required: true, type: string }

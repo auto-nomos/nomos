@@ -1,0 +1,84 @@
+id: google_gmail
+name: Gmail
+version: 1.0.0
+description: Gmail API — read, search, send messages.
+homepage: https://developers.google.com/gmail/api
+
+api_base: https://gmail.googleapis.com/gmail/v1
+
+auth:
+  kind: oauth2
+  authorize_url: https://accounts.google.com/o/oauth2/v2/auth
+  token_url: https://oauth2.googleapis.com/token
+  default_scopes:
+    - https://www.googleapis.com/auth/gmail.readonly
+    - https://www.googleapis.com/auth/gmail.send
+  pkce: true
+
+actions:
+  - id: list_messages
+    description: List message ids matching a query.
+    expected_use: Find a specific email by sender / subject before reading.
+    auto_execute: true
+    required_scopes: [https://www.googleapis.com/auth/gmail.readonly]
+    risk: { category: search, sensitivity: medium }
+    http:
+      method: GET
+      path: "/users/me/messages"
+    params:
+      - { name: q, in: query, type: string, description: "Gmail search query, e.g. from:boss after:2026/05/01" }
+      - { name: maxResults, in: query, type: integer, default: 25 }
+
+  - id: get_message
+    description: Fetch a single message.
+    expected_use: Read an email's body to inform a reply or summary.
+    auto_execute: true
+    required_scopes: [https://www.googleapis.com/auth/gmail.readonly]
+    risk: { category: read, sensitivity: high }
+    http:
+      method: GET
+      path: "/users/me/messages/{id}"
+    params:
+      - { name: id, in: path, required: true, type: string }
+      - { name: format, in: query, type: string, default: full, enum: [minimal, full, raw, metadata] }
+
+  - id: send_message
+    description: Send an email from the authenticated mailbox.
+    expected_use: Reply to a thread or send a status email.
+    auto_execute: false
+    required_scopes: [https://www.googleapis.com/auth/gmail.send]
+    risk: { category: write, sensitivity: high }
+    http:
+      method: POST
+      path: "/users/me/messages/send"
+    params:
+      - { name: raw, in: body, required: true, type: string, description: "RFC 2822 message, base64url encoded" }
+
+  - id: list_threads
+    description: List conversation threads.
+    expected_use: Browse inbox conversations.
+    auto_execute: true
+    required_scopes: [https://www.googleapis.com/auth/gmail.readonly]
+    risk: { category: search, sensitivity: medium }
+    http:
+      method: GET
+      path: "/users/me/threads"
+    params:
+      - { name: q, in: query, type: string }
+      - { name: maxResults, in: query, type: integer, default: 25 }
+
+  - id: trash_message
+    description: Move a message to trash (recoverable for 30 days).
+    expected_use: Clean up after auto-archiving rules.
+    auto_execute: false
+    required_scopes: [https://www.googleapis.com/auth/gmail.modify]
+    risk: { category: delete, sensitivity: high }
+    http:
+      method: POST
+      path: "/users/me/messages/{id}/trash"
+    params:
+      - { name: id, in: path, required: true, type: string }
+
+notes: |
+  Gmail rate limits: 250 quota units/user/sec; messages.send costs 100 units.
+  Burst calls trigger 429 — surface to caller for retry / backoff.

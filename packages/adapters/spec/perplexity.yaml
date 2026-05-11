@@ -1,0 +1,33 @@
+id: perplexity
+name: Perplexity
+version: 1.0.0
+description: Perplexity LLM API — chat completions with web search.
+homepage: https://docs.perplexity.ai
+
+api_base: https://api.perplexity.ai
+
+auth:
+  kind: api_key
+  header_name: Authorization
+  header_prefix: "Bearer "
+  setup_url: https://www.perplexity.ai/settings/api
+
+actions:
+  - id: chat_completion
+    description: Generate an answer using Perplexity's online models.
+    expected_use: Research a topic with web-augmented search.
+    auto_execute: true
+    risk: { category: read, sensitivity: low }
+    http:
+      method: POST
+      path: "/chat/completions"
+    params:
+      - { name: model, in: body, required: true, type: string, default: "sonar" }
+      - { name: messages, in: body, required: true, type: array }
+      - { name: max_tokens, in: body, type: integer, default: 1024 }
+      - { name: temperature, in: body, type: number, default: 0.2 }
+      - { name: stream, in: body, type: boolean, default: false }
+
+notes: |
+  Single primary action; Perplexity exposes a small chat-completions surface
+  modeled on OpenAI's API. `online` models do live web search.

@@ -5,8 +5,8 @@
  * fails, the bundle is dropped (caller keeps stale) and the failure is
  * surfaced via logger + Sentry.
  */
-import { verifyDetached } from '@credential-broker/crypto';
-import { base64urlToBytes, canonicalize } from '@credential-broker/ucan';
+import { verifyDetached } from '@auto-nomos/crypto';
+import { base64urlToBytes, canonicalize } from '@auto-nomos/ucan';
 import { hexToBytes } from '@noble/hashes/utils';
 import type { Logger } from '../logger.js';
 

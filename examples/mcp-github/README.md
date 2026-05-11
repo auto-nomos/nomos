@@ -1,9 +1,9 @@
 # mcp-github (deprecated example)
 
-> **Looking for the production MCP server?** Use [`@credential-broker/mcp-server`](../../packages/mcp-server)
+> **Looking for the production MCP server?** Use [`@auto-nomos/mcp-server`](../../packages/mcp-server)
 > instead. It's the distributable equivalent of this file: zero-trust by
 > default (proxy mode, no agent-side OAuth token), supports multiple
-> integrations, and ships as `npx -y @credential-broker/mcp-server`.
+> integrations, and ships as `npx -y @auto-nomos/mcp-server`.
 
 This example is kept for tests and historical reference. It uses the older
 `/v1/authorize` flow where the agent holds the GitHub token directly.
@@ -20,8 +20,8 @@ never runs.
 
 ```bash
 pnpm db:up
-pnpm --filter @credential-broker/control-plane dev   # :8788
-pnpm --filter @credential-broker/pdp dev             # :8787
+pnpm --filter @auto-nomos/control-plane dev   # :8788
+pnpm --filter @auto-nomos/pdp dev             # :8787
 ```
 
 2. Issue a UCAN via the control-plane tRPC API and capture its `jwt`. (See
@@ -35,13 +35,13 @@ CB_API_KEY=cb_<customerId>_<secret> \
 CB_PDP_URL=http://localhost:8787 \
 CB_UCAN=<jwt> \
 GITHUB_TOKEN=ghp_... \
-pnpm --filter @credential-broker/example-mcp-github dev
+pnpm --filter @auto-nomos/example-mcp-github dev
 ```
 
 4. Point Claude Desktop / Cursor at it, or attach an MCP inspector:
 
 ```bash
-npx @modelcontextprotocol/inspector pnpm --filter @credential-broker/example-mcp-github dev
+npx @modelcontextprotocol/inspector pnpm --filter @auto-nomos/example-mcp-github dev
 ```
 
 ## What it demonstrates

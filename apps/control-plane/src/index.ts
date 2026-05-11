@@ -1,4 +1,4 @@
-import { generateKeypair, keypairFromPrivate, loadSecretboxKey } from '@credential-broker/crypto';
+import { generateKeypair, keypairFromPrivate, loadSecretboxKey } from '@auto-nomos/crypto';
 import { serve } from '@hono/node-server';
 import { hexToBytes } from '@noble/hashes/utils';
 import { createAuth } from './auth/index.js';
@@ -6,6 +6,8 @@ import { type Config, loadConfig } from './config.js';
 import { createDb, seedSchemas } from './db/index.js';
 import { createLogger, type Logger } from './logger.js';
 import { createServer } from './server.js';
+import { createCoherenceVerifier } from './services/intent-coherence.js';
+import { createTelegramBot, type TelegramBot } from './services/notify/telegram-bot.js';
 import { createOAuthSweep } from './services/oauth-sweep.js';
 import { createRevocationPublisher } from './services/revocation-publisher.js';
 import { createStepUpNotifier } from './services/stepup/notify.js';
@@ -96,14 +98,49 @@ async function main(): Promise<void> {
     logger,
   });
 
+  let telegramBot: TelegramBot | undefined;
+  if (config.TELEGRAM_BOT_TOKEN && config.TELEGRAM_BOT_USERNAME) {
+    telegramBot = createTelegramBot({
+      token: config.TELEGRAM_BOT_TOKEN,
+      username: config.TELEGRAM_BOT_USERNAME,
+      pollTimeoutS: config.TELEGRAM_POLL_TIMEOUT_S,
+      db: db.drizzle,
+      logger,
+    });
+    telegramBot.start();
+  } else if (config.TELEGRAM_BOT_TOKEN || config.TELEGRAM_BOT_USERNAME) {
+    logger.warn(
+      'Telegram bot disabled — both TELEGRAM_BOT_TOKEN and TELEGRAM_BOT_USERNAME must be set',
+    );
+  }
+
   const stepUpNotifier = createStepUpNotifier({
     apiKey: config.KNOCK_API_KEY,
     workflow: config.KNOCK_WORKFLOW_ID,
     logger,
+    telegramBot,
   });
-  if (!config.KNOCK_API_KEY) {
+  if (!config.KNOCK_API_KEY && !telegramBot) {
     logger.warn(
-      'KNOCK_API_KEY not set — step-up notifications will log deep links to console only',
+      'KNOCK_API_KEY + Telegram bot both unset — step-up notifications will log deep links to console only',
+    );
+  }
+
+  const coherenceVerifier =
+    config.INTENT_COHERENCE_ENABLED && config.ANTHROPIC_API_KEY
+      ? createCoherenceVerifier({
+          apiKey: config.ANTHROPIC_API_KEY,
+          timeoutMs: config.INTENT_COHERENCE_TIMEOUT_MS,
+        })
+      : undefined;
+  if (config.INTENT_COHERENCE_ENABLED && !config.ANTHROPIC_API_KEY) {
+    logger.warn(
+      'INTENT_COHERENCE_ENABLED=true but ANTHROPIC_API_KEY missing — coherence verifier disabled',
+    );
+  } else if (coherenceVerifier) {
+    logger.info(
+      { timeoutMs: config.INTENT_COHERENCE_TIMEOUT_MS },
+      'intent coherence verifier enabled (Haiku 4.5, fail-closed)',
     );
   }
 
@@ -121,6 +158,12 @@ async function main(): Promise<void> {
       defaultTtlSeconds: Math.floor(config.STEPUP_DEFAULT_TTL_MS / 1_000),
     },
     webauthn: deriveWebAuthnConfig(config.DASHBOARD_PUBLIC_URL),
+    ...(coherenceVerifier ? { coherenceVerifier } : {}),
+    skills: {
+      controlPlanePublicUrl: config.CONTROL_PLANE_PUBLIC_URL,
+      pdpPublicUrl: process.env.PDP_PUBLIC_URL ?? 'http://localhost:8787',
+      dashboardPublicUrl: config.DASHBOARD_PUBLIC_URL,
+    },
   });
 
   const sweep = createOAuthSweep({

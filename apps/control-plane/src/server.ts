@@ -1,4 +1,4 @@
-import { generateKeypair } from '@credential-broker/crypto';
+import { generateKeypair } from '@auto-nomos/crypto';
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { secureHeaders } from 'hono/secure-headers';
@@ -9,9 +9,12 @@ import type { Logger } from './logger.js';
 import { loggerMiddleware } from './middleware/logger.js';
 import { requestId } from './middleware/request-id.js';
 import { createHealthRoutes } from './routes/health.js';
+import { createIntentRoutes } from './routes/intent.js';
 import { createInternalRoutes } from './routes/internal.js';
 import { createMintUcanRoutes } from './routes/mint-ucan.js';
 import { createOAuthRoutes } from './routes/oauth.js';
+import { createSkillRoutes } from './routes/skill.js';
+import type { CoherenceVerifier } from './services/intent-coherence.js';
 import type { RevocationPublisher } from './services/revocation-publisher.js';
 import type { StepUpNotifier } from './services/stepup/notify.js';
 import type { WebAuthnConfig } from './services/stepup/webauthn.js';
@@ -49,6 +52,15 @@ export interface ServerDeps {
   };
   /** Sprint 9 — WebAuthn config (RP id + origin) for passkey approval. */
   webauthn?: WebAuthnConfig;
+  /** P-CV1 — Optional LLM intent coherence verifier. When omitted,
+   *  /v1/intent skips the coherence step entirely. */
+  coherenceVerifier?: CoherenceVerifier;
+  /** Skill marketplace — public URLs templated into served markdown. */
+  skills?: {
+    controlPlanePublicUrl: string;
+    pdpPublicUrl: string;
+    dashboardPublicUrl: string;
+  };
 }
 
 export function createServer(deps: ServerDeps): Hono {
@@ -88,6 +100,21 @@ export function createServer(deps: ServerDeps): Hono {
   // SDK ↔ control-plane: trade an API key for short-lived UCANs. The PDP
   // never sees API keys; this route is the only one that does.
   app.route('/', createMintUcanRoutes({ db: deps.db, signing }));
+
+  // SDK ↔ control-plane: dynamic per-request scope narrowing via the
+  // Approval Envelope model. Mounted only when step-up is configured —
+  // step-up is the safety floor for new envelopes.
+  if (deps.stepup) {
+    app.route(
+      '/',
+      createIntentRoutes({
+        db: deps.db,
+        signing,
+        stepup: deps.stepup,
+        ...(deps.coherenceVerifier ? { coherenceVerifier: deps.coherenceVerifier } : {}),
+      }),
+    );
+  }
 
   // Better-Auth handles all /auth/* routes itself.
   app.all('/auth/*', (c) => deps.auth.handler(c.req.raw));
@@ -139,6 +166,10 @@ export function createServer(deps: ServerDeps): Hono {
         now: deps.oauth.now,
       }),
     );
+  }
+
+  if (deps.skills) {
+    app.route('/', createSkillRoutes(deps.skills));
   }
 
   app.onError((err, c) => {

@@ -36,6 +36,62 @@
       "when": 1778331024179,
       "tag": "0004_noisy_pyro",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1778406839576,
+      "tag": "0005_spooky_invaders",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1778426566079,
+      "tag": "0006_common_apocalypse",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1778436490715,
+      "tag": "0007_aspiring_matthew_murdock",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1778437332142,
+      "tag": "0008_funny_maginty",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1778441264905,
+      "tag": "0009_sparkling_the_enforcers",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1778441840431,
+      "tag": "0010_broken_lionheart",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1778441966236,
+      "tag": "0011_jittery_wonder_man",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1778499303339,
+      "tag": "0012_parched_argent",
+      "breakpoints": true
     }
   ]
 }

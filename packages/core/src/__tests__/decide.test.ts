@@ -1,6 +1,6 @@
-import { generateKeypair } from '@credential-broker/crypto';
-import type { AuthorizeRequest, UcanPayload } from '@credential-broker/shared-types';
-import { issueUcan } from '@credential-broker/ucan';
+import { generateKeypair } from '@auto-nomos/crypto';
+import type { AuthorizeRequest, UcanPayload } from '@auto-nomos/shared-types';
+import { issueUcan } from '@auto-nomos/ucan';
 import { describe, expect, it } from 'vitest';
 import { decide } from '../decide.js';
 
@@ -586,5 +586,105 @@ describe('decide', () => {
       now: NOW,
     });
     expect(decision.allow).toBe(true);
+  });
+
+  describe('resource_constraint gate', () => {
+    const fsPolicy = `
+      permit(principal, action == Action::"/filesystem/read", resource);
+    `;
+
+    it('allows when request.resource.path is inside UCAN constraint prefix', () => {
+      const issuer = generateKeypair();
+      const agent = generateKeypair();
+      const ucan = issueUcan({
+        payload: payloadFor(issuer.did, agent.did, {
+          cmd: '/filesystem/read',
+          meta: {
+            resource_constraint: {
+              provider: 'filesystem',
+              path_prefix: '/Users/x/finance/2026/',
+            },
+          },
+        }),
+        privateKey: issuer.privateKey,
+      });
+
+      const decision = decide({
+        ucan: ucan.jwt,
+        request: {
+          ucan: ucan.jwt,
+          command: '/filesystem/read',
+          resource: { path: '/Users/x/finance/2026/q1.pdf' },
+          context: {},
+        },
+        policies: fsPolicy,
+        now: NOW,
+      });
+      expect(decision.allow).toBe(true);
+    });
+
+    it('denies with resource_out_of_scope when path escapes prefix', () => {
+      const issuer = generateKeypair();
+      const agent = generateKeypair();
+      const ucan = issueUcan({
+        payload: payloadFor(issuer.did, agent.did, {
+          cmd: '/filesystem/read',
+          meta: {
+            resource_constraint: {
+              provider: 'filesystem',
+              path_prefix: '/Users/x/finance/2026/',
+            },
+          },
+        }),
+        privateKey: issuer.privateKey,
+      });
+
+      const decision = decide({
+        ucan: ucan.jwt,
+        request: {
+          ucan: ucan.jwt,
+          command: '/filesystem/read',
+          resource: { path: '/Users/x/finance/2025/secret.pdf' },
+          context: {},
+        },
+        policies: fsPolicy,
+        now: NOW,
+      });
+      expect(decision.allow).toBe(false);
+      expect(decision.reason).toBe('resource_out_of_scope');
+    });
+
+    it('exposes constraint to Cedar via context.resource_constraint', () => {
+      const issuer = generateKeypair();
+      const agent = generateKeypair();
+      const ucan = issueUcan({
+        payload: payloadFor(issuer.did, agent.did, {
+          cmd: '/filesystem/read',
+          meta: {
+            resource_constraint: {
+              provider: 'filesystem',
+              path_prefix: '/Users/x/finance/',
+            },
+          },
+        }),
+        privateKey: issuer.privateKey,
+      });
+      const cedarOnConstraint = `
+        permit(principal, action == Action::"/filesystem/read", resource)
+        when { context.resource_constraint.provider == "filesystem" };
+      `;
+      const decision = decide({
+        ucan: ucan.jwt,
+        request: {
+          ucan: ucan.jwt,
+          command: '/filesystem/read',
+          resource: { path: '/Users/x/finance/q1.pdf' },
+          context: {},
+        },
+        policies: cedarOnConstraint,
+        now: NOW,
+      });
+      expect(decision.allow).toBe(true);
+    });
   });
 });

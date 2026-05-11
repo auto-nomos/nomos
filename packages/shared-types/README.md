@@ -1,4 +1,4 @@
-# @credential-broker/shared-types
+# @auto-nomos/shared-types
 
 Authoritative Zod schemas + inferred TypeScript types used across every app and package in this monorepo.
 
@@ -9,7 +9,7 @@ A single source of truth for the wire shapes that flow between the dashboard, co
 ## Install (workspace)
 
 ```ts
-import { UcanPayload, AuthorizeRequest } from '@credential-broker/shared-types';
+import { UcanPayload, AuthorizeRequest } from '@auto-nomos/shared-types';
 ```
 
 ## Public API
@@ -36,7 +36,7 @@ Each export is both a Zod schema and a type. Use the schema at trust boundaries 
 ## Tests
 
 ```bash
-pnpm --filter @credential-broker/shared-types test
+pnpm --filter @auto-nomos/shared-types test
 ```
 
 100% line+branch+function coverage required.

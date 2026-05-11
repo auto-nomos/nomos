@@ -1,4 +1,4 @@
-# @credential-broker/audit-verify
+# @auto-nomos/audit-verify
 
 Standalone CLI + library that verifies a credential-broker audit bundle is
 internally consistent and (when present) anchored by a valid signed root.
@@ -22,7 +22,7 @@ environment.
 ## Library
 
 ```ts
-import { verifyBundle } from '@credential-broker/audit-verify';
+import { verifyBundle } from '@auto-nomos/audit-verify';
 
 const result = verifyBundle(bundle, AUDIT_VERIFY_KEY_HEX);
 if (!result.ok) {

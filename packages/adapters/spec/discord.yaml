@@ -1,0 +1,81 @@
+id: discord
+name: Discord
+version: 1.0.0
+description: Discord REST API — guilds, channels, messages.
+homepage: https://discord.com/developers/docs
+
+api_base: https://discord.com/api/v10
+
+auth:
+  kind: oauth2
+  authorize_url: https://discord.com/oauth2/authorize
+  token_url: https://discord.com/api/oauth2/token
+  default_scopes:
+    - identify
+    - guilds
+    - messages.read
+  pkce: false
+
+actions:
+  - id: get_user
+    description: Get the authenticated user's profile.
+    expected_use: Identify which Discord account the agent is acting as.
+    auto_execute: true
+    required_scopes: [identify]
+    risk: { category: read, sensitivity: low }
+    http:
+      method: GET
+      path: "/users/@me"
+    response:
+      type: object
+      sanitize:
+        - { field: email, redact: true }
+
+  - id: list_guilds
+    description: List servers the user is a member of.
+    expected_use: Discover where the agent can post / read.
+    auto_execute: true
+    required_scopes: [guilds]
+    risk: { category: read, sensitivity: low }
+    http:
+      method: GET
+      path: "/users/@me/guilds"
+  - id: list_channels
+    description: List channels in a guild.
+    expected_use: Pick a channel before posting.
+    auto_execute: true
+    required_scopes: [guilds]
+    risk: { category: read, sensitivity: low }
+    http:
+      method: GET
+      path: "/guilds/{guild_id}/channels"
+    params:
+      - { name: guild_id, in: path, required: true, type: string }
+
+  - id: post_message
+    description: Post a message to a channel (requires bot scope).
+    expected_use: Send notifications to the team.
+    auto_execute: false
+    required_scopes: [bot]
+    risk: { category: write, sensitivity: medium }
+    http:
+      method: POST
+      path: "/channels/{channel_id}/messages"
+    params:
+      - { name: channel_id, in: path, required: true, type: string }
+      - { name: content, in: body, required: true, type: string }
+      - { name: tts, in: body, type: boolean, default: false }
+      - { name: embeds, in: body, type: array }
+
+  - id: list_messages
+    description: List recent messages in a channel.
+    expected_use: Read recent traffic to inform a reply.
+    auto_execute: true
+    required_scopes: [messages.read]
+    risk: { category: read, sensitivity: medium }
+    http:
+      method: GET
+      path: "/channels/{channel_id}/messages"
+    params:
+      - { name: channel_id, in: path, required: true, type: string }
+      - { name: limit, in: query, type: integer, default: 50 }

@@ -1,5 +1,5 @@
 {
-  "name": "@credential-broker/dashboard",
+  "name": "@auto-nomos/dashboard",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -13,11 +13,11 @@
     "lint": "biome check ."
   },
   "dependencies": {
-    "@credential-broker/cedar": "workspace:*",
-    "@credential-broker/control-plane": "workspace:*",
-    "@credential-broker/policy-builder": "workspace:*",
-    "@credential-broker/schema-packs": "workspace:*",
-    "@credential-broker/shared-types": "workspace:*",
+    "@auto-nomos/cedar": "workspace:*",
+    "@auto-nomos/control-plane": "workspace:*",
+    "@auto-nomos/policy-builder": "workspace:*",
+    "@auto-nomos/schema-packs": "workspace:*",
+    "@auto-nomos/shared-types": "workspace:*",
     "@hookform/resolvers": "3.9.1",
     "@monaco-editor/react": "4.6.0",
     "@radix-ui/react-dialog": "1.1.4",

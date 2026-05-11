@@ -14,7 +14,7 @@
  * unifies these via schema packs.
  */
 
-export type ProviderId = 'github' | 'slack' | 'google' | 'notion';
+export type ProviderId = 'github' | 'slack' | 'google' | 'notion' | 'linear' | 'stripe';
 
 export interface ProviderApiConfig {
   base: string;
@@ -22,8 +22,11 @@ export interface ProviderApiConfig {
   /**
    * Slack accepts JSON request bodies but expects `content-type:
    * application/json; charset=utf-8`; everything else is plain `application/json`.
+   * Stripe expects `application/x-www-form-urlencoded` — encoded inline below.
    */
   jsonContentType?: string;
+  /** Stripe-style form encoding for request bodies. Default JSON. */
+  bodyEncoding?: 'json' | 'form';
 }
 
 export const PROVIDER_API: Record<ProviderId, ProviderApiConfig> = {
@@ -43,6 +46,15 @@ export const PROVIDER_API: Record<ProviderId, ProviderApiConfig> = {
   notion: {
     base: 'https://api.notion.com/v1',
     staticHeaders: { 'notion-version': '2022-06-28' },
+  },
+  linear: {
+    // Linear's API is GraphQL-only — callers POST to /graphql with a
+    // JSON body of `{ query, variables }`.
+    base: 'https://api.linear.app',
+  },
+  stripe: {
+    base: 'https://api.stripe.com',
+    bodyEncoding: 'form',
   },
 };
 
@@ -65,7 +77,14 @@ export interface ProxyAdapterDeps {
 }
 
 export function isKnownProvider(id: string): id is ProviderId {
-  return id === 'github' || id === 'slack' || id === 'google' || id === 'notion';
+  return (
+    id === 'github' ||
+    id === 'slack' ||
+    id === 'google' ||
+    id === 'notion' ||
+    id === 'linear' ||
+    id === 'stripe'
+  );
 }
 
 export async function proxyApiCall(
@@ -87,8 +106,13 @@ export async function proxyApiCall(
   };
   let body: string | undefined;
   if (req.body !== undefined && req.method !== 'GET') {
-    body = JSON.stringify(req.body);
-    headers['content-type'] = cfg.jsonContentType ?? 'application/json';
+    if (cfg.bodyEncoding === 'form') {
+      body = encodeFormBody(req.body);
+      headers['content-type'] = 'application/x-www-form-urlencoded';
+    } else {
+      body = JSON.stringify(req.body);
+      headers['content-type'] = cfg.jsonContentType ?? 'application/json';
+    }
   }
   const f = deps.fetch ?? globalThis.fetch;
   const res = await f(url.toString(), { method: req.method, headers, body });
@@ -106,4 +130,26 @@ export async function proxyApiCall(
     headerObj[k] = v;
   });
   return { status: res.status, body: parsed, headers: headerObj };
+}
+
+/** Stripe-style URL-encoded form bodies with bracket notation for one
+ *  level of nesting. Anything deeper is the caller's responsibility. */
+function encodeFormBody(body: unknown): string {
+  if (typeof body === 'string') return body;
+  if (!body || typeof body !== 'object') return '';
+  const params = new URLSearchParams();
+  for (const [k, v] of Object.entries(body as Record<string, unknown>)) {
+    if (v === undefined || v === null) continue;
+    if (typeof v === 'object' && !Array.isArray(v)) {
+      for (const [nk, nv] of Object.entries(v as Record<string, unknown>)) {
+        if (nv === undefined || nv === null) continue;
+        params.append(`${k}[${nk}]`, String(nv));
+      }
+    } else if (Array.isArray(v)) {
+      for (const item of v) params.append(`${k}[]`, String(item));
+    } else {
+      params.append(k, String(v));
+    }
+  }
+  return params.toString();
 }

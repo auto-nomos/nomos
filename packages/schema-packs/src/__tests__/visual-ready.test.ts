@@ -1,4 +1,4 @@
-import { parseToIr } from '@credential-broker/policy-builder';
+import { parseToIr } from '@auto-nomos/policy-builder';
 import { describe, expect, it } from 'vitest';
 import { listTemplates } from '../index.js';
 

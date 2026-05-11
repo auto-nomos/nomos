@@ -6,7 +6,15 @@
  * `actions`, `defaultPolicies`, and `connector` so the PDP can validate
  * authorize requests against per-integration vocab.
  */
-export type IntegrationId = 'github' | 'slack' | 'google' | 'notion';
+export type IntegrationId =
+  | 'github'
+  | 'slack'
+  | 'google'
+  | 'notion'
+  | 'filesystem'
+  | 'linear'
+  | 'stripe'
+  | 'google_calendar';
 
 export interface PolicyTemplate {
   /** Stable id, namespaced on integration: `github:read-only`. */
@@ -16,7 +24,7 @@ export interface PolicyTemplate {
   name: string;
   /** One-sentence description shown next to the name in the picker. */
   description: string;
-  /** Valid Cedar text — must parse via @credential-broker/cedar.parsePolicy. */
+  /** Valid Cedar text — must parse via @auto-nomos/cedar.parsePolicy. */
   cedarText: string;
   /**
    * `true` when the visual builder can render the template losslessly.

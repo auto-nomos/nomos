@@ -1,6 +1,6 @@
-import { sha256Hex } from '@credential-broker/crypto';
-import type { AuditEvent } from '@credential-broker/shared-types';
-import { canonicalize } from '@credential-broker/ucan';
+import { sha256Hex } from '@auto-nomos/crypto';
+import type { AuditEvent } from '@auto-nomos/shared-types';
+import { canonicalize } from '@auto-nomos/ucan';
 
 import { ZERO_HASH } from './emit.js';
 

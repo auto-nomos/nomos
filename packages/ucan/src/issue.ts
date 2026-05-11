@@ -1,8 +1,5 @@
-import { signDetached } from '@credential-broker/crypto';
-import {
-  type UcanPayload,
-  UcanPayload as UcanPayloadSchema,
-} from '@credential-broker/shared-types';
+import { signDetached } from '@auto-nomos/crypto';
+import { type UcanPayload, UcanPayload as UcanPayloadSchema } from '@auto-nomos/shared-types';
 import { bytesToBase64url, stringToBase64url } from './base64url.js';
 import { canonicalize } from './canonical.js';
 import { computeCid } from './cid.js';

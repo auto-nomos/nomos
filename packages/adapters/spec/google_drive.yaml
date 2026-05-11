@@ -1,0 +1,82 @@
+id: google_drive
+name: Google Drive
+version: 1.0.0
+description: Google Drive API — files and folders.
+homepage: https://developers.google.com/drive/api
+
+api_base: https://www.googleapis.com/drive/v3
+
+auth:
+  kind: oauth2
+  authorize_url: https://accounts.google.com/o/oauth2/v2/auth
+  token_url: https://oauth2.googleapis.com/token
+  default_scopes:
+    - https://www.googleapis.com/auth/drive.readonly
+    - https://www.googleapis.com/auth/drive.file
+  pkce: true
+
+actions:
+  - id: list_files
+    description: List files matching a query.
+    expected_use: Find a doc by name or modification date.
+    auto_execute: true
+    required_scopes: [https://www.googleapis.com/auth/drive.readonly]
+    risk: { category: search, sensitivity: medium }
+    http:
+      method: GET
+      path: "/files"
+    params:
+      - { name: q, in: query, type: string, description: "Drive search query, e.g. \"name contains 'budget'\"" }
+      - { name: pageSize, in: query, type: integer, default: 25 }
+      - { name: fields, in: query, type: string, default: "files(id,name,mimeType,modifiedTime,owners)" }
+
+  - id: get_file
+    description: Fetch a file's metadata.
+    expected_use: Inspect ownership, type, and timestamps.
+    auto_execute: true
+    required_scopes: [https://www.googleapis.com/auth/drive.readonly]
+    risk: { category: read, sensitivity: low }
+    http:
+      method: GET
+      path: "/files/{fileId}"
+    params:
+      - { name: fileId, in: path, required: true, type: string }
+
+  - id: download_file
+    description: Download a file's content.
+    expected_use: Read a doc's body for summarization.
+    auto_execute: true
+    required_scopes: [https://www.googleapis.com/auth/drive.readonly]
+    risk: { category: read, sensitivity: high }
+    http:
+      method: GET
+      path: "/files/{fileId}"
+    params:
+      - { name: fileId, in: path, required: true, type: string }
+      - { name: alt, in: query, type: string, default: media }
+
+  - id: create_file
+    description: Upload a new file.
+    expected_use: Save a generated artifact.
+    auto_execute: false
+    required_scopes: [https://www.googleapis.com/auth/drive.file]
+    risk: { category: write, sensitivity: medium }
+    http:
+      method: POST
+      path: "/files"
+    params:
+      - { name: name, in: body, required: true, type: string }
+      - { name: mimeType, in: body, type: string }
+      - { name: parents, in: body, type: array }
+
+  - id: delete_file
+    description: Permanently delete a file.
+    expected_use: Clean up generated artifacts.
+    auto_execute: false
+    required_scopes: [https://www.googleapis.com/auth/drive.file]
+    risk: { category: delete, sensitivity: high }
+    http:
+      method: DELETE
+      path: "/files/{fileId}"
+    params:
+      - { name: fileId, in: path, required: true, type: string }

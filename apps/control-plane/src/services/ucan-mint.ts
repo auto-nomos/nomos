@@ -12,8 +12,8 @@
  * authoritative source is the signed bundle the PDP loads from
  * `/v1/internal/bundles/:customerId`.
  */
-import type { UcanPayload } from '@credential-broker/shared-types';
-import { issueUcan } from '@credential-broker/ucan';
+import type { ResourceConstraint, UcanPayload } from '@auto-nomos/shared-types';
+import { issueUcan } from '@auto-nomos/ucan';
 import { and, eq } from 'drizzle-orm';
 import type { DrizzleClient } from '../db/index.js';
 import * as schema from '../db/schema.js';
@@ -64,6 +64,17 @@ export interface MintInput {
    * Ephemeral values (time, IP) belong in PDP-computed context, not here.
    */
   contextHints?: Record<string, unknown>;
+  /**
+   * Issuer-vouched resource scope. When set, the PDP enforces that
+   * `request.resource` stays inside the constraint, and chain
+   * attenuation forbids any child UCAN from broadening it.
+   */
+  resourceConstraint?: ResourceConstraint;
+  /**
+   * Audit tag. `dynamic` for /v1/intent path; `static` for bulk mint /
+   * policy-pre-mint path. Defaults from `resourceConstraint` presence.
+   */
+  mode?: 'static' | 'dynamic';
 }
 
 export interface MintDeps {
@@ -130,6 +141,14 @@ export async function mintUcan(input: MintInput, deps: MintDeps): Promise<MintRe
   if (input.contextHints && Object.keys(input.contextHints).length > 0) {
     meta.context_hints = input.contextHints;
   }
+  if (input.resourceConstraint) {
+    meta.resource_constraint = input.resourceConstraint;
+  }
+  // Audit signal: record which mint path produced the UCAN. `dynamic`
+  // means it came through /v1/intent inside an Approval Envelope;
+  // `static` means it came through the bulk mint endpoint or a policy
+  // pre-mint. Defaults to `static` because static is the older path.
+  meta.mode = input.mode ?? (input.resourceConstraint ? 'dynamic' : 'static');
 
   const payload: UcanPayload = {
     iss: deps.signerDid,

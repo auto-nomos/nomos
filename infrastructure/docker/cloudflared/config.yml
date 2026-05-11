@@ -1,0 +1,32 @@
+# Named cloudflared tunnel template — OPTIONAL, opt-in alternative to quick-tunnel.
+#
+# Quick tunnel is the default (rotates URL every run; no setup). Use this only
+# when you want a stable hostname for OAuth callbacks across dev sessions.
+#
+# Setup (host, one time):
+#   1. cloudflared tunnel login
+#   2. cloudflared tunnel create cb-dev
+#   3. cloudflared tunnel route dns cb-dev cb-dev.<your-domain>.com
+#   4. cloudflared tunnel route dns cb-dev cb-dashboard.<your-domain>.com
+#   5. Replace the hostname placeholders below with your real domains.
+#   6. Switch the cloudflared service in docker-compose.dev.yml to:
+#        command:
+#          - tunnel
+#          - --config
+#          - /etc/cloudflared/config.yml
+#          - run
+#        volumes:
+#          - ./cloudflared:/etc/cloudflared:ro
+#          - ${HOME}/.cloudflared:/etc/cloudflared/creds:ro
+#
+# Reference: https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/
+
+tunnel: cb-dev
+credentials-file: /etc/cloudflared/creds/cb-dev.json
+
+ingress:
+  - hostname: cb-dev.example.com
+    service: http://control-plane:8788
+  - hostname: cb-dashboard.example.com
+    service: http://dashboard:3000
+  - service: http_status:404

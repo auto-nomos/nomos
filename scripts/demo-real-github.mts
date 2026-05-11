@@ -1,4 +1,5 @@
 #!/usr/bin/env tsx
+import { hexToBytes } from '@noble/hashes/utils';
 /**
  * End-to-end demo against REAL GitHub via the live local stack.
  *
@@ -24,9 +25,8 @@
  * Run: `pnpm tsx --env-file=.env.local scripts/demo-real-github.mts`
  */
 import { eq } from 'drizzle-orm';
-import pg from 'pg';
 import { drizzle } from 'drizzle-orm/node-postgres';
-import { hexToBytes } from '@noble/hashes/utils';
+import pg from 'pg';
 import * as schema from '../apps/control-plane/src/db/schema.js';
 import { mintUcan } from '../apps/control-plane/src/services/ucan-mint.js';
 
@@ -72,9 +72,7 @@ async function main(): Promise<void> {
   const policies = await db.query.policies.findMany({
     where: eq(schema.policies.customerId, customerId),
   });
-  const allowsUserRead = policies.some((p) =>
-    p.cedarText.includes('/github/user/read'),
-  );
+  const allowsUserRead = policies.some((p) => p.cedarText.includes('/github/user/read'));
   if (!allowsUserRead) {
     console.error(
       'No policy permits /github/user/read for this customer. Create one in /app/policies/new:',

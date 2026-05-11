@@ -1,12 +1,15 @@
-import type { Context } from '@credential-broker/cedar';
-import { evaluate, type Schema } from '@credential-broker/cedar';
-import { sha256Hex } from '@credential-broker/crypto';
-import type {
-  AuthorizeDecision,
-  AuthorizeRequest,
-  DenyReason,
-} from '@credential-broker/shared-types';
-import { type ChainError, canonicalize, computeCid, validateChain } from '@credential-broker/ucan';
+import type { Context } from '@auto-nomos/cedar';
+import { evaluate, type Schema } from '@auto-nomos/cedar';
+import { sha256Hex } from '@auto-nomos/crypto';
+import type { AuthorizeDecision, AuthorizeRequest, DenyReason } from '@auto-nomos/shared-types';
+import {
+  type ChainError,
+  canonicalize,
+  computeCid,
+  constraintMatchesResource,
+  extractResourceConstraint,
+  validateChain,
+} from '@auto-nomos/ucan';
 
 export interface DecideInput {
   ucan: string | string[];
@@ -86,10 +89,19 @@ export function decide(input: DecideInput): AuthorizeDecision {
   }
 
   const leaf = chainResult.leaf;
+
+  const constraint = extractResourceConstraint(leaf.meta);
+  if (constraint && !constraintMatchesResource(constraint, input.request.resource)) {
+    return deny('resource_out_of_scope', jwts, input.request);
+  }
+
   const mergedContext = mergeContext(
     input.request.context as unknown as Record<string, unknown>,
     computeEphemeralContext(now),
     extractContextHints(leaf.meta),
+    constraint
+      ? { resource_constraint: constraint as unknown as Record<string, unknown> }
+      : undefined,
   );
   const cedarResult = evaluate({
     policies: input.policies,

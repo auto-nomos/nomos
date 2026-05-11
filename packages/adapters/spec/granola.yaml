@@ -1,0 +1,57 @@
+id: granola
+name: Granola
+version: 1.0.0
+description: Granola meeting-notes API — read transcripts and summaries.
+homepage: https://www.granola.ai
+
+api_base: https://api.granola.ai/v1
+
+auth:
+  kind: api_key
+  header_name: Authorization
+  header_prefix: "Bearer "
+  setup_url: https://www.granola.ai/settings/api
+
+actions:
+  - id: list_meetings
+    description: List recent meetings the user has notes for.
+    expected_use: Find a specific meeting before summarizing.
+    auto_execute: true
+    risk: { category: read, sensitivity: medium }
+    http:
+      method: GET
+      path: "/meetings"
+    params:
+      - { name: limit, in: query, type: integer, default: 25 }
+      - { name: cursor, in: query, type: string }
+
+  - id: get_meeting
+    description: Fetch full notes + transcript for a meeting.
+    expected_use: Read meeting notes for summary or follow-up.
+    auto_execute: true
+    risk: { category: read, sensitivity: high }
+    http:
+      method: GET
+      path: "/meetings/{meeting_id}"
+    params:
+      - { name: meeting_id, in: path, required: true, type: string }
+    response:
+      type: object
+      sanitize:
+        - { field: "attendees[].email", redact: true }
+
+  - id: search_notes
+    description: Search meeting notes by keyword.
+    expected_use: Find meetings discussing a topic.
+    auto_execute: true
+    risk: { category: search, sensitivity: medium }
+    http:
+      method: GET
+      path: "/search"
+    params:
+      - { name: q, in: query, required: true, type: string }
+      - { name: limit, in: query, type: integer, default: 10 }
+
+notes: |
+  Granola is API-key auth; user pastes the key from app settings.
+  No OAuth flow yet (as of 2026-05).

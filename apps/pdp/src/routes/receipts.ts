@@ -1,4 +1,4 @@
-import { ReceiptInput as ReceiptInputSchema } from '@credential-broker/shared-types';
+import { ReceiptInput as ReceiptInputSchema } from '@auto-nomos/shared-types';
 import { Hono } from 'hono';
 import { getLog } from '../middleware/logger.js';
 

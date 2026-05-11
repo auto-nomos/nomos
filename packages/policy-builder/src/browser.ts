@@ -1,6 +1,6 @@
 /**
  * Browser-safe subset. Excludes parse.ts and validate.ts because both
- * pull in @cedar-policy/cedar-wasm/nodejs through @credential-broker/cedar
+ * pull in @cedar-policy/cedar-wasm/nodejs through @auto-nomos/cedar
  * (transitively) — Node-only WASM bindings.
  *
  * Browser callers parse Cedar via the server-side `policies.parseToIr`

@@ -1,4 +1,4 @@
-import type { AuthGuard } from '@credential-broker/sdk';
+import type { AuthGuard } from '@auto-nomos/sdk';
 import { z } from 'zod';
 import { runGuarded, type ToolResultJson } from '../run-guarded.js';
 import type { ToolDefinition } from './types.js';

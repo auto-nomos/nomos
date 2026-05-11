@@ -1,5 +1,5 @@
-import { generateKeypair, signDetached } from '@credential-broker/crypto';
-import { bytesToBase64url, canonicalize } from '@credential-broker/ucan';
+import { generateKeypair, signDetached } from '@auto-nomos/crypto';
+import { bytesToBase64url, canonicalize } from '@auto-nomos/ucan';
 import { bytesToHex } from '@noble/hashes/utils';
 import { pino } from 'pino';
 import { describe, expect, it, vi } from 'vitest';

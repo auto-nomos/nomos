@@ -1,0 +1,91 @@
+id: stripe
+name: Stripe
+version: 1.0.0
+description: Stripe REST API — customers, payments, subscriptions.
+homepage: https://docs.stripe.com/api
+
+api_base: https://api.stripe.com/v1
+
+auth:
+  kind: oauth2
+  authorize_url: https://connect.stripe.com/oauth/authorize
+  token_url: https://connect.stripe.com/oauth/token
+  default_scopes:
+    - read_write
+  pkce: false
+
+actions:
+  - id: list_customers
+    description: List Stripe customers.
+    expected_use: Look up customer ids before charging or refunding.
+    auto_execute: true
+    required_scopes: [read_write]
+    risk: { category: read, sensitivity: medium }
+    http:
+      method: GET
+      path: "/customers"
+    params:
+      - { name: limit, in: query, type: integer, default: 25 }
+      - { name: email, in: query, type: string }
+    response:
+      type: array
+      sanitize:
+        - { field: "data[].email", redact: true }
+        - { field: "data[].phone", redact: true }
+
+  - id: get_customer
+    description: Retrieve a customer by id.
+    expected_use: Fetch full customer record before action.
+    auto_execute: true
+    required_scopes: [read_write]
+    risk: { category: read, sensitivity: medium }
+    http:
+      method: GET
+      path: "/customers/{customer_id}"
+    params:
+      - { name: customer_id, in: path, required: true, type: string }
+    response:
+      type: object
+      sanitize:
+        - { field: email, redact: true }
+        - { field: phone, redact: true }
+
+  - id: create_refund
+    description: Refund a charge in part or in full.
+    expected_use: Issue a refund as part of a customer-support flow.
+    auto_execute: false
+    required_scopes: [read_write]
+    risk: { category: write, sensitivity: high }
+    http:
+      method: POST
+      path: "/refunds"
+    params:
+      - { name: charge, in: form, required: true, type: string }
+      - { name: amount, in: form, type: integer }
+      - { name: reason, in: form, type: string, enum: [duplicate, fraudulent, requested_by_customer] }
+
+  - id: list_subscriptions
+    description: List active subscriptions for a customer.
+    expected_use: Audit billing state.
+    auto_execute: true
+    required_scopes: [read_write]
+    risk: { category: read, sensitivity: medium }
+    http:
+      method: GET
+      path: "/subscriptions"
+    params:
+      - { name: customer, in: query, type: string }
+      - { name: status, in: query, type: string, default: active }
+      - { name: limit, in: query, type: integer, default: 25 }
+
+  - id: cancel_subscription
+    description: Cancel a subscription immediately.
+    expected_use: End a subscription as part of a churn or refund flow.
+    auto_execute: false
+    required_scopes: [read_write]
+    risk: { category: delete, sensitivity: high }
+    http:
+      method: DELETE
+      path: "/subscriptions/{subscription_id}"
+    params:
+      - { name: subscription_id, in: path, required: true, type: string }

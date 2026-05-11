@@ -39,6 +39,7 @@ export const DenyReason = z.enum([
   'step_up_required',
   'cosigner_invalid',
   'cosigner_expired',
+  'resource_out_of_scope',
 ]);
 
 export const AuthorizeDecision = z.object({

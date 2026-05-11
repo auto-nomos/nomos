@@ -1,0 +1,72 @@
+id: telegram
+name: Telegram
+version: 1.0.0
+description: Telegram Bot API — read updates, send messages, manage chats.
+homepage: https://core.telegram.org/bots/api
+
+# Telegram bot API uses {bot_token} in the path itself; api_base substitution happens
+# at executor time via path templating. The connector layer holds the bot token.
+api_base: https://api.telegram.org
+
+auth:
+  kind: bot_token
+  setup_url: https://t.me/BotFather
+
+actions:
+  - id: get_me
+    description: Get the bot's profile (sanity check).
+    expected_use: Verify which bot is connected.
+    auto_execute: true
+    risk: { category: read, sensitivity: low }
+    http:
+      method: GET
+      path: "/bot{bot_token}/getMe"
+    params:
+      - { name: bot_token, in: path, required: true, type: string, sensitive: true }
+
+  - id: send_message
+    description: Send a text message to a chat.
+    expected_use: Post a notification, status update, or chat reply.
+    auto_execute: false
+    risk: { category: write, sensitivity: medium }
+    http:
+      method: POST
+      path: "/bot{bot_token}/sendMessage"
+    params:
+      - { name: bot_token, in: path, required: true, type: string, sensitive: true }
+      - { name: chat_id, in: body, required: true, type: string }
+      - { name: text, in: body, required: true, type: string }
+      - { name: parse_mode, in: body, type: string, enum: [Markdown, MarkdownV2, HTML] }
+      - { name: disable_notification, in: body, type: boolean }
+
+  - id: get_updates
+    description: Long-poll for incoming updates (alternative to webhook).
+    expected_use: Read inbound messages targeted at the bot.
+    auto_execute: true
+    risk: { category: read, sensitivity: medium }
+    http:
+      method: GET
+      path: "/bot{bot_token}/getUpdates"
+    params:
+      - { name: bot_token, in: path, required: true, type: string, sensitive: true }
+      - { name: offset, in: query, type: integer }
+      - { name: timeout, in: query, type: integer, default: 30 }
+
+  - id: send_photo
+    description: Send a photo to a chat.
+    expected_use: Share an image (e.g., chart) with the team.
+    auto_execute: false
+    risk: { category: write, sensitivity: medium }
+    http:
+      method: POST
+      path: "/bot{bot_token}/sendPhoto"
+    params:
+      - { name: bot_token, in: path, required: true, type: string, sensitive: true }
+      - { name: chat_id, in: body, required: true, type: string }
+      - { name: photo, in: body, required: true, type: string }
+      - { name: caption, in: body, type: string }
+
+notes: |
+  Telegram bot tokens are the only auth — paste from @BotFather.
+  This adapter is the "Telegram as agent tool" surface, distinct from
+  the step-up approval bot in apps/control-plane/src/services/notify/telegram-bot.ts.

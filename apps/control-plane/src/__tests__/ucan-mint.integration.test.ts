@@ -4,7 +4,7 @@
  *
  * Requires postgres. SKIP_DB_TESTS=1 to skip.
  */
-import { generateKeypair, generateSecretboxKeyHex } from '@credential-broker/crypto';
+import { generateKeypair, generateSecretboxKeyHex } from '@auto-nomos/crypto';
 import { hexToBytes } from '@noble/hashes/utils';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -101,7 +101,11 @@ describe.skipIf(!RUN)('mintUcan service (requires postgres)', () => {
     expect(result.jwt.split('.')).toHaveLength(3);
     expect(result.payload.iss).toBe(signing.signerDid);
     expect(result.payload.cmd).toBe('/github/issue/create');
-    expect(result.payload.meta).toEqual({ agent_id: agentId, oauth_connection_id: conn.id });
+    expect(result.payload.meta).toEqual({
+      agent_id: agentId,
+      oauth_connection_id: conn.id,
+      mode: 'static',
+    });
     expect(result.expiresAt.getTime()).toBeGreaterThan(Date.now());
 
     const stored = await db.drizzle.query.ucanIssues.findFirst({
@@ -228,7 +232,7 @@ describe.skipIf(!RUN)('mintUcan service (requires postgres)', () => {
       },
       { db: db.drizzle, ...signing },
     );
-    expect(result.payload.meta).toEqual({ agent_id: agentId });
+    expect(result.payload.meta).toEqual({ agent_id: agentId, mode: 'static' });
   });
 
   it('D-5: stamps contextHints into meta.context_hints when provided', async () => {
@@ -248,6 +252,7 @@ describe.skipIf(!RUN)('mintUcan service (requires postgres)', () => {
     expect(result.payload.meta).toEqual({
       agent_id: agentId,
       context_hints: { user: { department: 'engineering', role: 'staff' } },
+      mode: 'static',
     });
   });
 
@@ -265,7 +270,7 @@ describe.skipIf(!RUN)('mintUcan service (requires postgres)', () => {
       },
       { db: db.drizzle, ...signing },
     );
-    expect(result.payload.meta).toEqual({ agent_id: agentId });
+    expect(result.payload.meta).toEqual({ agent_id: agentId, mode: 'static' });
   });
 
   it('uses injected `now` for deterministic exp/nbf', async () => {

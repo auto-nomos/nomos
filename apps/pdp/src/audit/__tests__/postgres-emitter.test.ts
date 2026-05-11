@@ -1,4 +1,4 @@
-import type { AuditEvent } from '@credential-broker/shared-types';
+import type { AuditEvent } from '@auto-nomos/shared-types';
 import pino from 'pino';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ZERO_HASH } from '../emit.js';

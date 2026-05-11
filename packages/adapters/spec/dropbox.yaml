@@ -1,0 +1,94 @@
+id: dropbox
+name: Dropbox
+version: 1.0.0
+description: Dropbox v2 API — files and folders.
+homepage: https://www.dropbox.com/developers/documentation/http/documentation
+
+api_base: https://api.dropboxapi.com/2
+
+auth:
+  kind: oauth2
+  authorize_url: https://www.dropbox.com/oauth2/authorize
+  token_url: https://api.dropboxapi.com/oauth2/token
+  default_scopes:
+    - files.metadata.read
+    - files.content.read
+    - files.content.write
+  pkce: true
+
+actions:
+  - id: list_folder
+    description: List the contents of a folder.
+    expected_use: Discover files before reading or moving.
+    auto_execute: true
+    required_scopes: [files.metadata.read]
+    risk: { category: read, sensitivity: low }
+    http:
+      method: POST
+      path: "/files/list_folder"
+    params:
+      - { name: path, in: body, required: true, type: string, default: "" }
+      - { name: recursive, in: body, type: boolean, default: false }
+      - { name: limit, in: body, type: integer, default: 100 }
+
+  - id: search_files
+    description: Search files by name or content.
+    expected_use: Find a specific file by keyword.
+    auto_execute: true
+    required_scopes: [files.metadata.read]
+    risk: { category: search, sensitivity: low }
+    http:
+      method: POST
+      path: "/files/search_v2"
+    params:
+      - { name: query, in: body, required: true, type: string }
+      - name: options
+        in: body
+        type: object
+        default: { max_results: 20 }
+
+  - id: download_file
+    description: Download a file's content.
+    expected_use: Read file body for summarization.
+    auto_execute: true
+    required_scopes: [files.content.read]
+    risk: { category: read, sensitivity: high }
+    http:
+      method: POST
+      path: /files/download
+      base_url_override: https://content.dropboxapi.com/2/files/download
+    params:
+      - name: Dropbox-API-Arg
+        in: header
+        required: true
+        type: string
+        description: 'JSON-encoded {"path": "/file.txt"}'
+
+  - id: upload_file
+    description: Upload a file (under 150 MB).
+    expected_use: Save a generated artifact.
+    auto_execute: false
+    required_scopes: [files.content.write]
+    risk: { category: write, sensitivity: medium }
+    http:
+      method: POST
+      path: /files/upload
+      base_url_override: https://content.dropboxapi.com/2/files/upload
+    params:
+      - name: Dropbox-API-Arg
+        in: header
+        required: true
+        type: string
+        description: 'JSON-encoded {"path": "/file.txt", "mode": "add"}'
+
+  - id: delete_file
+    description: Delete a file or folder.
+    expected_use: Clean up generated artifacts.
+    auto_execute: false
+    required_scopes: [files.content.write]
+    risk: { category: delete, sensitivity: high }
+    http:
+      method: POST
+      path: "/files/delete_v2"
+    params:
+      - { name: path, in: body, required: true, type: string }

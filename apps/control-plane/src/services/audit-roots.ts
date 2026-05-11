@@ -1,4 +1,4 @@
-import { signDetached } from '@credential-broker/crypto';
+import { signDetached } from '@auto-nomos/crypto';
 import { bytesToHex } from '@noble/hashes/utils';
 import { desc, eq } from 'drizzle-orm';
 import type { DrizzleClient } from '../db/index.js';

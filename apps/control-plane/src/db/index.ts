@@ -1,4 +1,4 @@
-import { PACKS } from '@credential-broker/schema-packs';
+import { PACKS } from '@auto-nomos/schema-packs';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import pg from 'pg';
 import type { Config } from '../config.js';

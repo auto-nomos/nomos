@@ -8,24 +8,27 @@ importers:
 
   .:
     devDependencies:
+      '@auto-nomos/control-plane':
+        specifier: workspace:*
+        version: link:apps/control-plane
+      '@auto-nomos/crypto':
+        specifier: workspace:*
+        version: link:packages/crypto
+      '@auto-nomos/pdp':
+        specifier: workspace:*
+        version: link:apps/pdp
+      '@auto-nomos/sdk':
+        specifier: workspace:*
+        version: link:packages/sdk-typescript
+      '@auto-nomos/ucan':
+        specifier: workspace:*
+        version: link:packages/ucan
       '@biomejs/biome':
         specifier: 2.4.14
         version: 2.4.14
       '@changesets/cli':
         specifier: 2.27.11
         version: 2.27.11
-      '@credential-broker/control-plane':
-        specifier: workspace:*
-        version: link:apps/control-plane
-      '@credential-broker/crypto':
-        specifier: workspace:*
-        version: link:packages/crypto
-      '@credential-broker/pdp':
-        specifier: workspace:*
-        version: link:apps/pdp
-      '@credential-broker/sdk':
-        specifier: workspace:*
-        version: link:packages/sdk-typescript
       '@hono/node-server':
         specifier: 1.13.7
         version: 1.13.7(hono@4.6.14)
@@ -65,30 +68,30 @@ importers:
 
   apps/control-plane:
     dependencies:
+      '@auto-nomos/cedar':
+        specifier: workspace:*
+        version: link:../../packages/cedar
+      '@auto-nomos/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@auto-nomos/crypto':
+        specifier: workspace:*
+        version: link:../../packages/crypto
+      '@auto-nomos/policy-builder':
+        specifier: workspace:*
+        version: link:../../packages/policy-builder
+      '@auto-nomos/schema-packs':
+        specifier: workspace:*
+        version: link:../../packages/schema-packs
+      '@auto-nomos/shared-types':
+        specifier: workspace:*
+        version: link:../../packages/shared-types
+      '@auto-nomos/ucan':
+        specifier: workspace:*
+        version: link:../../packages/ucan
       '@aws-sdk/client-s3':
         specifier: 3.700.0
         version: 3.700.0
-      '@credential-broker/cedar':
-        specifier: workspace:*
-        version: link:../../packages/cedar
-      '@credential-broker/core':
-        specifier: workspace:*
-        version: link:../../packages/core
-      '@credential-broker/crypto':
-        specifier: workspace:*
-        version: link:../../packages/crypto
-      '@credential-broker/policy-builder':
-        specifier: workspace:*
-        version: link:../../packages/policy-builder
-      '@credential-broker/schema-packs':
-        specifier: workspace:*
-        version: link:../../packages/schema-packs
-      '@credential-broker/shared-types':
-        specifier: workspace:*
-        version: link:../../packages/shared-types
-      '@credential-broker/ucan':
-        specifier: workspace:*
-        version: link:../../packages/ucan
       '@dsnp/parquetjs':
         specifier: 1.8.6
         version: 1.8.6
@@ -126,7 +129,7 @@ importers:
         specifier: 3.25.76
         version: 3.25.76
     devDependencies:
-      '@credential-broker/audit-verify':
+      '@auto-nomos/audit-verify':
         specifier: workspace:*
         version: link:../../packages/audit-verify
       '@trpc/client':
@@ -153,19 +156,19 @@ importers:
 
   apps/dashboard:
     dependencies:
-      '@credential-broker/cedar':
+      '@auto-nomos/cedar':
         specifier: workspace:*
         version: link:../../packages/cedar
-      '@credential-broker/control-plane':
+      '@auto-nomos/control-plane':
         specifier: workspace:*
         version: link:../control-plane
-      '@credential-broker/policy-builder':
+      '@auto-nomos/policy-builder':
         specifier: workspace:*
         version: link:../../packages/policy-builder
-      '@credential-broker/schema-packs':
+      '@auto-nomos/schema-packs':
         specifier: workspace:*
         version: link:../../packages/schema-packs
-      '@credential-broker/shared-types':
+      '@auto-nomos/shared-types':
         specifier: workspace:*
         version: link:../../packages/shared-types
       '@hookform/resolvers':
@@ -278,24 +281,46 @@ importers:
         specifier: 4.1.5
         version: 4.1.5(@opentelemetry/api@1.9.1)(@types/node@22.10.5)(@vitest/coverage-v8@4.1.5)(happy-dom@15.11.7)(msw@2.7.0(@types/node@22.10.5)(typescript@5.7.2))(vite@8.0.11(@types/node@22.10.5)(esbuild@0.27.7)(jiti@1.21.7)(tsx@4.21.0)(yaml@2.8.4))
 
+  apps/egress-proxy:
+    dependencies:
+      pino:
+        specifier: 9.5.0
+        version: 9.5.0
+      zod:
+        specifier: 3.25.76
+        version: 3.25.76
+    devDependencies:
+      '@types/node':
+        specifier: 22.10.5
+        version: 22.10.5
+      tsx:
+        specifier: 4.21.0
+        version: 4.21.0
+      typescript:
+        specifier: 5.7.2
+        version: 5.7.2
+      vitest:
+        specifier: 4.1.5
+        version: 4.1.5(@opentelemetry/api@1.9.1)(@types/node@22.10.5)(@vitest/coverage-v8@4.1.5)(happy-dom@15.11.7)(msw@2.7.0(@types/node@22.10.5)(typescript@5.7.2))(vite@8.0.11(@types/node@22.10.5)(esbuild@0.27.7)(jiti@1.21.7)(tsx@4.21.0)(yaml@2.8.4))
+
   apps/pdp:
     dependencies:
-      '@credential-broker/cedar':
+      '@auto-nomos/cedar':
         specifier: workspace:*
         version: link:../../packages/cedar
-      '@credential-broker/core':
+      '@auto-nomos/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@credential-broker/crypto':
+      '@auto-nomos/crypto':
         specifier: workspace:*
         version: link:../../packages/crypto
-      '@credential-broker/schema-packs':
+      '@auto-nomos/schema-packs':
         specifier: workspace:*
         version: link:../../packages/schema-packs
-      '@credential-broker/shared-types':
+      '@auto-nomos/shared-types':
         specifier: workspace:*
         version: link:../../packages/shared-types
-      '@credential-broker/ucan':
+      '@auto-nomos/ucan':
         specifier: workspace:*
         version: link:../../packages/ucan
       '@hono/node-server':
@@ -360,9 +385,34 @@ importers:
         specifier: 4.1.5
         version: 4.1.5(@opentelemetry/api@1.9.1)(@types/node@22.10.5)(@vitest/coverage-v8@4.1.5)(happy-dom@15.11.7)(msw@2.7.0(@types/node@22.10.5)(typescript@5.7.2))(vite@8.0.11(@types/node@22.10.5)(esbuild@0.27.7)(jiti@1.21.7)(tsx@4.21.0)(yaml@2.8.4))
 
+  examples/mcp-filesystem:
+    dependencies:
+      '@auto-nomos/sdk':
+        specifier: workspace:*
+        version: link:../../packages/sdk-typescript
+      '@modelcontextprotocol/sdk':
+        specifier: 1.18.1
+        version: 1.18.1
+      zod:
+        specifier: 3.25.76
+        version: 3.25.76
+    devDependencies:
+      '@types/node':
+        specifier: 22.10.5
+        version: 22.10.5
+      tsx:
+        specifier: 4.21.0
+        version: 4.21.0
+      typescript:
+        specifier: 5.7.2
+        version: 5.7.2
+      vitest:
+        specifier: 4.1.5
+        version: 4.1.5(@opentelemetry/api@1.9.1)(@types/node@22.10.5)(@vitest/coverage-v8@4.1.5)(happy-dom@15.11.7)(msw@2.7.0(@types/node@22.10.5)(typescript@5.7.2))(vite@8.0.11(@types/node@22.10.5)(esbuild@0.27.7)(jiti@1.21.7)(tsx@4.21.0)(yaml@2.8.4))
+
   examples/mcp-github:
     dependencies:
-      '@credential-broker/sdk':
+      '@auto-nomos/sdk':
         specifier: workspace:*
         version: link:../../packages/sdk-typescript
       '@modelcontextprotocol/sdk':
@@ -397,15 +447,59 @@ importers:
         specifier: 4.1.5
         version: 4.1.5(@opentelemetry/api@1.9.1)(@types/node@22.10.5)(@vitest/coverage-v8@4.1.5)(happy-dom@15.11.7)(msw@2.7.0(@types/node@22.10.5)(typescript@5.7.2))(vite@8.0.11(@types/node@22.10.5)(esbuild@0.27.7)(jiti@1.21.7)(tsx@4.21.0)(yaml@2.8.4))
 
+  examples/mcp-github-dynamic:
+    dependencies:
+      '@auto-nomos/sdk':
+        specifier: workspace:*
+        version: link:../../packages/sdk-typescript
+      '@modelcontextprotocol/sdk':
+        specifier: 1.18.1
+        version: 1.18.1
+      zod:
+        specifier: 3.25.76
+        version: 3.25.76
+    devDependencies:
+      '@types/node':
+        specifier: 22.10.5
+        version: 22.10.5
+      tsx:
+        specifier: 4.21.0
+        version: 4.21.0
+      typescript:
+        specifier: 5.7.2
+        version: 5.7.2
+      vitest:
+        specifier: 4.1.5
+        version: 4.1.5(@opentelemetry/api@1.9.1)(@types/node@22.10.5)(@vitest/coverage-v8@4.1.5)(happy-dom@15.11.7)(msw@2.7.0(@types/node@22.10.5)(typescript@5.7.2))(vite@8.0.11(@types/node@22.10.5)(esbuild@0.27.7)(jiti@1.21.7)(tsx@4.21.0)(yaml@2.8.4))
+
+  packages/adapters:
+    dependencies:
+      yaml:
+        specifier: 2.6.1
+        version: 2.6.1
+      zod:
+        specifier: 3.25.76
+        version: 3.25.76
+    devDependencies:
+      '@types/node':
+        specifier: 22.10.5
+        version: 22.10.5
+      typescript:
+        specifier: 5.7.2
+        version: 5.7.2
+      vitest:
+        specifier: 4.1.5
+        version: 4.1.5(@opentelemetry/api@1.9.1)(@types/node@22.10.5)(@vitest/coverage-v8@4.1.5)(happy-dom@15.11.7)(msw@2.7.0(@types/node@22.10.5)(typescript@5.7.2))(vite@8.0.11(@types/node@22.10.5)(esbuild@0.27.7)(jiti@1.21.7)(tsx@4.21.0)(yaml@2.6.1))
+
   packages/audit-verify:
     dependencies:
-      '@credential-broker/crypto':
+      '@auto-nomos/crypto':
         specifier: workspace:*
         version: link:../crypto
-      '@credential-broker/shared-types':
+      '@auto-nomos/shared-types':
         specifier: workspace:*
         version: link:../shared-types
-      '@credential-broker/ucan':
+      '@auto-nomos/ucan':
         specifier: workspace:*
         version: link:../ucan
       '@noble/hashes':
@@ -438,18 +532,40 @@ importers:
         specifier: 4.1.5
         version: 4.1.5(@opentelemetry/api@1.9.1)(@types/node@22.10.5)(@vitest/coverage-v8@4.1.5)(happy-dom@15.11.7)(msw@2.7.0(@types/node@22.10.5)(typescript@5.7.2))(vite@8.0.11(@types/node@22.10.5)(esbuild@0.27.7)(jiti@1.21.7)(tsx@4.21.0)(yaml@2.8.4))
 
+  packages/cli:
+    dependencies:
+      '@auto-nomos/adapters':
+        specifier: workspace:*
+        version: link:../adapters
+      zod:
+        specifier: 3.25.76
+        version: 3.25.76
+    devDependencies:
+      '@types/node':
+        specifier: 22.10.5
+        version: 22.10.5
+      tsx:
+        specifier: 4.21.0
+        version: 4.21.0
+      typescript:
+        specifier: 5.7.2
+        version: 5.7.2
+      vitest:
+        specifier: 4.1.5
+        version: 4.1.5(@opentelemetry/api@1.9.1)(@types/node@22.10.5)(@vitest/coverage-v8@4.1.5)(happy-dom@15.11.7)(msw@2.7.0(@types/node@22.10.5)(typescript@5.7.2))(vite@8.0.11(@types/node@22.10.5)(esbuild@0.27.7)(jiti@1.21.7)(tsx@4.21.0)(yaml@2.8.4))
+
   packages/core:
     dependencies:
-      '@credential-broker/cedar':
+      '@auto-nomos/cedar':
         specifier: workspace:*
         version: link:../cedar
-      '@credential-broker/crypto':
+      '@auto-nomos/crypto':
         specifier: workspace:*
         version: link:../crypto
-      '@credential-broker/shared-types':
+      '@auto-nomos/shared-types':
         specifier: workspace:*
         version: link:../shared-types
-      '@credential-broker/ucan':
+      '@auto-nomos/ucan':
         specifier: workspace:*
         version: link:../ucan
     devDependencies:
@@ -490,7 +606,7 @@ importers:
 
   packages/mcp-server:
     dependencies:
-      '@credential-broker/sdk':
+      '@auto-nomos/sdk':
         specifier: workspace:*
         version: link:../sdk-typescript
       '@modelcontextprotocol/sdk':
@@ -515,12 +631,12 @@ importers:
 
   packages/policy-builder:
     dependencies:
+      '@auto-nomos/cedar':
+        specifier: workspace:*
+        version: link:../cedar
       '@cedar-policy/cedar-wasm':
         specifier: 4.10.0
         version: 4.10.0
-      '@credential-broker/cedar':
-        specifier: workspace:*
-        version: link:../cedar
       '@xyflow/react':
         specifier: 12.4.4
         version: 12.4.4(@types/react@19.0.0)(react-dom@19.0.0(react@19.0.0))(react@19.0.0)
@@ -555,11 +671,11 @@ importers:
 
   packages/schema-packs:
     dependencies:
-      '@credential-broker/cedar':
+      '@auto-nomos/cedar':
         specifier: workspace:*
         version: link:../cedar
     devDependencies:
-      '@credential-broker/policy-builder':
+      '@auto-nomos/policy-builder':
         specifier: workspace:*
         version: link:../policy-builder
       '@types/node':
@@ -574,7 +690,7 @@ importers:
 
   packages/sdk-typescript:
     dependencies:
-      '@credential-broker/shared-types':
+      '@auto-nomos/shared-types':
         specifier: workspace:*
         version: link:../shared-types
     devDependencies:
@@ -615,10 +731,10 @@ importers:
 
   packages/ucan:
     dependencies:
-      '@credential-broker/crypto':
+      '@auto-nomos/crypto':
         specifier: workspace:*
         version: link:../crypto
-      '@credential-broker/shared-types':
+      '@auto-nomos/shared-types':
         specifier: workspace:*
         version: link:../shared-types
       zod:
@@ -5974,6 +6090,11 @@ packages:
     resolution: {integrity: sha512-0pfFzegeDWJHJIAmTLRP2DwHjdF5s7jo9tuztdQxAhINCdvS+3nGINqPd00AphqJR/0LhANUS6/+7SCb98YOfA==}
     engines: {node: '>=10'}
 
+  yaml@2.6.1:
+    resolution: {integrity: sha512-7r0XPzioN/Q9kXBro/XPnA6kznR73DHq+GXh5ON7ZozRO6aMjbmiBuKste2wslTFkC5d1dw0GooOCepZXJ2SAg==}
+    engines: {node: '>= 14'}
+    hasBin: true
+
   yaml@2.8.4:
     resolution: {integrity: sha512-ml/JPOj9fOQK8RNnWojA67GbZ0ApXAUlN2UQclwv2eVgTgn7O9gg9o7paZWKMp4g0H3nTLtS9LVzhkpOFIKzog==}
     engines: {node: '>= 14.6'}
@@ -9797,6 +9918,15 @@ snapshots:
       msw: 2.7.0(@types/node@22.10.5)(typescript@5.7.2)
       vite: 8.0.11(@types/node@22.10.5)(esbuild@0.19.12)(jiti@1.21.7)(tsx@4.21.0)(yaml@2.8.4)
 
+  '@vitest/mocker@4.1.5(msw@2.7.0(@types/node@22.10.5)(typescript@5.7.2))(vite@8.0.11(@types/node@22.10.5)(esbuild@0.27.7)(jiti@1.21.7)(tsx@4.21.0)(yaml@2.6.1))':
+    dependencies:
+      '@vitest/spy': 4.1.5
+      estree-walker: 3.0.3
+      magic-string: 0.30.21
+    optionalDependencies:
+      msw: 2.7.0(@types/node@22.10.5)(typescript@5.7.2)
+      vite: 8.0.11(@types/node@22.10.5)(esbuild@0.27.7)(jiti@1.21.7)(tsx@4.21.0)(yaml@2.6.1)
+
   '@vitest/mocker@4.1.5(msw@2.7.0(@types/node@22.10.5)(typescript@5.7.2))(vite@8.0.11(@types/node@22.10.5)(esbuild@0.27.7)(jiti@1.21.7)(tsx@4.21.0)(yaml@2.8.4))':
     dependencies:
       '@vitest/spy': 4.1.5
@@ -12047,6 +12177,21 @@ snapshots:
       tsx: 4.21.0
       yaml: 2.8.4
 
+  vite@8.0.11(@types/node@22.10.5)(esbuild@0.27.7)(jiti@1.21.7)(tsx@4.21.0)(yaml@2.6.1):
+    dependencies:
+      lightningcss: 1.32.0
+      picomatch: 4.0.4
+      postcss: 8.5.14
+      rolldown: 1.0.0-rc.18
+      tinyglobby: 0.2.16
+    optionalDependencies:
+      '@types/node': 22.10.5
+      esbuild: 0.27.7
+      fsevents: 2.3.3
+      jiti: 1.21.7
+      tsx: 4.21.0
+      yaml: 2.6.1
+
   vite@8.0.11(@types/node@22.10.5)(esbuild@0.27.7)(jiti@1.21.7)(tsx@4.21.0)(yaml@2.8.4):
     dependencies:
       lightningcss: 1.32.0
@@ -12083,6 +12228,36 @@ snapshots:
       tinyglobby: 0.2.16
       tinyrainbow: 3.1.0
       vite: 8.0.11(@types/node@22.10.5)(esbuild@0.19.12)(jiti@1.21.7)(tsx@4.21.0)(yaml@2.8.4)
+      why-is-node-running: 2.3.0
+    optionalDependencies:
+      '@opentelemetry/api': 1.9.1
+      '@types/node': 22.10.5
+      '@vitest/coverage-v8': 4.1.5(vitest@4.1.5)
+      happy-dom: 15.11.7
+    transitivePeerDependencies:
+      - msw
+
+  vitest@4.1.5(@opentelemetry/api@1.9.1)(@types/node@22.10.5)(@vitest/coverage-v8@4.1.5)(happy-dom@15.11.7)(msw@2.7.0(@types/node@22.10.5)(typescript@5.7.2))(vite@8.0.11(@types/node@22.10.5)(esbuild@0.27.7)(jiti@1.21.7)(tsx@4.21.0)(yaml@2.6.1)):
+    dependencies:
+      '@vitest/expect': 4.1.5
+      '@vitest/mocker': 4.1.5(msw@2.7.0(@types/node@22.10.5)(typescript@5.7.2))(vite@8.0.11(@types/node@22.10.5)(esbuild@0.27.7)(jiti@1.21.7)(tsx@4.21.0)(yaml@2.6.1))
+      '@vitest/pretty-format': 4.1.5
+      '@vitest/runner': 4.1.5
+      '@vitest/snapshot': 4.1.5
+      '@vitest/spy': 4.1.5
+      '@vitest/utils': 4.1.5
+      es-module-lexer: 2.1.0
+      expect-type: 1.3.0
+      magic-string: 0.30.21
+      obug: 2.1.1
+      pathe: 2.0.3
+      picomatch: 4.0.4
+      std-env: 4.1.0
+      tinybench: 2.9.0
+      tinyexec: 1.1.2
+      tinyglobby: 0.2.16
+      tinyrainbow: 3.1.0
+      vite: 8.0.11(@types/node@22.10.5)(esbuild@0.27.7)(jiti@1.21.7)(tsx@4.21.0)(yaml@2.6.1)
       why-is-node-running: 2.3.0
     optionalDependencies:
       '@opentelemetry/api': 1.9.1
@@ -12170,6 +12345,8 @@ snapshots:
   xxhash-wasm@1.1.0: {}
 
   y18n@5.0.8: {}
+
+  yaml@2.6.1: {}
 
   yaml@2.8.4: {}
 

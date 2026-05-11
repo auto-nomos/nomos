@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { createAuthGuard } from '@credential-broker/sdk';
+import { createAuthGuard } from '@auto-nomos/sdk';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { ConfigError, loadConfig } from './config.js';
 import { createMcpServer } from './server.js';

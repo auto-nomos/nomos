@@ -1,0 +1,100 @@
+id: notion
+name: Notion
+version: 1.0.0
+description: Notion API — pages, databases, blocks.
+homepage: https://developers.notion.com
+
+api_base: https://api.notion.com/v1
+
+auth:
+  kind: oauth2
+  authorize_url: https://api.notion.com/v1/oauth/authorize
+  token_url: https://api.notion.com/v1/oauth/token
+  default_scopes: []
+  pkce: false
+
+actions:
+  - id: search
+    description: Search pages and databases by title or content.
+    expected_use: Find relevant pages before reading or editing.
+    auto_execute: true
+    required_scopes: []
+    risk: { category: search, sensitivity: low }
+    http:
+      method: POST
+      path: "/search"
+    params:
+      - { name: query, in: body, required: true, type: string }
+      - { name: page_size, in: body, type: integer, default: 25 }
+
+  - id: get_page
+    description: Fetch a Notion page by id.
+    expected_use: Read page properties and metadata.
+    auto_execute: true
+    required_scopes: []
+    risk: { category: read, sensitivity: low }
+    http:
+      method: GET
+      path: "/pages/{page_id}"
+    params:
+      - { name: page_id, in: path, required: true, type: string }
+
+  - id: list_block_children
+    description: List the blocks (paragraphs, lists, etc.) of a page.
+    expected_use: Read page body.
+    auto_execute: true
+    required_scopes: []
+    risk: { category: read, sensitivity: low }
+    http:
+      method: GET
+      path: "/blocks/{block_id}/children"
+    params:
+      - { name: block_id, in: path, required: true, type: string }
+      - { name: page_size, in: query, type: integer, default: 50 }
+
+  - id: append_block_children
+    description: Append blocks to a page.
+    expected_use: Add a status update or note to an existing page.
+    auto_execute: false
+    required_scopes: []
+    risk: { category: write, sensitivity: medium }
+    http:
+      method: PATCH
+      path: "/blocks/{block_id}/children"
+    params:
+      - { name: block_id, in: path, required: true, type: string }
+      - { name: children, in: body, required: true, type: array }
+
+  - id: create_page
+    description: Create a new page in a database or under a parent page.
+    expected_use: File an entry in a tracker or knowledge base.
+    auto_execute: false
+    required_scopes: []
+    risk: { category: write, sensitivity: medium }
+    http:
+      method: POST
+      path: "/pages"
+    params:
+      - { name: parent, in: body, required: true, type: object }
+      - { name: properties, in: body, required: true, type: object }
+      - { name: children, in: body, type: array }
+
+  - id: query_database
+    description: Query a Notion database with filters and sorts.
+    expected_use: Read structured data from a tracker.
+    auto_execute: true
+    required_scopes: []
+    risk: { category: search, sensitivity: low }
+    http:
+      method: POST
+      path: "/databases/{database_id}/query"
+    params:
+      - { name: database_id, in: path, required: true, type: string }
+      - { name: filter, in: body, type: object }
+      - { name: sorts, in: body, type: array }
+      - { name: page_size, in: body, type: integer, default: 25 }
+
+notes: |
+  Notion does not issue refresh tokens; access tokens are long-lived but the
+  user can revoke them via Settings → Connected apps. Treat 401 as
+  reauth-required.

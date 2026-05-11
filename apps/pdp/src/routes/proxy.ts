@@ -10,13 +10,14 @@
  * 5.4 mints add this when callers ask for proxy mode). Without it the route
  * returns 400 — proxy mode without a binding is by definition impossible.
  */
-import type { Schema } from '@credential-broker/cedar';
-import { type DecideInput, decide } from '@credential-broker/core';
-import { actionsFor, PACKS } from '@credential-broker/schema-packs';
-import { AuthorizeRequest as AuthorizeRequestSchema } from '@credential-broker/shared-types';
-import { parseUcanJwt } from '@credential-broker/ucan';
+import type { Schema } from '@auto-nomos/cedar';
+import { type DecideInput, decide } from '@auto-nomos/core';
+import { actionsFor, PACKS } from '@auto-nomos/schema-packs';
+import { AuthorizeRequest as AuthorizeRequestSchema } from '@auto-nomos/shared-types';
+import { parseUcanJwt } from '@auto-nomos/ucan';
 import { Hono } from 'hono';
 import { z } from 'zod';
+import { validateGithubProxyCall } from '../adapters/github.js';
 import {
   isKnownProvider,
   type ProviderId,
@@ -28,6 +29,7 @@ import type { PolicyCache } from '../cache/policies.js';
 import type { RevocationCache } from '../cache/revocations.js';
 import type { OAuthTokenResponse } from '../control-plane/client.js';
 import { getLog } from '../middleware/logger.js';
+import { sanitizeResponseBody } from '../middleware/sanitize-response.js';
 import { recordAuthorize } from '../observability/metrics.js';
 import type { AuditEmitInput } from './authorize.js';
 
@@ -200,6 +202,35 @@ export function createProxyRoutes(deps: ProxyRouteDeps): Hono {
     const provider: ProviderId = token.connector;
     const apiCall = parsed.data.apiCall as ProxyRequest;
 
+    // GitHub gate: the agent's `resource` already passed the pre-Cedar
+    // `constraintMatchesResource` check, but the upstream URL might
+    // still target a different repo. Re-derive the target from
+    // `apiCall.path` and refuse anything outside the UCAN's signed
+    // github constraint.
+    const leafMeta = leaf?.payload.meta as Record<string, unknown> | undefined;
+    const ghConstraint =
+      leafMeta && typeof leafMeta.resource_constraint === 'object'
+        ? (leafMeta.resource_constraint as { provider?: string })
+        : undefined;
+    if (ghConstraint?.provider === 'github') {
+      const ghCheck = validateGithubProxyCall(
+        ghConstraint as Parameters<typeof validateGithubProxyCall>[0],
+        apiCall,
+        apiCall.query,
+      );
+      if (!ghCheck.ok) {
+        return c.json(
+          {
+            allow: false,
+            decision: { allow: false, reason: 'resource_out_of_scope' },
+            error_code: 'resource_out_of_scope',
+            adapter_reason: ghCheck.reason,
+          },
+          403,
+        );
+      }
+    }
+
     let upstream: Awaited<ReturnType<typeof proxyApiCall>>;
     try {
       upstream = await proxyApiCall(provider, token.accessToken, apiCall, {
@@ -242,6 +273,8 @@ export function createProxyRoutes(deps: ProxyRouteDeps): Hono {
       }
     }
 
+    const sanitized = sanitizeResponseBody(upstream.body, upstream.headers['content-type']);
+
     log.info(
       {
         customerId,
@@ -249,6 +282,7 @@ export function createProxyRoutes(deps: ProxyRouteDeps): Hono {
         provider,
         connectionId,
         upstreamStatus: upstream.status,
+        redactions: sanitized.redactions.length,
       },
       'proxy',
     );
@@ -259,10 +293,11 @@ export function createProxyRoutes(deps: ProxyRouteDeps): Hono {
         decision,
         upstream: {
           status: upstream.status,
-          body: upstream.body,
+          body: sanitized.body,
           headers: upstream.headers,
         },
         connector: provider,
+        ...(sanitized.redactions.length > 0 ? { redactions: sanitized.redactions } : {}),
       },
       200,
     );

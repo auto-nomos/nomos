@@ -3,7 +3,7 @@
  *
  * Requires postgres. SKIP_DB_TESTS=1 to skip.
  */
-import { generateKeypair, generateSecretboxKeyHex, sha256Hex } from '@credential-broker/crypto';
+import { generateKeypair, generateSecretboxKeyHex, sha256Hex } from '@auto-nomos/crypto';
 import { hexToBytes } from '@noble/hashes/utils';
 import { pino } from 'pino';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';

@@ -1,7 +1,8 @@
 {
-  "name": "@credential-broker/core",
-  "version": "0.0.0",
-  "private": true,
+  "name": "@auto-nomos/core",
+  "version": "0.0.1",
+  "license": "MIT",
+  "private": false,
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -24,10 +25,10 @@
     "clean": "rm -rf dist .turbo"
   },
   "dependencies": {
-    "@credential-broker/cedar": "workspace:*",
-    "@credential-broker/crypto": "workspace:*",
-    "@credential-broker/shared-types": "workspace:*",
-    "@credential-broker/ucan": "workspace:*"
+    "@auto-nomos/cedar": "workspace:*",
+    "@auto-nomos/crypto": "workspace:*",
+    "@auto-nomos/shared-types": "workspace:*",
+    "@auto-nomos/ucan": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "22.10.5",

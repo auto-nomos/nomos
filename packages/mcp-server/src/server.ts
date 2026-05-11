@@ -1,4 +1,4 @@
-import type { AuthGuard } from '@credential-broker/sdk';
+import type { AuthGuard } from '@auto-nomos/sdk';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { IntegrationId } from './config.js';
 import { toolsFor } from './tools/index.js';
@@ -10,7 +10,7 @@ export interface McpServerDeps {
 
 export function createMcpServer(deps: McpServerDeps): McpServer {
   const server = new McpServer({
-    name: '@credential-broker/mcp-server',
+    name: '@auto-nomos/mcp-server',
     version: '0.0.0',
   });
   for (const tool of toolsFor(deps.integrations)) {

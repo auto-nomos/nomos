@@ -7,8 +7,8 @@
  * - revocations endpoint reflects revoked CIDs
  * - bearer-token gate rejects missing/wrong tokens
  */
-import { generateKeypair, sha256Hex, verifyDetached } from '@credential-broker/crypto';
-import { base64urlToBytes, canonicalize } from '@credential-broker/ucan';
+import { generateKeypair, sha256Hex, verifyDetached } from '@auto-nomos/crypto';
+import { base64urlToBytes, canonicalize } from '@auto-nomos/ucan';
 import { createTRPCClient, httpBatchLink } from '@trpc/client';
 import { eq } from 'drizzle-orm';
 import { pino } from 'pino';

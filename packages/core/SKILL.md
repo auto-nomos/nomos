@@ -1,4 +1,4 @@
-# SKILL: working in @credential-broker/core
+# SKILL: working in @auto-nomos/core
 
 Read this before changing the `decide()` function.
 

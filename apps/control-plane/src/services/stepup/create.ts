@@ -68,6 +68,28 @@ export async function createStepUpApproval(
     )
     .limit(1);
 
+  let ownerPrefs:
+    | {
+        telegramChatId: string | null;
+        telegramEnabled: boolean;
+        emailEnabled: boolean;
+        webPushEnabled: boolean;
+      }
+    | undefined;
+  if (owner) {
+    const [row] = await deps.db
+      .select({
+        telegramChatId: schema.notificationPreferences.telegramChatId,
+        telegramEnabled: schema.notificationPreferences.telegramEnabled,
+        emailEnabled: schema.notificationPreferences.emailEnabled,
+        webPushEnabled: schema.notificationPreferences.webPushEnabled,
+      })
+      .from(schema.notificationPreferences)
+      .where(eq(schema.notificationPreferences.userId, owner.userId))
+      .limit(1);
+    if (row) ownerPrefs = row;
+  }
+
   const [row] = await deps.db
     .insert(schema.pushApprovals)
     .values({
@@ -98,6 +120,7 @@ export async function createStepUpApproval(
         resource: input.resource,
         deepLink,
         ttlSeconds,
+        ...(ownerPrefs ? { prefs: ownerPrefs } : {}),
       })
       .catch((err) => {
         deps.logger.warn(

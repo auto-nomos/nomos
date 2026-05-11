@@ -39,7 +39,7 @@ export const auditRouter = router({
    * customer's chain head if no root has been signed yet).
    *
    * Output is the canonical `AuditBundle` shape consumed by the
-   * @credential-broker/audit-verify CLI.
+   * @auto-nomos/audit-verify CLI.
    */
   proof: tenantProcedure
     .input(z.object({ eventId: z.string().uuid() }))

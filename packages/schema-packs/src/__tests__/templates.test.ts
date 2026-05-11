@@ -1,13 +1,13 @@
-import { parsePolicy } from '@credential-broker/cedar';
+import { parsePolicy } from '@auto-nomos/cedar';
 import { describe, expect, it } from 'vitest';
 import { listTemplates, PACKS, templateById, templatesFor } from '../index.js';
 
 describe('schema-packs templates', () => {
-  it('ships exactly 20 templates (5 per integration × 4 integrations)', () => {
-    expect(listTemplates()).toHaveLength(20);
+  it('ships 5 templates per integration', () => {
     for (const pack of PACKS) {
       expect(pack.templates).toHaveLength(5);
     }
+    expect(listTemplates()).toHaveLength(PACKS.length * 5);
   });
 
   it('every template has a unique id', () => {

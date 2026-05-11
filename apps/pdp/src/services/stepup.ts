@@ -18,8 +18,8 @@
  * - the request already carries cosigner=true (would loop otherwise),
  * - the request already carries a `cosignerJwt` (cosigner retry path).
  */
-import { type DecideInput, decide } from '@credential-broker/core';
-import type { AuthorizeDecision } from '@credential-broker/shared-types';
+import { type DecideInput, decide } from '@auto-nomos/core';
+import type { AuthorizeDecision } from '@auto-nomos/shared-types';
 
 const COSIGNER_KEY = 'cosigner';
 

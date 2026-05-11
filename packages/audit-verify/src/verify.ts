@@ -1,5 +1,5 @@
-import { sha256Hex, verifyDetached } from '@credential-broker/crypto';
-import { canonicalize } from '@credential-broker/ucan';
+import { sha256Hex, verifyDetached } from '@auto-nomos/crypto';
+import { canonicalize } from '@auto-nomos/ucan';
 import { hexToBytes } from '@noble/hashes/utils';
 
 /**

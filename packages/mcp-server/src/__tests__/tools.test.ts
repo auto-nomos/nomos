@@ -1,4 +1,4 @@
-import type { AuthGuard, MintedUcan } from '@credential-broker/sdk';
+import type { AuthGuard, MintedUcan } from '@auto-nomos/sdk';
 import { describe, expect, it, vi } from 'vitest';
 import { toolsFor } from '../tools/index.js';
 

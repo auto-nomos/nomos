@@ -1,5 +1,5 @@
 /**
- * OAuth token persistence — encrypts tokens at rest with @credential-broker/crypto's
+ * OAuth token persistence — encrypts tokens at rest with @auto-nomos/crypto's
  * XChaCha20-Poly1305 secretbox (Sprint 5 master key, per-row nonce; per-customer
  * KMS deferred to Phase 2) and writes them through Drizzle into oauth_connections.
  *
@@ -7,7 +7,7 @@
  * through `saveConnection` / `loadConnection` / `updateConnectionTokens` so
  * the encryption boundary stays in one file.
  */
-import { openString, sealString } from '@credential-broker/crypto';
+import { openString, sealString } from '@auto-nomos/crypto';
 import { and, eq } from 'drizzle-orm';
 import type { DrizzleClient } from '../db/index.js';
 import * as schema from '../db/schema.js';
@@ -193,7 +193,9 @@ function rowToStored(
   return {
     id: row.id,
     customerId: row.customerId,
-    connector: row.connector,
+    // DB enum is wider than ConnectorId (covers in-progress YAML adapters);
+    // implementations only mint rows for known IDs so the cast is safe.
+    connector: row.connector as ConnectorId,
     accountId: row.accountId,
     tokens: rowToTokens(deps, row),
     createdAt: row.createdAt,

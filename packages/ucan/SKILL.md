@@ -1,4 +1,4 @@
-# SKILL: working in @credential-broker/ucan
+# SKILL: working in @auto-nomos/ucan
 
 Read this before changing the UCAN envelope or chain validation.
 

@@ -28,6 +28,7 @@ import {
 export const planEnum = pgEnum('plan', ['free', 'pro', 'enterprise']);
 export const membershipRoleEnum = pgEnum('membership_role', ['owner', 'admin', 'member']);
 export const agentStatusEnum = pgEnum('agent_status', ['active', 'disabled', 'deleted']);
+export const agentModeEnum = pgEnum('agent_mode', ['static', 'dynamic']);
 export const oauthConnectorEnum = pgEnum('oauth_connector', [
   'github',
   'slack',
@@ -39,6 +40,17 @@ export const oauthConnectorEnum = pgEnum('oauth_connector', [
   'jira',
   'google_calendar',
   'postgres',
+  // P1 / M3 — new YAML-driven adapters
+  'google_gmail',
+  'google_drive',
+  'google_contacts',
+  'discord',
+  'telegram',
+  'dropbox',
+  'twilio',
+  'granola',
+  'perplexity',
+  'imessage',
 ]);
 export const auditDecisionEnum = pgEnum('audit_decision', ['allow', 'deny', 'stepup']);
 export const pushApprovalStateEnum = pgEnum('push_approval_state', [
@@ -160,8 +172,11 @@ export const agents = pgTable(
     did: text('did').notNull(),
     apiKeyHash: text('api_key_hash'),
     status: agentStatusEnum('status').notNull().default('active'),
+    mode: agentModeEnum('mode').notNull().default('static'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     lastActiveAt: timestamp('last_active_at', { withTimezone: true }),
+    connectionApprovedAt: timestamp('connection_approved_at', { withTimezone: true }),
+    connectionApprovedBy: uuid('connection_approved_by'),
   },
   (t) => ({
     customerIdx: index('agents_customer_idx').on(t.customerId),
@@ -412,6 +427,61 @@ export const webauthnCredentials = pgTable(
   }),
 );
 
+/**
+ * Approval Envelope — passkey-cosigned grant that bounds the resource
+ * scope of subsequent dynamic UCAN mints for an agent. The /v1/intent
+ * endpoint mints child UCANs whose `meta.resource_constraint` is a
+ * subset of `constraint`. Revoked envelopes are pushed to the PDP via
+ * the existing Sprint 8 revocation channel.
+ */
+export const envelopes = pgTable(
+  'envelopes',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    customerId: uuid('customer_id')
+      .notNull()
+      .references(() => customers.id, { onDelete: 'cascade' }),
+    agentId: uuid('agent_id')
+      .notNull()
+      .references(() => agents.id, { onDelete: 'cascade' }),
+    constraint: jsonb('constraint').notNull(),
+    actions: jsonb('actions').$type<string[]>().notNull(),
+    parentUcanCid: text('parent_ucan_cid').references(() => ucanIssues.cid),
+    createdBy: uuid('created_by').references(() => user.id),
+    /** Null when the envelope is *standing* (durable until revoked).
+     *  Otherwise the TTL boundary set at creation. */
+    expiresAt: timestamp('expires_at', { withTimezone: true }),
+    revokedAt: timestamp('revoked_at', { withTimezone: true }),
+    /** True for durable grants ("always allow this agent to read X").
+     *  Standing envelopes always require step-up + cosigner to create
+     *  and never silently mint without explicit approval. */
+    isStanding: boolean('is_standing').notNull().default(false),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    customerAgentIdx: index('envelopes_customer_agent_idx').on(t.customerId, t.agentId),
+    expiresIdx: index('envelopes_expires_idx').on(t.expiresAt),
+    standingIdx: index('envelopes_standing_idx').on(t.customerId, t.agentId, t.isStanding),
+  }),
+);
+
+/**
+ * Per-user notification preferences (P-CV4 — Telegram channel parity).
+ * Drives step-up notifier channel selection. Web push + email default
+ * to on; Telegram is opt-in and requires the user to provide their
+ * chat id from the credential-broker bot.
+ */
+export const notificationPreferences = pgTable('notification_preferences', {
+  userId: uuid('user_id')
+    .primaryKey()
+    .references(() => user.id, { onDelete: 'cascade' }),
+  telegramChatId: text('telegram_chat_id'),
+  telegramEnabled: boolean('telegram_enabled').notNull().default(false),
+  emailEnabled: boolean('email_enabled').notNull().default(true),
+  webPushEnabled: boolean('web_push_enabled').notNull().default(true),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 // ===== Relations =====
 
 export const userRelations = relations(user, ({ many }) => ({
@@ -497,4 +567,115 @@ export const mcpServersRelations = relations(mcpServers, ({ one }) => ({
 export const apiKeysRelations = relations(apiKeys, ({ one }) => ({
   customer: one(customers, { fields: [apiKeys.customerId], references: [customers.id] }),
   agent: one(agents, { fields: [apiKeys.agentId], references: [agents.id] }),
+}));
+
+export const envelopesRelations = relations(envelopes, ({ one }) => ({
+  customer: one(customers, { fields: [envelopes.customerId], references: [customers.id] }),
+  agent: one(agents, { fields: [envelopes.agentId], references: [agents.id] }),
+  createdByUser: one(user, { fields: [envelopes.createdBy], references: [user.id] }),
+  parentUcan: one(ucanIssues, {
+    fields: [envelopes.parentUcanCid],
+    references: [ucanIssues.cid],
+  }),
+}));
+
+// ===== M6: Telegram approval bot =====
+
+export const customerTelegramLinks = pgTable(
+  'customer_telegram_links',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    customerId: uuid('customer_id')
+      .notNull()
+      .references(() => customers.id, { onDelete: 'cascade' }),
+    /** Better-Auth user id who paired this chat. */
+    userId: uuid('user_id').notNull(),
+    /** Telegram chat id; numeric, but stored as text to avoid 64-bit issues. */
+    chatId: text('chat_id').notNull(),
+    /** Telegram username at link time (display only; may rotate). */
+    username: text('username'),
+    enabled: boolean('enabled').notNull().default(true),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    lastUsedAt: timestamp('last_used_at', { withTimezone: true }),
+  },
+  (t) => ({
+    customerChatUq: uniqueIndex('customer_telegram_links_customer_chat_uq').on(
+      t.customerId,
+      t.chatId,
+    ),
+    chatIdx: index('customer_telegram_links_chat_idx').on(t.chatId),
+  }),
+);
+
+export const telegramLinkTokens = pgTable(
+  'telegram_link_tokens',
+  {
+    token: text('token').primaryKey(),
+    customerId: uuid('customer_id')
+      .notNull()
+      .references(() => customers.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id').notNull(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    consumedAt: timestamp('consumed_at', { withTimezone: true }),
+  },
+  (t) => ({
+    customerIdx: index('telegram_link_tokens_customer_idx').on(t.customerId),
+  }),
+);
+
+export const customerTelegramLinksRelations = relations(customerTelegramLinks, ({ one }) => ({
+  customer: one(customers, {
+    fields: [customerTelegramLinks.customerId],
+    references: [customers.id],
+  }),
+}));
+
+export const telegramLinkTokensRelations = relations(telegramLinkTokens, ({ one }) => ({
+  customer: one(customers, {
+    fields: [telegramLinkTokens.customerId],
+    references: [customers.id],
+  }),
+}));
+
+// ===== M7: chain-context LLM intent verification =====
+
+export const chainContextFacts = pgTable(
+  'chain_context_facts',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    customerId: uuid('customer_id')
+      .notNull()
+      .references(() => customers.id, { onDelete: 'cascade' }),
+    /** Logical task identifier. Maps onto envelope or task lifecycle. */
+    taskId: text('task_id').notNull(),
+    /** Session identifier — typically the agent's interactive session. */
+    sessionId: text('session_id').notNull(),
+    /** Fact category — `id`, `email`, `address`, `amount`, `name`, `url`. */
+    factType: text('fact_type').notNull(),
+    /** Extracted value (kept short — sanitized + truncated upstream). */
+    factValue: text('fact_value').notNull(),
+    /**
+     * UCAN CID (or other request id) of the response this fact was
+     * extracted from — lets us audit + invalidate when revoked.
+     */
+    sourceRequestId: text('source_request_id'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    taskSessionIdx: index('chain_context_facts_task_session_idx').on(
+      t.customerId,
+      t.taskId,
+      t.sessionId,
+      t.createdAt,
+    ),
+    typeIdx: index('chain_context_facts_type_idx').on(t.customerId, t.factType),
+  }),
+);
+
+export const chainContextFactsRelations = relations(chainContextFacts, ({ one }) => ({
+  customer: one(customers, {
+    fields: [chainContextFacts.customerId],
+    references: [customers.id],
+  }),
 }));

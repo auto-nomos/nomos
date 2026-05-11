@@ -18,8 +18,9 @@ import {
   TableHeader,
   TableRow,
 } from '../../../components/ui/table';
-import { type ConnectorId, startOAuthConnect } from '../../../lib/oauth';
+import { type ConnectorId, OAUTH_FLOW_CONNECTORS, startOAuthConnect } from '../../../lib/oauth';
 import { trpc } from '../../../lib/trpc';
+import { ManualTokenForm } from './manual-token';
 
 const CONNECTOR_LABELS: Record<string, string> = {
   github: 'GitHub',
@@ -54,8 +55,9 @@ export default function ConnectionsPage() {
 
   const rows = list.data ?? [];
   const connectedIds = new Set(rows.map((r) => r.connector));
-  const allConnectors: ConnectorId[] = ['github', 'slack', 'google', 'notion'];
-  const unconnected = allConnectors.filter((c) => !connectedIds.has(c));
+  const unconnected = OAUTH_FLOW_CONNECTORS.filter(
+    (c) => !connectedIds.has(c as ConnectorId),
+  ) as ConnectorId[];
 
   return (
     <div className="space-y-6">
@@ -199,6 +201,8 @@ export default function ConnectionsPage() {
           </CardContent>
         </Card>
       ) : null}
+
+      <ManualTokenForm />
     </div>
   );
 }

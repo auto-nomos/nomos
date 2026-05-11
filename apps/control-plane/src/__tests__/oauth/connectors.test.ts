@@ -49,14 +49,14 @@ function ctx(fetchImpl: typeof fetch): ConnectorContext {
 }
 
 describe('connectorRegistry', () => {
-  it('exposes all 4 Sprint-5 connectors', () => {
+  it('exposes every implemented connector', () => {
     for (const id of ALL_CONNECTOR_IDS) {
       expect(connectorRegistry[id].id).toBe(id);
     }
   });
 
   it('getConnector throws on unknown id', () => {
-    expect(() => getConnector('linear' as never)).toThrow(/unknown connector/);
+    expect(() => getConnector('salesforce' as never)).toThrow(/unknown connector/);
   });
 });
 

@@ -1,5 +1,7 @@
-# Credential Broker — Agent Authorization Platform
+# Nomos — Agent Authorization Platform
 
+> Domain: [auto-nomos.com](https://auto-nomos.com) · npm scope: `@auto-nomos/*`
+>
 > The capability layer for MCP. Scoped, time-bound, revocable, delegable permissions for AI agents.
 
 ## What this is

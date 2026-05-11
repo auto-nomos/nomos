@@ -1,6 +1,6 @@
-import { generateKeypair } from '@credential-broker/crypto';
-import type { UcanPayload } from '@credential-broker/shared-types';
-import { issueUcan } from '@credential-broker/ucan';
+import { generateKeypair } from '@auto-nomos/crypto';
+import type { UcanPayload } from '@auto-nomos/shared-types';
+import { issueUcan } from '@auto-nomos/ucan';
 import pino from 'pino';
 import { describe, expect, it, vi } from 'vitest';
 import { createPolicyCache } from '../cache/policies.js';
@@ -14,7 +14,7 @@ const AGENT_ID = '11111111-1111-1111-1111-111111111111';
 const stripePolicy = `
 permit(
   principal,
-  action == Action::"/stripe/charge",
+  action == Action::"/example/charge",
   resource
 )
 when {
@@ -23,7 +23,7 @@ when {
 
 permit(
   principal,
-  action == Action::"/stripe/charge",
+  action == Action::"/example/charge",
   resource
 )
 when {
@@ -36,7 +36,7 @@ function makePayload(iss: string, aud: string, overrides: Partial<UcanPayload> =
   return {
     iss,
     aud,
-    cmd: '/stripe/charge',
+    cmd: '/example/charge',
     pol: [],
     nonce: `n-${Math.random()}`,
     nbf: now - 60,
@@ -103,7 +103,7 @@ describe('POST /v1/authorize step-up', () => {
       headers: { 'content-type': 'application/json', 'x-cb-customer': CUSTOMER },
       body: JSON.stringify({
         ucan: ucan.jwt,
-        command: '/stripe/charge',
+        command: '/example/charge',
         resource: { amount: 50 },
         context: {},
       }),
@@ -129,7 +129,7 @@ describe('POST /v1/authorize step-up', () => {
       headers: { 'content-type': 'application/json', 'x-cb-customer': CUSTOMER },
       body: JSON.stringify({
         ucan: ucan.jwt,
-        command: '/stripe/charge',
+        command: '/example/charge',
         resource: { amount: 250 },
         context: {},
       }),
@@ -151,7 +151,7 @@ describe('POST /v1/authorize step-up', () => {
       expect.objectContaining({
         customerId: CUSTOMER,
         agentId: AGENT_ID,
-        command: '/stripe/charge',
+        command: '/example/charge',
         resource: { amount: 250 },
       }),
     );
@@ -171,7 +171,7 @@ describe('POST /v1/authorize step-up', () => {
       headers: { 'content-type': 'application/json', 'x-cb-customer': CUSTOMER },
       body: JSON.stringify({
         ucan: ucan.jwt,
-        command: '/stripe/charge',
+        command: '/example/charge',
         resource: { amount: 250 },
         context: { cosigner: true },
       }),
@@ -198,7 +198,7 @@ describe('POST /v1/authorize step-up', () => {
       headers: { 'content-type': 'application/json', 'x-cb-customer': CUSTOMER },
       body: JSON.stringify({
         ucan: ucan.jwt,
-        command: '/stripe/charge',
+        command: '/example/charge',
         resource: { amount: 250 },
         context: {},
       }),
@@ -221,13 +221,13 @@ describe('POST /v1/authorize cosigner retry', () => {
       payload: makePayload(issuer.did, agent.did),
       privateKey: issuer.privateKey,
     });
-    const origCid = (await import('@credential-broker/ucan')).computeCid(requestUcan.jwt);
+    const origCid = (await import('@auto-nomos/ucan')).computeCid(requestUcan.jwt);
     const approvalId = 'aprv-cosign-1';
     const cosigner = issueUcan({
       payload: {
         iss: issuer.did,
         aud: agent.did,
-        cmd: '/stripe/charge',
+        cmd: '/example/charge',
         pol: [],
         nonce: 'cos',
         nbf: Math.floor(Date.now() / 1000) - 60,
@@ -240,7 +240,7 @@ describe('POST /v1/authorize cosigner retry', () => {
       id: approvalId,
       customerId: CUSTOMER,
       agentId: AGENT_ID,
-      command: '/stripe/charge',
+      command: '/example/charge',
       resource: { amount: 250 },
       state: 'approved',
       expiresAt: new Date(Date.now() + 60_000).toISOString(),
@@ -252,7 +252,7 @@ describe('POST /v1/authorize cosigner retry', () => {
       headers: { 'content-type': 'application/json', 'x-cb-customer': CUSTOMER },
       body: JSON.stringify({
         ucan: requestUcan.jwt,
-        command: '/stripe/charge',
+        command: '/example/charge',
         resource: { amount: 250 },
         context: {},
         cosignerJwt: cosigner.jwt,
@@ -278,7 +278,7 @@ describe('POST /v1/authorize cosigner retry', () => {
       payload: {
         iss: issuer.did,
         aud: agent.did,
-        cmd: '/stripe/charge',
+        cmd: '/example/charge',
         pol: [],
         nonce: 'cos2',
         nbf: Math.floor(Date.now() / 1000) - 60,
@@ -295,7 +295,7 @@ describe('POST /v1/authorize cosigner retry', () => {
       id: approvalId,
       customerId: CUSTOMER,
       agentId: AGENT_ID,
-      command: '/stripe/charge',
+      command: '/example/charge',
       resource: { amount: 250 },
       state: 'approved',
       expiresAt: new Date(Date.now() + 60_000).toISOString(),
@@ -307,7 +307,7 @@ describe('POST /v1/authorize cosigner retry', () => {
       headers: { 'content-type': 'application/json', 'x-cb-customer': CUSTOMER },
       body: JSON.stringify({
         ucan: requestUcan.jwt,
-        command: '/stripe/charge',
+        command: '/example/charge',
         resource: { amount: 250 },
         context: {},
         cosignerJwt: cosigner.jwt,
@@ -327,7 +327,7 @@ describe('GET /v1/stepup/:id', () => {
       id: 'aprv-123',
       customerId: CUSTOMER,
       agentId: AGENT_ID,
-      command: '/stripe/charge',
+      command: '/example/charge',
       resource: { amount: 250 },
       state: 'pending',
       expiresAt: new Date(Date.now() + 60_000).toISOString(),
@@ -350,7 +350,7 @@ describe('GET /v1/stepup/:id', () => {
       id: 'aprv-456',
       customerId: 'other-customer',
       agentId: AGENT_ID,
-      command: '/stripe/charge',
+      command: '/example/charge',
       resource: {},
       state: 'pending',
       expiresAt: new Date(Date.now() + 60_000).toISOString(),

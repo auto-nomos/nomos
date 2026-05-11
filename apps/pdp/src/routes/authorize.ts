@@ -1,14 +1,14 @@
-import type { Schema } from '@credential-broker/cedar';
-import { type DecideInput, decide } from '@credential-broker/core';
-import { sha256Hex } from '@credential-broker/crypto';
-import { actionsFor, PACKS } from '@credential-broker/schema-packs';
+import type { Schema } from '@auto-nomos/cedar';
+import { type DecideInput, decide } from '@auto-nomos/core';
+import { sha256Hex } from '@auto-nomos/crypto';
+import { actionsFor, PACKS } from '@auto-nomos/schema-packs';
 import {
   type AuthorizeDecision,
   type AuthorizeRequest,
   AuthorizeRequest as AuthorizeRequestSchema,
   type DenyReason,
-} from '@credential-broker/shared-types';
-import { canonicalize, computeCid, parseUcanJwt } from '@credential-broker/ucan';
+} from '@auto-nomos/shared-types';
+import { canonicalize, computeCid, parseUcanJwt } from '@auto-nomos/ucan';
 import { Hono } from 'hono';
 import { decisionToAudit } from '../audit/emit.js';
 import type { PolicyCache } from '../cache/policies.js';

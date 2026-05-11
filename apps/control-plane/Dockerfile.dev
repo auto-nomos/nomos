@@ -1,0 +1,53 @@
+# syntax=docker/dockerfile:1.7
+# Dev image for the control-plane.
+# Provides node_modules + tsx; source is mounted by docker-compose.dev.yml.
+# Hot reload via tsx --watch + CHOKIDAR_USEPOLLING=true.
+
+ARG NODE_VERSION=22.18.0
+ARG PNPM_VERSION=11.0.8
+
+FROM node:${NODE_VERSION}-alpine
+
+ARG PNPM_VERSION
+
+RUN apk add --no-cache git curl bash python3 make g++ libc6-compat \
+    && corepack enable \
+    && corepack prepare pnpm@${PNPM_VERSION} --activate
+
+WORKDIR /repo
+
+# Workspace metadata first for cached install
+COPY pnpm-workspace.yaml pnpm-lock.yaml package.json .npmrc tsconfig.base.json turbo.json biome.json ./
+
+# All workspace package manifests (install resolves graph)
+COPY apps/control-plane/package.json apps/control-plane/
+COPY apps/dashboard/package.json apps/dashboard/
+COPY apps/pdp/package.json apps/pdp/
+COPY packages/audit-verify/package.json packages/audit-verify/
+COPY packages/cedar/package.json packages/cedar/
+COPY packages/core/package.json packages/core/
+COPY packages/crypto/package.json packages/crypto/
+COPY packages/mcp-server/package.json packages/mcp-server/
+COPY packages/policy-builder/package.json packages/policy-builder/
+COPY packages/schema-packs/package.json packages/schema-packs/
+COPY packages/sdk-typescript/package.json packages/sdk-typescript/
+COPY packages/shared-types/package.json packages/shared-types/
+COPY packages/ucan/package.json packages/ucan/
+
+RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
+    pnpm install --frozen-lockfile --filter=@auto-nomos/control-plane...
+
+# Bake source so the image runs standalone if no host mount; compose overlays.
+COPY . ./
+
+WORKDIR /repo/apps/control-plane
+
+ENV NODE_ENV=development \
+    PORT=8788 \
+    HOSTNAME=0.0.0.0 \
+    CHOKIDAR_USEPOLLING=true \
+    WATCHPACK_POLLING=true
+
+EXPOSE 8788
+
+CMD ["pnpm", "dev"]

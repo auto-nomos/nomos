@@ -35,20 +35,29 @@ function makeFetch(map: Record<string, () => Response>): {
 }
 
 describe('PROVIDER_API', () => {
-  it('covers all 4 Sprint-5 providers', () => {
-    expect(Object.keys(PROVIDER_API).sort()).toEqual(['github', 'google', 'notion', 'slack']);
+  it('covers all implemented providers', () => {
+    expect(Object.keys(PROVIDER_API).sort()).toEqual([
+      'github',
+      'google',
+      'linear',
+      'notion',
+      'slack',
+      'stripe',
+    ]);
   });
 });
 
 describe('isKnownProvider', () => {
-  it('accepts the four implemented providers', () => {
+  it('accepts every implemented provider', () => {
     expect(isKnownProvider('github')).toBe(true);
     expect(isKnownProvider('slack')).toBe(true);
     expect(isKnownProvider('google')).toBe(true);
     expect(isKnownProvider('notion')).toBe(true);
+    expect(isKnownProvider('linear')).toBe(true);
+    expect(isKnownProvider('stripe')).toBe(true);
   });
   it('rejects everything else', () => {
-    expect(isKnownProvider('linear')).toBe(false);
+    expect(isKnownProvider('salesforce')).toBe(false);
     expect(isKnownProvider('')).toBe(false);
   });
 });

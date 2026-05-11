@@ -4,7 +4,7 @@
  *
  * Requires postgres. Set SKIP_DB_TESTS=1 to skip.
  */
-import { generateSecretboxKeyHex } from '@credential-broker/crypto';
+import { generateSecretboxKeyHex } from '@auto-nomos/crypto';
 import { hexToBytes } from '@noble/hashes/utils';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { type Config, loadConfig } from '../../config.js';

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { createAuthGuard } from '@credential-broker/sdk';
+import { createAuthGuard } from '@auto-nomos/sdk';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { Octokit } from 'octokit';
 import { createMcpGithubServer } from './server.js';

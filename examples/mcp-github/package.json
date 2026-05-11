@@ -1,5 +1,5 @@
 {
-  "name": "@credential-broker/example-mcp-github",
+  "name": "@auto-nomos/example-mcp-github",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -20,7 +20,7 @@
     "clean": "rm -rf dist .turbo"
   },
   "dependencies": {
-    "@credential-broker/sdk": "workspace:*",
+    "@auto-nomos/sdk": "workspace:*",
     "@modelcontextprotocol/sdk": "1.18.1",
     "octokit": "4.0.3",
     "zod": "3.25.76"

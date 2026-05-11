@@ -4,7 +4,7 @@
  *
  * Requires postgres. SKIP_DB_TESTS=1 to skip.
  */
-import { generateKeypair } from '@credential-broker/crypto';
+import { generateKeypair } from '@auto-nomos/crypto';
 import { createTRPCClient, httpBatchLink, type TRPCClientError } from '@trpc/client';
 import { eq } from 'drizzle-orm';
 import { pino } from 'pino';

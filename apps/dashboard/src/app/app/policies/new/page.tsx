@@ -1,6 +1,6 @@
 'use client';
 
-import { PACKS, type PolicyTemplate, templatesFor } from '@credential-broker/schema-packs';
+import { PACKS, type PolicyTemplate, templatesFor } from '@auto-nomos/schema-packs';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { PolicyEditor } from '../../../../components/policy-editor';

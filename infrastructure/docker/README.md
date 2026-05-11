@@ -48,7 +48,7 @@ Sprint 5 introduces OAuth providers (GitHub, Slack, Google, Notion) which requir
 
 ```bash
 pnpm db:up                                            # start postgres
-pnpm --filter @credential-broker/control-plane dev    # control-plane on :8788
+pnpm --filter @auto-nomos/control-plane dev    # control-plane on :8788
 pnpm tunnel                                           # cloudflared quick tunnel
 # look for https://<random>.trycloudflare.com in the cloudflared output
 ```

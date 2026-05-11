@@ -1,4 +1,4 @@
-# @credential-broker/schema-packs
+# @auto-nomos/schema-packs
 
 Per-integration schema packs. Sprint 7 ships 20 starter policy templates
 (5 each × 4 integrations: github / slack / google / notion). Sprint 10
@@ -13,7 +13,7 @@ import {
   listTemplates,
   templateById,
   templatesFor,
-} from '@credential-broker/schema-packs';
+} from '@auto-nomos/schema-packs';
 ```
 
 - `PACKS` — every `IntegrationPack` (id, name, templates).

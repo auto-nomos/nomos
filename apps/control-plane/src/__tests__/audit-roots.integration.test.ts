@@ -6,7 +6,7 @@
  * Requires postgres. SKIP_DB_TESTS=1 to skip.
  */
 import { randomBytes } from 'node:crypto';
-import { generateKeypair, verifyDetached } from '@credential-broker/crypto';
+import { generateKeypair, verifyDetached } from '@auto-nomos/crypto';
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils';
 import { eq } from 'drizzle-orm';
 import pino from 'pino';

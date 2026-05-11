@@ -1,4 +1,4 @@
-import { sha256Hex } from '@credential-broker/crypto';
+import { sha256Hex } from '@auto-nomos/crypto';
 
 /**
  * Compute a content identifier for a UCAN JWT.

@@ -1,0 +1,31 @@
+# syntax=docker/dockerfile:1.7
+ARG NODE_VERSION=22.18.0
+ARG PNPM_VERSION=11.0.8
+
+FROM node:${NODE_VERSION}-alpine
+
+ARG PNPM_VERSION
+RUN apk add --no-cache git curl bash python3 make g++ libc6-compat \
+    && corepack enable \
+    && corepack prepare pnpm@${PNPM_VERSION} --activate
+
+WORKDIR /repo
+
+COPY pnpm-workspace.yaml pnpm-lock.yaml package.json .npmrc tsconfig.base.json turbo.json biome.json ./
+COPY apps/egress-proxy/package.json apps/egress-proxy/
+
+RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
+    pnpm install --frozen-lockfile --filter=@auto-nomos/egress-proxy...
+
+COPY . ./
+
+WORKDIR /repo/apps/egress-proxy
+
+ENV NODE_ENV=development \
+    EGRESS_PROXY_HOST=0.0.0.0 \
+    EGRESS_PROXY_PORT=25290 \
+    CHOKIDAR_USEPOLLING=true
+
+EXPOSE 25290
+
+CMD ["pnpm", "dev"]

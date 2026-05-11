@@ -1,4 +1,4 @@
-# SKILL: working in @credential-broker/cedar
+# SKILL: working in @auto-nomos/cedar
 
 Read this before changing how Cedar policies are parsed or evaluated.
 

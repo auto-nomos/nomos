@@ -32,16 +32,29 @@
         "noConsole": {
           "level": "warn",
           "options": { "allow": ["error", "warn", "info"] }
-        }
+        },
+        "noArrayIndexKey": "warn",
+        "noUnknownAtRules": "off",
+        "noAssignInExpressions": "warn",
+        "noImplicitAnyLet": "warn"
       },
       "style": {
         "noNonNullAssertion": "warn",
         "useImportType": "error",
-        "useNodejsImportProtocol": "error"
+        "useNodejsImportProtocol": "error",
+        "useTemplate": "warn"
       },
       "correctness": {
         "noUnusedImports": "error",
-        "noUnusedVariables": "error"
+        "noUnusedVariables": "error",
+        "useExhaustiveDependencies": "warn"
+      },
+      "complexity": {
+        "useOptionalChain": "warn"
+      },
+      "a11y": {
+        "useValidAnchor": "warn",
+        "useAriaPropsSupportedByRole": "warn"
       }
     }
   },

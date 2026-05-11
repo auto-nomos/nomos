@@ -1,4 +1,4 @@
-# @credential-broker/cedar
+# @auto-nomos/cedar
 
 Cedar policy parsing, evaluation, lint, and schema validation. Wraps `@cedar-policy/cedar-wasm` (the official AWS Rust SDK as WASM).
 
@@ -9,7 +9,7 @@ The PDP and control plane need to parse Cedar policy text, evaluate authorizatio
 ## Install (workspace)
 
 ```ts
-import { parsePolicy, evaluate, validateSchema, lintPolicy } from '@credential-broker/cedar';
+import { parsePolicy, evaluate, validateSchema, lintPolicy } from '@auto-nomos/cedar';
 ```
 
 ## Public API
@@ -72,7 +72,7 @@ A `format` warning means the text parses but doesn't match Cedar's preferred for
 ## Tests
 
 ```bash
-pnpm --filter @credential-broker/cedar test
+pnpm --filter @auto-nomos/cedar test
 ```
 
 100% line+branch+function coverage required.
