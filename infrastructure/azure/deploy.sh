@@ -74,6 +74,10 @@ else
 fi
 chown -R "$SERVICE_USER:$SERVICE_USER" /opt/nomos
 
+# Remove stale tsconfig.tsbuildinfo files — if rsync brought them without dist/,
+# tsc incremental build skips compilation and produces no output.
+find "$APP_DIR" -name "tsconfig.tsbuildinfo" -not -path "*/node_modules/*" -delete
+
 # ── 8. Generate secrets (first run only) ─────────────────────────────────────
 if [[ ! -f "$ENV_FILE" ]]; then
   log "Generating secrets (first run)..."
