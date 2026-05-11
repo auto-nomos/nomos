@@ -39,36 +39,56 @@ This builds + packs:
 …and verifies each tarball contains `package.json` + `dist/`. Add more packages to
 `scripts/pack-smoke.mts` (`TARGETS`) before publishing them.
 
-## Publish order
+## Publish — DO NOT use `npm publish`
 
-Publish dependencies first, then dependents. Each `npm publish --access public` from inside the
-package directory.
+The recipe is `pnpm publish -r` from the repo root. `pnpm` rewrites `workspace:*`
+ranges to real semver at pack time; `npm publish` ships the literal string and the
+tarball fails to install with `EUNSUPPORTEDPROTOCOL: Unsupported URL Type "workspace:"`.
+
+Single command (interactive — must be your real terminal, not a non-TTY subprocess):
 
 ```sh
-# 1. Leaf packages (no internal Nomos deps)
-pnpm --filter @auto-nomos/shared-types build && (cd packages/shared-types && npm publish --access public)
-pnpm --filter @auto-nomos/crypto       build && (cd packages/crypto       && npm publish --access public)
-
-# 2. Packages that depend only on leaves
-pnpm --filter @auto-nomos/cedar          build && (cd packages/cedar          && npm publish --access public)
-pnpm --filter @auto-nomos/ucan           build && (cd packages/ucan           && npm publish --access public)
-pnpm --filter @auto-nomos/schema-packs   build && (cd packages/schema-packs   && npm publish --access public)
-pnpm --filter @auto-nomos/policy-builder build && (cd packages/policy-builder && npm publish --access public)
-pnpm --filter @auto-nomos/audit-verify   build && (cd packages/audit-verify   && npm publish --access public)
-pnpm --filter @auto-nomos/adapters       build && (cd packages/adapters       && npm publish --access public)
-
-# 3. Packages that compose the above
-pnpm --filter @auto-nomos/core       build && (cd packages/core       && npm publish --access public)
-pnpm --filter @auto-nomos/sdk        build && (cd packages/sdk-typescript && npm publish --access public)
-pnpm --filter @auto-nomos/mcp-server build && (cd packages/mcp-server && npm publish --access public)
-
-# 4. CLI last (bin)
-pnpm --filter @auto-nomos/cli build && (cd packages/cli && npm publish --access public)
+pnpm -w build           # build every package first
+pnpm test:packs         # pack-smoke verifies tarball layout
+pnpm publish -r --access public
 ```
 
-`pnpm publish` resolves `workspace:*` ranges to the actual versions automatically, so the
-published `dependencies` look like `"@auto-nomos/crypto": "^0.0.0"` — npm can resolve them once the
-leaf packages are on the registry.
+`pnpm publish` will:
+1. Prompt once for your npm 2FA OTP
+2. Skip already-published versions
+3. Walk the workspace dep graph and publish leaves first
+4. Rewrite each `workspace:*` to `^<version>` in the actual tarball
+
+If your terminal is non-interactive (CI), use a granular token + `--no-git-checks`:
+
+```sh
+NPM_TOKEN=$(...) pnpm publish -r --access public --no-git-checks
+```
+
+### History — what NOT to repeat (2026-05-11)
+
+The original publish ran `npm publish` per-package. All 12 tarballs at v0.0.0 had
+literal `workspace:*` in `dependencies` and were uninstallable. Fix recipe:
+
+1. Add a changeset bumping every shippable package to patch (sdk had a pending minor)
+2. `pnpm changeset version && pnpm install --lockfile-only`
+3. `pnpm test:packs`
+4. `pnpm publish -r --access public --no-git-checks` (entered OTP interactively)
+5. Deprecate the broken versions:
+   ```sh
+   read -p "OTP: " OTP
+   for p in shared-types crypto cedar ucan schema-packs policy-builder \
+            audit-verify adapters core sdk mcp-server cli; do
+     npm deprecate "@auto-nomos/$p@0.0.0" \
+       "0.0.0 shipped with broken workspace:* deps; use ^0.0.1 (sdk: ^0.1.0)" \
+       --otp="$OTP"
+   done
+   ```
+
+`.changeset/config.json` ignore list must include every workspace package that is
+NOT being published (`control-plane`, `pdp`, `dashboard`, `egress-proxy`,
+`example-mcp-github`), otherwise `pnpm changeset version` errors when a dependent
+references an ignored package.
 
 ## Version bumping
 
@@ -79,7 +99,10 @@ pnpm install --lockfile-only
 git commit -am "release: bump versions"
 ```
 
-Then re-run the publish sequence above.
+Then re-run the publish command (`pnpm publish -r --access public`).
+
+Versions currently shipped (2026-05-11): all packages at `0.0.1` except
+`@auto-nomos/sdk` at `0.1.0`.
 
 ## After publish
 
