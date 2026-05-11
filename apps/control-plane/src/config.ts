@@ -110,5 +110,10 @@ const Config = z.object({
 export type Config = z.infer<typeof Config>;
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
-  return Config.parse(env);
+  // Empty strings from env files mean "not set"; convert to undefined so
+  // optional validators (.url(), .min(1)) don't fail on blank lines.
+  const cleaned = Object.fromEntries(
+    Object.entries(env).map(([k, v]) => [k, v === '' ? undefined : v]),
+  );
+  return Config.parse(cleaned);
 }
