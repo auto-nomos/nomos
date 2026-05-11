@@ -156,7 +156,6 @@ R2_AUDIT_SECRET_ACCESS_KEY=
 ENVEOF
 
   chmod 600 "$ENV_FILE"
-  chown "$SERVICE_USER:$SERVICE_USER" "$ENV_FILE"
   log ".env.local created (secrets generated)"
 fi
 
@@ -171,33 +170,29 @@ log "Infra healthy."
 
 # ── 10. Install deps ──────────────────────────────────────────────────────────
 log "Installing dependencies (this may take a few minutes)..."
-sudo -u "$SERVICE_USER" pnpm install --frozen-lockfile
+pnpm install --frozen-lockfile
 
 # ── 11. Build ─────────────────────────────────────────────────────────────────
 log "Building all packages..."
-sudo -u "$SERVICE_USER" NODE_OPTIONS="--max-old-space-size=768" pnpm build
+NODE_OPTIONS="--max-old-space-size=768" pnpm build
 
 # ── 12. Generate signing keys (first run only) ────────────────────────────────
 if ! grep -q "^CONTROL_PLANE_BUNDLE_SIGN_KEY=[a-f0-9]" "$ENV_FILE" 2>/dev/null; then
   log "Generating Ed25519 signing keys..."
-  # gen-keys reads/writes process.cwd()/.env.local — ensure CWD = APP_DIR
-  sudo -u "$SERVICE_USER" bash -c "cd $APP_DIR && pnpm gen-keys"
-  # reload env with newly written keys
+  pnpm gen-keys   # writes to APP_DIR/.env.local (since CWD = APP_DIR)
   set -a; source "$ENV_FILE"; set +a
   log "Signing keys written to .env.local"
 fi
 
 # ── 13. DB migrations ─────────────────────────────────────────────────────────
 log "Running DB migrations..."
-sudo -u "$SERVICE_USER" bash -c "
-  cd $APP_DIR
-  set -a; source .env.local; set +a
-  pnpm --filter @auto-nomos/control-plane db:migrate
-"
+pnpm --filter @auto-nomos/control-plane db:migrate
 log "Migrations done."
 
 # ── 14. Systemd services ──────────────────────────────────────────────────────
 log "Installing systemd services..."
+
+NODE_BIN=$(which node)
 
 cat > /etc/systemd/system/nomos-control-plane.service <<UNIT
 [Unit]
@@ -207,11 +202,10 @@ Requires=docker.service
 
 [Service]
 Type=simple
-User=${SERVICE_USER}
 WorkingDirectory=${APP_DIR}
 EnvironmentFile=${ENV_FILE}
 Environment=PORT=8788
-ExecStart=/usr/bin/node apps/control-plane/dist/index.js
+ExecStart=${NODE_BIN} apps/control-plane/dist/index.js
 Restart=on-failure
 RestartSec=5s
 StandardOutput=journal
@@ -230,11 +224,10 @@ Requires=docker.service
 
 [Service]
 Type=simple
-User=${SERVICE_USER}
 WorkingDirectory=${APP_DIR}
 EnvironmentFile=${ENV_FILE}
 Environment=PORT=8787
-ExecStart=/usr/bin/node apps/pdp/dist/index.js
+ExecStart=${NODE_BIN} apps/pdp/dist/index.js
 Restart=on-failure
 RestartSec=5s
 StandardOutput=journal
