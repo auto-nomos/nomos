@@ -4,6 +4,7 @@ import type { Config } from '../config.js';
 import type { Db } from '../db/index.js';
 import * as schema from '../db/schema.js';
 import type { Logger } from '../logger.js';
+import type { TelegramBot } from '../services/notify/telegram-bot.js';
 import {
   noopRevocationPublisher,
   type RevocationPublisher,
@@ -22,6 +23,8 @@ export interface ContextDeps {
   webauthn?: WebAuthnConfig;
   /** OAuth refresh deps. Required for oauth.refresh / oauth.disconnect. */
   oauth?: { config: Config; encryptionKey: Uint8Array };
+  /** Telegram bot for event notifications. Optional — omit in tests. */
+  telegramBot?: TelegramBot;
 }
 
 export interface Context {
@@ -31,6 +34,7 @@ export interface Context {
   revocationPublisher: RevocationPublisher;
   webauthn: WebAuthnConfig | null;
   oauth: { config: Config; encryptionKey: Uint8Array } | null;
+  telegramBot: TelegramBot | null;
   session: {
     user: { id: string; email: string; name: string | null };
     token: string;
@@ -78,6 +82,7 @@ export async function createContext(req: Request, deps: ContextDeps): Promise<Co
     revocationPublisher: deps.revocationPublisher ?? noopRevocationPublisher(),
     webauthn: deps.webauthn ?? null,
     oauth: deps.oauth ?? null,
+    telegramBot: deps.telegramBot ?? null,
     session: userPayload,
     customerId,
   };

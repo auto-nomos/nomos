@@ -5,7 +5,9 @@ import {
   Boxes,
   CheckCircle2,
   CircleSlash,
+  Clock,
   FileLock2,
+  KeyRound,
   Plug,
   ShieldAlert,
   ShieldCheck,
@@ -21,6 +23,7 @@ export default function AppHomePage() {
   const policies = trpc.policies.list.useQuery();
   const audit = trpc.audit.list.useQuery({ limit: 8 });
   const connections = trpc.oauth.list.useQuery();
+  const pending = trpc.stepup.listPending.useQuery(undefined, { refetchInterval: 5_000 });
 
   const allows = (audit.data ?? []).filter((r) => r.decision === 'allow').length;
   const denies = (audit.data ?? []).filter((r) => r.decision === 'deny').length;
@@ -69,6 +72,8 @@ export default function AppHomePage() {
           accent="signal"
         />
       </section>
+
+      {(pending.data?.length ?? 0) > 0 ? <PendingApprovals rows={pending.data ?? []} /> : null}
 
       <section className="grid grid-cols-12 gap-6">
         <RecentDecisions
@@ -343,6 +348,70 @@ function QuickStart() {
         </Link>
       </div>
     </article>
+  );
+}
+
+/* ─── Pending approvals ───────────────────────────────────────────────── */
+
+interface PendingRow {
+  id: string;
+  agentId: string;
+  agentName: string | null;
+  command: string | null;
+  resource: unknown;
+  expiresAt: Date | string;
+  requestedAt: Date | string | null;
+}
+
+function PendingApprovals({ rows }: { rows: PendingRow[] }) {
+  return (
+    <section className="overflow-hidden rounded-sm border border-aegis-amber/50 bg-aegis-amber/5">
+      <div className="flex items-center gap-3 border-b border-aegis-amber/30 px-6 py-4">
+        <Clock className="h-4 w-4 text-aegis-amber" />
+        <div>
+          <div className="font-mono text-[11px] uppercase tracking-[0.18em] text-aegis-amber">
+            action required
+          </div>
+          <h2 className="mt-0.5 font-display text-xl text-aegis-paper">
+            {rows.length} pending step-up{rows.length !== 1 ? 's' : ''}
+          </h2>
+        </div>
+      </div>
+      <ul className="divide-y divide-aegis-amber/20">
+        {rows.map((r) => {
+          const secsLeft = Math.max(
+            0,
+            Math.round((new Date(r.expiresAt).getTime() - Date.now()) / 1000),
+          );
+          return (
+            <li
+              key={r.id}
+              className="grid grid-cols-[minmax(0,1fr)_120px_140px] items-center gap-4 px-6 py-4"
+            >
+              <div className="min-w-0">
+                <div className="truncate font-mono text-sm text-aegis-paper">
+                  {r.command ?? '—'}
+                </div>
+                <div className="mt-0.5 truncate text-xs text-aegis-mute">
+                  {r.agentName ?? r.agentId.slice(0, 8)}
+                </div>
+              </div>
+              <span className="font-mono text-xs text-aegis-amber tabular-nums">
+                {secsLeft}s left
+              </span>
+              <Link
+                href={`/approve/${r.id}`}
+                className="inline-flex items-center justify-end gap-1.5 font-mono text-xs uppercase tracking-[0.14em] text-aegis-signal transition-colors hover:underline"
+              >
+                <KeyRound className="h-3.5 w-3.5" />
+                Approve
+                <ArrowUpRight className="h-3 w-3" />
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
   );
 }
 

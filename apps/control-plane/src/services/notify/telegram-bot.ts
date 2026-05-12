@@ -80,6 +80,8 @@ export interface TelegramBot {
   stop(): void;
   sendStepUp(args: SendStepUpArgs): Promise<boolean>;
   mintLinkToken(args: MintTokenArgs): Promise<MintedToken>;
+  /** Send a plain-text Markdown message to every enabled Telegram link for a customer. */
+  sendToCustomer(customerId: string, text: string): Promise<void>;
 }
 
 export function createTelegramBot(opts: TelegramBotOptions): TelegramBot {
@@ -347,5 +349,24 @@ export function createTelegramBot(opts: TelegramBotOptions): TelegramBot {
     return { token, deepLink, expiresAt };
   }
 
-  return { start, stop, sendStepUp, mintLinkToken };
+  async function sendToCustomer(customerId: string, text: string): Promise<void> {
+    const links = await opts.db
+      .select({ chatId: customerTelegramLinks.chatId })
+      .from(customerTelegramLinks)
+      .where(
+        and(
+          eq(customerTelegramLinks.customerId, customerId),
+          eq(customerTelegramLinks.enabled, true),
+        ),
+      );
+    await Promise.all(
+      links.map((l) =>
+        sendMessage({ chatId: l.chatId, text }).catch((err) => {
+          opts.logger.warn({ err, customerId }, 'telegram-bot: sendToCustomer failed for chat');
+        }),
+      ),
+    );
+  }
+
+  return { start, stop, sendStepUp, mintLinkToken, sendToCustomer };
 }

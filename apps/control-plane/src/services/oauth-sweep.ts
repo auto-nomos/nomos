@@ -18,6 +18,7 @@ import type { Config } from '../config.js';
 import type { DrizzleClient } from '../db/index.js';
 import * as schema from '../db/schema.js';
 import type { Logger } from '../logger.js';
+import type { TelegramBot } from './notify/telegram-bot.js';
 import { type RefreshDeps, RefreshError, refreshConnection } from './oauth-refresh.js';
 
 export interface OAuthSweepDeps {
@@ -37,6 +38,8 @@ export interface OAuthSweepDeps {
   intervalMs?: number;
   /** Override clock for tests. */
   now?: () => number;
+  /** Telegram bot — when set, sends a message to the customer on refresh failure. */
+  telegramBot?: TelegramBot;
 }
 
 export interface OAuthSweepHandle {
@@ -113,6 +116,12 @@ export function createOAuthSweep(deps: OAuthSweepDeps): OAuthSweepHandle {
               { connectionId: c.id, connector: c.connector, code: err.code },
               'sweep: refresh failed',
             );
+            void deps.telegramBot
+              ?.sendToCustomer(
+                c.customerId,
+                `⚠️ *OAuth refresh failed*: \`${c.connector}\` connection needs re-authentication.\nError: \`${err.code}\`\nVisit the dashboard to reconnect.`,
+              )
+              .catch(() => {});
           } else {
             deps.logger.error(
               { err, connectionId: c.id, connector: c.connector },

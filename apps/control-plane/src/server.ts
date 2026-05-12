@@ -15,6 +15,7 @@ import { createMintUcanRoutes } from './routes/mint-ucan.js';
 import { createOAuthRoutes } from './routes/oauth.js';
 import { createSkillRoutes } from './routes/skill.js';
 import type { CoherenceVerifier } from './services/intent-coherence.js';
+import type { TelegramBot } from './services/notify/telegram-bot.js';
 import type { RevocationPublisher } from './services/revocation-publisher.js';
 import type { StepUpNotifier } from './services/stepup/notify.js';
 import type { WebAuthnConfig } from './services/stepup/webauthn.js';
@@ -52,6 +53,8 @@ export interface ServerDeps {
   };
   /** Sprint 9 — WebAuthn config (RP id + origin) for passkey approval. */
   webauthn?: WebAuthnConfig;
+  /** Telegram bot for customer event notifications. */
+  telegramBot?: TelegramBot;
   /** P-CV1 — Optional LLM intent coherence verifier. When omitted,
    *  /v1/intent skips the coherence step entirely. */
   coherenceVerifier?: CoherenceVerifier;
@@ -134,6 +137,7 @@ export function createServer(deps: ServerDeps): Hono {
       ...(deps.oauth
         ? { oauth: { config: deps.oauth.config, encryptionKey: deps.oauth.encryptionKey } }
         : {}),
+      ...(deps.telegramBot ? { telegramBot: deps.telegramBot } : {}),
     }),
   );
 

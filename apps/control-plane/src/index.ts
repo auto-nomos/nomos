@@ -159,6 +159,7 @@ async function main(): Promise<void> {
     },
     webauthn: deriveWebAuthnConfig(config.DASHBOARD_PUBLIC_URL),
     ...(coherenceVerifier ? { coherenceVerifier } : {}),
+    ...(telegramBot ? { telegramBot } : {}),
     skills: {
       controlPlanePublicUrl: config.CONTROL_PLANE_PUBLIC_URL,
       pdpPublicUrl: process.env.PDP_PUBLIC_URL ?? 'http://localhost:8787',
@@ -171,6 +172,7 @@ async function main(): Promise<void> {
     encryptionKey,
     config,
     logger,
+    ...(telegramBot ? { telegramBot } : {}),
   });
   sweep.start();
   logger.info('oauth refresh sweep started (interval=1h, lookahead=24h)');

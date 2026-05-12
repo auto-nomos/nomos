@@ -112,6 +112,12 @@ export const ucansRouter = router({
           { cid: input.cid, customerId: ctx.customerId, ...result },
           'revocation pushed to PDP webhooks',
         );
+        void ctx.telegramBot
+          ?.sendToCustomer(
+            ctx.customerId,
+            `🚫 *UCAN revoked* by ${ctx.session.user.email}\nCID: \`${input.cid.slice(0, 24)}...\`${input.reason ? `\nReason: ${input.reason}` : ''}`,
+          )
+          .catch(() => {});
       }
       return { cid: input.cid, revoked: revoked !== undefined };
     }),

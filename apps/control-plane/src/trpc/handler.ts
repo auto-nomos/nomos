@@ -3,6 +3,7 @@ import type { Auth } from '../auth/index.js';
 import type { Config } from '../config.js';
 import type { Db } from '../db/index.js';
 import type { Logger } from '../logger.js';
+import type { TelegramBot } from '../services/notify/telegram-bot.js';
 import type { RevocationPublisher } from '../services/revocation-publisher.js';
 import type { WebAuthnConfig } from '../services/stepup/webauthn.js';
 import { createContext } from './context.js';
@@ -16,6 +17,7 @@ export interface TrpcHandlerDeps {
   revocationPublisher?: RevocationPublisher;
   webauthn?: WebAuthnConfig;
   oauth?: { config: Config; encryptionKey: Uint8Array };
+  telegramBot?: TelegramBot;
 }
 
 export function handleTrpc(req: Request, deps: TrpcHandlerDeps): Promise<Response> {
@@ -32,6 +34,7 @@ export function handleTrpc(req: Request, deps: TrpcHandlerDeps): Promise<Respons
         ...(deps.revocationPublisher ? { revocationPublisher: deps.revocationPublisher } : {}),
         ...(deps.webauthn ? { webauthn: deps.webauthn } : {}),
         ...(deps.oauth ? { oauth: deps.oauth } : {}),
+        ...(deps.telegramBot ? { telegramBot: deps.telegramBot } : {}),
       }),
     onError: ({ error, path }) => {
       deps.logger.error({ err: error, path }, 'trpc error');

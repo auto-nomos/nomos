@@ -38,6 +38,12 @@ export const agentsRouter = router({
       if (!agent) {
         throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'agent insert failed' });
       }
+      void ctx.telegramBot
+        ?.sendToCustomer(
+          ctx.customerId,
+          `🤖 *App created*: \`${agent.name}\`\nCreated by: ${ctx.session.user.email}`,
+        )
+        .catch(() => {});
       return agent;
     }),
 

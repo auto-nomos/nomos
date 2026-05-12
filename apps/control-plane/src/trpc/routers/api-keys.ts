@@ -85,6 +85,12 @@ export const apiKeysRouter = router({
       if (!created) {
         throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'api key insert failed' });
       }
+      void ctx.telegramBot
+        ?.sendToCustomer(
+          ctx.customerId,
+          `🔑 *API key issued*: \`${created.name}\` for app \`${agent.name}\`\nKey prefix: \`${created.prefix.slice(0, 20)}...\``,
+        )
+        .catch(() => {});
       return {
         id: created.id,
         agentId: created.agentId,

@@ -10,7 +10,7 @@
  *   deny               — flip state to denied.
  */
 import { TRPCError } from '@trpc/server';
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, gt } from 'drizzle-orm';
 import { z } from 'zod';
 import * as schema from '../../db/schema.js';
 import {
@@ -53,6 +53,32 @@ const AuthenticationResponseSchema = z
   .passthrough();
 
 export const stepupRouter = router({
+  /** All non-expired pending approvals for the current customer (for dashboard widget). */
+  listPending: tenantProcedure.query(async ({ ctx }) => {
+    const now = new Date();
+    return ctx.db.drizzle
+      .select({
+        id: schema.pushApprovals.id,
+        agentId: schema.pushApprovals.agentId,
+        agentName: schema.agents.name,
+        command: schema.pushApprovals.command,
+        resource: schema.pushApprovals.resource,
+        expiresAt: schema.pushApprovals.expiresAt,
+        requestedAt: schema.pushApprovals.requestedAt,
+      })
+      .from(schema.pushApprovals)
+      .leftJoin(schema.agents, eq(schema.pushApprovals.agentId, schema.agents.id))
+      .where(
+        and(
+          eq(schema.pushApprovals.customerId, ctx.customerId),
+          eq(schema.pushApprovals.state, 'pending'),
+          gt(schema.pushApprovals.expiresAt, now),
+        ),
+      )
+      .orderBy(desc(schema.pushApprovals.requestedAt))
+      .limit(20);
+  }),
+
   /** Returns the latest pending approval for an agent in the current customer. */
   latestForAgent: tenantProcedure
     .input(z.object({ agentId: z.string().uuid() }))
