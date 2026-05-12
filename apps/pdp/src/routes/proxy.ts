@@ -12,9 +12,10 @@
  */
 import type { Schema } from '@auto-nomos/cedar';
 import { type DecideInput, decide } from '@auto-nomos/core';
+import { sha256Hex } from '@auto-nomos/crypto';
 import { actionsFor, PACKS } from '@auto-nomos/schema-packs';
 import { AuthorizeRequest as AuthorizeRequestSchema } from '@auto-nomos/shared-types';
-import { parseUcanJwt } from '@auto-nomos/ucan';
+import { canonicalize, parseUcanJwt } from '@auto-nomos/ucan';
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { validateGithubProxyCall } from '../adapters/github.js';
@@ -104,7 +105,11 @@ export function createProxyRoutes(deps: ProxyRouteDeps): Hono {
       return c.json(
         {
           allow: false,
-          decision: { allow: false, reason: 'unknown_command' },
+          decision: {
+            allow: false,
+            reason: 'unknown_command',
+            receiptId: sha256Hex(`unknown-command|${request.command}`),
+          },
           error_code: 'unknown_command',
         },
         403,
@@ -222,7 +227,13 @@ export function createProxyRoutes(deps: ProxyRouteDeps): Hono {
         return c.json(
           {
             allow: false,
-            decision: { allow: false, reason: 'resource_out_of_scope' },
+            decision: {
+              allow: false,
+              reason: 'resource_out_of_scope',
+              receiptId: sha256Hex(
+                `proxy-out-of-scope|${request.command}|${canonicalize(request as unknown as Record<string, unknown>)}`,
+              ),
+            },
             error_code: 'resource_out_of_scope',
             adapter_reason: ghCheck.reason,
           },

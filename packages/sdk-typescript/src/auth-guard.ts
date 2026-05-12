@@ -426,7 +426,16 @@ function parseProxyResponse(body: unknown): ProxyResult {
 function isAuthorizeDecision(v: unknown): v is AuthorizeDecision {
   if (typeof v !== 'object' || v === null) return false;
   const r = v as Record<string, unknown>;
-  return typeof r.allow === 'boolean' && typeof r.receiptId === 'string';
+  if (typeof r.allow !== 'boolean') return false;
+  // PDP must always send receiptId, but older deny paths (unknown_command,
+  // resource_out_of_scope) historically omitted it. Backfill a synthetic id
+  // so the decision still surfaces with its true reason instead of being
+  // masked as `pdp_invalid_response`.
+  if (typeof r.receiptId !== 'string') {
+    const reason = typeof r.reason === 'string' ? r.reason : 'unknown_reason';
+    (r as { receiptId: string }).receiptId = `pdp-synth-${reason}`;
+  }
+  return true;
 }
 
 function sleep(ms: number): Promise<void> {
