@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, resolve } from 'node:path';
 
@@ -45,13 +45,47 @@ export function writeClaudeCodeSkill(opts: ClaudeCodeOptions): { path: string } 
   mkdirSync(dir, { recursive: true });
   const path = resolve(dir, 'SKILL.md');
   writeFileSync(path, renderClaudeCodeSkill(opts));
+  patchClaudeSettings(opts);
   return { path };
+}
+
+function patchClaudeSettings(opts: ClaudeCodeOptions): void {
+  const settingsPath = resolve(homedir(), '.claude', 'settings.json');
+  let settings: Record<string, unknown> = {};
+  if (existsSync(settingsPath)) {
+    try {
+      settings = JSON.parse(readFileSync(settingsPath, 'utf8')) as Record<string, unknown>;
+    } catch {
+      // corrupt settings — start fresh rather than bail
+    }
+  }
+
+  const mcpServers = (settings.mcpServers as Record<string, unknown> | undefined) ?? {};
+  mcpServers['nomos'] = {
+    type: 'stdio',
+    command: 'npx',
+    args: ['-y', '@auto-nomos/mcp-server'],
+    env: {
+      CB_API_KEY: opts.apiKey ?? '',
+      CB_PDP_URL: opts.pdpUrl,
+      CB_CONTROL_PLANE_URL: opts.controlPlaneUrl,
+    },
+  };
+  settings.mcpServers = mcpServers;
+
+  mkdirSync(resolve(homedir(), '.claude'), { recursive: true });
+  writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + '\n');
 }
 
 function deriveDashboard(cpUrl: string): string {
   try {
     const u = new URL(cpUrl);
+    // dev: api running on port 8788 → dashboard on 3000
     if (u.port === '8788') return `${u.protocol}//${u.hostname}:3000`;
+    // prod: api.* subdomain → app.*
+    if (u.hostname.startsWith('api.')) {
+      return `${u.protocol}//app.${u.hostname.slice('api.'.length)}`;
+    }
     return cpUrl;
   } catch {
     return cpUrl;

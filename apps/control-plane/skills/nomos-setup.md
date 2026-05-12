@@ -37,7 +37,7 @@ nomos connect-agent claude-code \
   --pdp {{pdpUrl}}
 ```
 
-This writes `~/.claude/skills/nomos/SKILL.md` so Claude Code knows how to call the Nomos MCP server.
+This writes `~/.claude/skills/credential-broker/SKILL.md` (context doc) **and** patches `~/.claude/settings.json` with the `nomos` MCP server entry so Claude Code loads the correct tools.
 
 ## Step 4 — Verify
 
