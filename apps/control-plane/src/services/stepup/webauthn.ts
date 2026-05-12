@@ -132,6 +132,7 @@ export async function verifyRegistration(args: {
     expectedChallenge: expected,
     expectedOrigin: args.config.origin,
     expectedRPID: args.config.rpId,
+    requireUserVerification: false,
   });
   if (!verification.verified || !verification.registrationInfo) {
     return { ok: false };
@@ -201,6 +202,7 @@ export async function verifyAuthentication(args: {
     expectedChallenge: expected,
     expectedOrigin: args.config.origin,
     expectedRPID: args.config.rpId,
+    requireUserVerification: false,
     credential: {
       id: stored.credentialId,
       publicKey,

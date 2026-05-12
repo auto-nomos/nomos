@@ -111,6 +111,41 @@ export const stepupRouter = router({
       return { ...row, state: effectiveState };
     }),
 
+  /** List passkeys registered to the current user. */
+  listCredentials: tenantProcedure.query(async ({ ctx }) => {
+    return ctx.db.drizzle
+      .select({
+        id: schema.webauthnCredentials.id,
+        credentialId: schema.webauthnCredentials.credentialId,
+        name: schema.webauthnCredentials.name,
+        transports: schema.webauthnCredentials.transports,
+        createdAt: schema.webauthnCredentials.createdAt,
+        lastUsedAt: schema.webauthnCredentials.lastUsedAt,
+      })
+      .from(schema.webauthnCredentials)
+      .where(eq(schema.webauthnCredentials.userId, ctx.session.user.id))
+      .orderBy(desc(schema.webauthnCredentials.createdAt));
+  }),
+
+  /** Remove a passkey by uuid; only the owning user may delete. */
+  removeCredential: tenantProcedure
+    .input(z.object({ id: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      const deleted = await ctx.db.drizzle
+        .delete(schema.webauthnCredentials)
+        .where(
+          and(
+            eq(schema.webauthnCredentials.id, input.id),
+            eq(schema.webauthnCredentials.userId, ctx.session.user.id),
+          ),
+        )
+        .returning({ id: schema.webauthnCredentials.id });
+      if (deleted.length === 0) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'credential_not_found' });
+      }
+      return { removed: true };
+    }),
+
   registerOptions: tenantProcedure.mutation(async ({ ctx }) => {
     if (!ctx.webauthn) {
       throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'webauthn_disabled' });

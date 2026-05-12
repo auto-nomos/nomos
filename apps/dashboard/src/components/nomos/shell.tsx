@@ -53,6 +53,7 @@ const NAV_GROUPS: { id: string; label: string; items: NavItem[] }[] = [
     id: 'account',
     label: 'Account',
     items: [
+      { href: '/app/settings/security', label: 'Passkeys', icon: KeyRound, hint: 'step-up' },
       { href: '/app/settings/notifications', label: 'Notifications', icon: Layers },
       { href: '/app/guide/what-is-nomos', label: 'User guide', icon: BookOpen, hint: 'docs' },
     ],
