@@ -109,12 +109,23 @@ export default function PolicyDetailPage({ params }: { params: Promise<{ id: str
         </CardContent>
       </Card>
 
-      <Tabs defaultValue="cedar">
+      <Tabs defaultValue="visual">
         <TabsList>
-          <TabsTrigger value="cedar">Cedar</TabsTrigger>
           <TabsTrigger value="visual">Visual</TabsTrigger>
+          <TabsTrigger value="cedar">Cedar</TabsTrigger>
           <TabsTrigger value="test">Test policy</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="visual">
+          <VisualPolicyTab
+            cedarText={text}
+            integrationId={policy.data.integrationId ?? null}
+            onApply={(t) => {
+              setText(t);
+              setDirty(true);
+            }}
+          />
+        </TabsContent>
 
         <TabsContent value="cedar">
           <Card>
@@ -160,16 +171,6 @@ export default function PolicyDetailPage({ params }: { params: Promise<{ id: str
               ) : null}
             </CardContent>
           </Card>
-        </TabsContent>
-
-        <TabsContent value="visual">
-          <VisualPolicyTab
-            cedarText={text}
-            onApply={(t) => {
-              setText(t);
-              setDirty(true);
-            }}
-          />
         </TabsContent>
 
         <TabsContent value="test">

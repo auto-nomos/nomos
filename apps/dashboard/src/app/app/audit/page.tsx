@@ -1,6 +1,6 @@
 'use client';
 
-import { Download } from 'lucide-react';
+import { Clock, Download, ShieldCheck } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { Badge } from '../../../components/ui/badge';
 import { Button } from '../../../components/ui/button';
@@ -258,15 +258,48 @@ function FilterField({
 
 function AuditDrawer({ event, onClose }: { event: AuditRow | null; onClose: () => void }) {
   const proof = trpc.audit.proof.useQuery({ eventId: event?.eventId ?? '' }, { enabled: !!event });
+  const proofSigned = proof.data?.root != null;
+
+  function downloadProof() {
+    if (!proof.data || !event) return;
+    const blob = new Blob([JSON.stringify(proof.data, null, 2)], { type: 'application/json' });
+    triggerDownload(blob, `audit-proof-${event.eventId}.json`);
+  }
 
   return (
     <Dialog open={event !== null} onOpenChange={(open) => (!open ? onClose() : undefined)}>
       <DialogContent className="max-w-3xl">
         <DialogHeader>
-          <DialogTitle>Decision detail</DialogTitle>
-          <DialogDescription>
-            Hash-chain proof button stub until Sprint 8 (signed root + R2 archive).
-          </DialogDescription>
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <DialogTitle>Decision detail</DialogTitle>
+              <DialogDescription>
+                Hash-chained Cedar decision. Download the signed proof bundle and verify with the
+                CLI.
+              </DialogDescription>
+            </div>
+            {proof.isPending && event ? (
+              <span className="inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-1 text-[10px] uppercase tracking-wide text-muted-foreground">
+                Loading proof…
+              </span>
+            ) : proofSigned ? (
+              <span
+                className="inline-flex shrink-0 items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-emerald-900 dark:border-emerald-900/40 dark:bg-emerald-950/40 dark:text-emerald-100"
+                data-testid="proof-signed-badge"
+                title="Hash-chained decision anchored under an Ed25519-signed root"
+              >
+                <ShieldCheck className="h-3 w-3" /> Signed proof
+              </span>
+            ) : proof.data && event ? (
+              <span
+                className="inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/40 dark:text-amber-100"
+                data-testid="proof-unsigned-pill"
+                title="The root signature for this period has not been minted yet"
+              >
+                <Clock className="h-3 w-3" /> Proof pending
+              </span>
+            ) : null}
+          </div>
         </DialogHeader>
 
         {event ? (
@@ -312,12 +345,29 @@ function AuditDrawer({ event, onClose }: { event: AuditRow | null; onClose: () =
             <Row label="hash">
               <span className="font-mono text-xs">{event.hash.slice(0, 16)}…</span>
             </Row>
+
+            <div className="rounded-md border bg-muted/30 p-3 text-xs">
+              <p className="font-medium">Verify offline</p>
+              <p className="mt-1 text-muted-foreground">
+                Download the proof bundle, then run the audit-verify CLI to confirm the hash chain
+                and the root signature.
+              </p>
+              <pre className="mt-2 overflow-x-auto rounded bg-background p-2 font-mono text-[11px]">
+                {`npx @auto-nomos/audit-verify audit-proof-${event.eventId.slice(0, 8)}.json`}
+              </pre>
+            </div>
           </div>
         ) : null}
 
         <DialogFooter>
-          <Button variant="outline" disabled={!proof.data}>
-            Show proof (S8)
+          <Button
+            variant="outline"
+            onClick={downloadProof}
+            disabled={!proof.data || proof.isPending}
+            data-testid="download-proof"
+          >
+            <Download className="h-4 w-4" />
+            Download proof
           </Button>
           <Button onClick={onClose}>Close</Button>
         </DialogFooter>
