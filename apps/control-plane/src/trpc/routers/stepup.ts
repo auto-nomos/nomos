@@ -10,7 +10,7 @@
  *   deny               — flip state to denied.
  */
 import { TRPCError } from '@trpc/server';
-import { and, desc, eq, gt } from 'drizzle-orm';
+import { and, desc, eq, gt, inArray } from 'drizzle-orm';
 import { z } from 'zod';
 import * as schema from '../../db/schema.js';
 import { upsertGrant } from '../../services/grants/upsert.js';
@@ -79,6 +79,68 @@ export const stepupRouter = router({
       .orderBy(desc(schema.pushApprovals.requestedAt))
       .limit(20);
   }),
+
+  /**
+   * History of resolved approvals (approved / denied / expired) for the
+   * dashboard /app/approvals tabs. Pending approvals stay on listPending;
+   * this proc returns everything else, optionally filtered by agent or
+   * state set, ordered newest first.
+   *
+   * "Expired" is derived: a row with state='pending' whose expires_at <=
+   * now() is folded into the expired bucket without requiring a state
+   * change. This avoids needing a background sweeper to relabel rows.
+   */
+  listHistory: tenantProcedure
+    .input(
+      z
+        .object({
+          state: z.array(z.enum(['approved', 'denied', 'expired'])).optional(),
+          agentId: z.string().uuid().optional(),
+          limit: z.number().int().min(1).max(200).optional(),
+        })
+        .optional(),
+    )
+    .query(async ({ ctx, input }) => {
+      const limit = input?.limit ?? 100;
+      const wants = new Set(input?.state ?? ['approved', 'denied', 'expired']);
+      const dbStates: ('approved' | 'denied' | 'pending')[] = [];
+      if (wants.has('approved')) dbStates.push('approved');
+      if (wants.has('denied')) dbStates.push('denied');
+      if (wants.has('expired')) dbStates.push('pending');
+      if (dbStates.length === 0) return [];
+      const now = new Date();
+      const filters = [
+        eq(schema.pushApprovals.customerId, ctx.customerId),
+        inArray(schema.pushApprovals.state, dbStates),
+      ];
+      if (input?.agentId) filters.push(eq(schema.pushApprovals.agentId, input.agentId));
+      const rows = await ctx.db.drizzle
+        .select({
+          id: schema.pushApprovals.id,
+          agentId: schema.pushApprovals.agentId,
+          agentName: schema.agents.name,
+          command: schema.pushApprovals.command,
+          resource: schema.pushApprovals.resource,
+          state: schema.pushApprovals.state,
+          expiresAt: schema.pushApprovals.expiresAt,
+          requestedAt: schema.pushApprovals.requestedAt,
+          decidedAt: schema.pushApprovals.decidedAt,
+          decidedBy: schema.pushApprovals.decidedBy,
+        })
+        .from(schema.pushApprovals)
+        .leftJoin(schema.agents, eq(schema.pushApprovals.agentId, schema.agents.id))
+        .where(and(...filters))
+        .orderBy(desc(schema.pushApprovals.requestedAt))
+        .limit(limit);
+      const out = rows
+        .map((r) => {
+          const folded =
+            r.state === 'pending' && r.expiresAt.getTime() <= now.getTime() ? 'expired' : r.state;
+          return { ...r, state: folded };
+        })
+        .filter((r) => wants.has(r.state as 'approved' | 'denied' | 'expired'));
+      return out;
+    }),
 
   /** Returns the latest pending approval for an agent in the current customer. */
   latestForAgent: tenantProcedure

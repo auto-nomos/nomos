@@ -441,6 +441,12 @@ export const apiKeys = pgTable(
     name: text('name').notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     revokedAt: timestamp('revoked_at', { withTimezone: true }),
+    /** Last MCP client that used this key. Populated by api-key-auth
+     *  middleware on each successful auth so the dashboard can show
+     *  which Cursor / Claude-Code / Codex instance is paired. */
+    lastUsedAt: timestamp('last_used_at', { withTimezone: true }),
+    lastUserAgent: text('last_user_agent'),
+    lastHost: text('last_host'),
   },
   (t) => ({
     customerIdx: index('api_keys_customer_idx').on(t.customerId),

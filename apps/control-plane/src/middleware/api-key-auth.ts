@@ -56,10 +56,22 @@ export const apiKeyAuth = (
     if (!agent || agent.status === 'deleted') {
       return c.json({ error: 'unauthorized', error_code: 'agent_not_found' }, 401);
     }
+    const now = new Date();
     await deps.db.drizzle
       .update(schema.agents)
-      .set({ lastActiveAt: new Date() })
+      .set({ lastActiveAt: now })
       .where(eq(schema.agents.id, row.agentId));
+    const userAgent = c.req.header('user-agent') ?? null;
+    const forwardedFor = c.req.header('x-forwarded-for') ?? '';
+    const host = forwardedFor.split(',')[0]?.trim() || c.req.header('x-real-ip') || null;
+    await deps.db.drizzle
+      .update(schema.apiKeys)
+      .set({
+        lastUsedAt: now,
+        ...(userAgent ? { lastUserAgent: userAgent.slice(0, 500) } : {}),
+        ...(host ? { lastHost: host.slice(0, 100) } : {}),
+      })
+      .where(eq(schema.apiKeys.id, row.id));
     if (!agent.connectionApprovedAt) {
       return c.json(
         {

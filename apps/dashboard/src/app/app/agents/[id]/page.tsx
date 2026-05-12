@@ -47,6 +47,7 @@ export default function AgentDetailPage({ params }: { params: Promise<{ id: stri
 
   const apiKeys = trpc.apiKeys.list.useQuery({ agentId: id });
   const envelopes = trpc.envelopes.list.useQuery({ agentId: id });
+  const grants = trpc.grants.list.useQuery({ agentId: id });
   const audit = trpc.audit.list.useQuery({ agent: agent?.did, limit: 50 }, { enabled: !!agent });
 
   const [revealedKey, setRevealedKey] = useState<string | null>(null);
@@ -75,6 +76,12 @@ export default function AgentDetailPage({ params }: { params: Promise<{ id: stri
   });
   const revokeEnvelope = trpc.envelopes.revoke.useMutation({
     onSuccess: () => utils.envelopes.list.invalidate({ agentId: id }),
+  });
+  const revokeGrant = trpc.grants.revoke.useMutation({
+    onSuccess: () => utils.grants.list.invalidate({ agentId: id }),
+  });
+  const toggleGrant = trpc.grants.toggle.useMutation({
+    onSuccess: () => utils.grants.list.invalidate({ agentId: id }),
   });
 
   useEffect(() => {
@@ -122,10 +129,11 @@ export default function AgentDetailPage({ params }: { params: Promise<{ id: stri
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
-              <KeyRound className="h-4 w-4" /> API keys
+              <KeyRound className="h-4 w-4" /> API keys · Connected clients
             </CardTitle>
             <CardDescription>
-              Plaintext is shown ONCE. The hash is stored; we cannot recover the secret.
+              Plaintext is shown ONCE. The hash is stored; we cannot recover the secret. Each row
+              tracks the MCP client (Cursor / Claude Code / Codex) that last used the key.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -135,17 +143,27 @@ export default function AgentDetailPage({ params }: { params: Promise<{ id: stri
                   <TableRow>
                     <TableHead>Name</TableHead>
                     <TableHead>Prefix</TableHead>
-                    <TableHead>Created</TableHead>
+                    <TableHead>Last seen</TableHead>
+                    <TableHead>Client</TableHead>
+                    <TableHead>Host</TableHead>
                     <TableHead />
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {apiKeys.data.map((k) => (
                     <TableRow key={k.id}>
-                      <TableCell>{k.name}</TableCell>
-                      <TableCell className="font-mono text-xs">{k.prefix}…</TableCell>
+                      <TableCell className="font-medium">{k.name}</TableCell>
+                      <TableCell className="font-mono text-[11px] text-muted-foreground">
+                        {k.prefix.slice(0, 20)}…
+                      </TableCell>
                       <TableCell className="text-xs text-muted-foreground">
-                        {formatDate(k.createdAt)}
+                        {k.lastUsedAt ? formatDate(k.lastUsedAt) : 'never'}
+                      </TableCell>
+                      <TableCell className="font-mono text-[11px] text-muted-foreground">
+                        {k.lastUserAgent ? k.lastUserAgent.slice(0, 40) : '—'}
+                      </TableCell>
+                      <TableCell className="font-mono text-[11px] text-muted-foreground">
+                        {k.lastHost ?? '—'}
                       </TableCell>
                       <TableCell className="text-right">
                         {k.revokedAt ? (
@@ -301,11 +319,86 @@ export default function AgentDetailPage({ params }: { params: Promise<{ id: stri
             </Table>
           ) : (
             <p className="text-sm text-muted-foreground">
-              No active grants. Switch this agent to dynamic mode and call
+              No Approval Envelopes yet. Envelopes are durable UCAN factories created from the
               <code className="mx-1 rounded bg-muted px-1 py-0.5 font-mono text-xs">
                 /v1/intent
               </code>
-              to create one via passkey approval.
+              flow after passkey approval; they bound resource scope + actions until expiry or
+              revocation. For "Always allow" decisions you made from the dashboard/Telegram, see the{' '}
+              <strong>Remembered decisions</strong> card below.
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Remembered decisions</CardTitle>
+          <CardDescription>
+            Auto-allow / auto-deny rules written when you tapped "Always allow" or "Always deny"
+            during a step-up. The PDP renders each row as a Cedar clause inside the customer bundle,
+            so future calls matching <code>command + resource</code> resolve silently.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {grants.data && grants.data.length > 0 ? (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Decision</TableHead>
+                  <TableHead>Command</TableHead>
+                  <TableHead>Resource</TableHead>
+                  <TableHead>Scope</TableHead>
+                  <TableHead>Granted</TableHead>
+                  <TableHead className="text-right">Action</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {grants.data.map((g) => (
+                  <TableRow key={g.id}>
+                    <TableCell>
+                      {g.decision === 'allow' ? (
+                        <Badge className="bg-green-500/15 text-green-700 dark:text-green-300">
+                          allow
+                        </Badge>
+                      ) : (
+                        <Badge className="bg-red-500/15 text-red-700 dark:text-red-300">deny</Badge>
+                      )}
+                    </TableCell>
+                    <TableCell className="font-mono text-xs">{g.command}</TableCell>
+                    <TableCell className="font-mono text-xs">
+                      {JSON.stringify(g.resourcePattern).slice(0, 60)}
+                    </TableCell>
+                    <TableCell className="text-xs text-muted-foreground">{g.scope}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground">
+                      {formatDate(g.grantedAt)}
+                    </TableCell>
+                    <TableCell className="text-right space-x-2">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => toggleGrant.mutate({ grantId: g.id })}
+                        disabled={toggleGrant.isPending}
+                      >
+                        Flip
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => revokeGrant.mutate({ grantId: g.id })}
+                        disabled={revokeGrant.isPending}
+                      >
+                        Revoke
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              No remembered decisions yet. The first time this agent's call hits a step-up, approve
+              or deny with the <em>Remember</em> toggle on to write a row here.
             </p>
           )}
         </CardContent>

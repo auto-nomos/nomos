@@ -46,6 +46,9 @@ export const apiKeysRouter = router({
         prefix: r.prefix,
         createdAt: r.createdAt,
         revokedAt: r.revokedAt,
+        lastUsedAt: r.lastUsedAt,
+        lastUserAgent: r.lastUserAgent,
+        lastHost: r.lastHost,
       }));
     }),
 
