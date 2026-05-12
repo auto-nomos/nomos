@@ -1,11 +1,13 @@
 'use client';
 
-import { ArrowRight, Check, Plug } from 'lucide-react';
+import { templatesFor } from '@auto-nomos/schema-packs';
+import { ArrowRight, Check, Copy, Plug, Terminal } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { NomosLogo } from '../../components/nomos/logo';
 import { useSession } from '../../lib/auth-client';
+import { clientEnv } from '../../lib/env';
 import { type ConnectorId, startOAuthConnect } from '../../lib/oauth';
 import { trpc } from '../../lib/trpc';
 import { cn } from '../../lib/utils';
@@ -17,22 +19,82 @@ const CONNECTORS: { id: ConnectorId; label: string; blurb: string }[] = [
   { id: 'notion', label: 'Notion', blurb: 'pages, databases' },
 ];
 
-const STARTER_POLICY = `permit (
-  principal,
-  action == Action::"/github/issue/create",
-  resource
-);`;
+const STEP_LABELS = [
+  'Connect SaaS',
+  'Register App',
+  'Author policy',
+  'Mint UCAN',
+  'First call',
+  'Audit',
+];
+type StepIndex = 1 | 2 | 3 | 4 | 5 | 6;
 
-const STEP_LABELS = ['Connect SaaS', 'Register App', 'Author policy'];
+interface WizardState {
+  step: StepIndex;
+  agentId: string | null;
+  agentName: string | null;
+  policyId: string | null;
+  apiKey: string | null;
+  apiKeyName: string | null;
+}
+
+const INITIAL_STATE: WizardState = {
+  step: 1,
+  agentId: null,
+  agentName: null,
+  policyId: null,
+  apiKey: null,
+  apiKeyName: null,
+};
+
+const STORAGE_KEY = 'nomos:onboarding';
+
+function loadState(): WizardState {
+  if (typeof window === 'undefined') return INITIAL_STATE;
+  try {
+    const raw = sessionStorage.getItem(STORAGE_KEY);
+    if (!raw) return INITIAL_STATE;
+    const parsed = JSON.parse(raw) as Partial<WizardState>;
+    return {
+      step: (parsed.step as StepIndex) ?? 1,
+      agentId: parsed.agentId ?? null,
+      agentName: parsed.agentName ?? null,
+      policyId: parsed.policyId ?? null,
+      apiKey: parsed.apiKey ?? null,
+      apiKeyName: parsed.apiKeyName ?? null,
+    };
+  } catch {
+    return INITIAL_STATE;
+  }
+}
+
+function saveState(s: WizardState) {
+  if (typeof window === 'undefined') return;
+  sessionStorage.setItem(STORAGE_KEY, JSON.stringify(s));
+}
 
 export default function OnboardingPage() {
   const router = useRouter();
   const session = useSession();
-  const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [state, setState] = useState<WizardState>(INITIAL_STATE);
+  const [hydrated, setHydrated] = useState(false);
+
+  useEffect(() => {
+    setState(loadState());
+    setHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    if (hydrated) saveState(state);
+  }, [state, hydrated]);
 
   useEffect(() => {
     if (!session.isPending && !session.data) router.replace('/sign-in');
   }, [session.isPending, session.data, router]);
+
+  function update(patch: Partial<WizardState>) {
+    setState((prev) => ({ ...prev, ...patch }));
+  }
 
   if (session.isPending || !session.data) {
     return (
@@ -45,36 +107,72 @@ export default function OnboardingPage() {
     );
   }
 
+  const percentDone = Math.round(((state.step - 1) / STEP_LABELS.length) * 100);
+
   return (
-    <main className="relative z-10 mx-auto max-w-[920px] px-6 py-16 md:px-10">
+    <main className="relative z-10 mx-auto max-w-[960px] px-6 py-16 md:px-10">
       <header className="flex items-center justify-between">
         <Link href="/" aria-label="Nomos home">
           <NomosLogo size={24} />
         </Link>
         <span className="font-mono text-[11px] uppercase tracking-[0.18em] text-aegis-mute">
-          step {step} of 3
+          step {state.step} of {STEP_LABELS.length} · {percentDone}%
         </span>
       </header>
 
       <div className="mt-16">
         <div className="eyebrow">welcome</div>
         <h1 className="display mt-4 text-[56px] leading-tight text-aegis-paper">
-          Three steps to your
+          Six steps to your
           <br />
           first <em>authorized</em> call.
         </h1>
-        <p className="mt-5 max-w-[520px] text-sm leading-relaxed text-aegis-mute">
-          Connect a SaaS, register the agent that will call into Nomos, save a starter policy.
-          We&rsquo;ll drop you into the dashboard when you&rsquo;re done.
+        <p className="mt-5 max-w-[540px] text-sm leading-relaxed text-aegis-mute">
+          Connect a SaaS, register the App that will call into Nomos, save a starter policy, mint a
+          UCAN, run a real curl. We&rsquo;ll drop you into the audit chain at the end.
         </p>
       </div>
 
-      <Stepper step={step} />
+      <Stepper step={state.step} />
 
       <section className="mt-12">
-        {step === 1 ? <ConnectStep onNext={() => setStep(2)} /> : null}
-        {step === 2 ? <AgentStep onNext={() => setStep(3)} /> : null}
-        {step === 3 ? <PolicyStep onDone={() => router.push('/app')} /> : null}
+        {state.step === 1 ? <ConnectStep onNext={() => update({ step: 2 })} /> : null}
+        {state.step === 2 ? (
+          <AgentStep
+            onNext={(agent) => update({ step: 3, agentId: agent.id, agentName: agent.name })}
+          />
+        ) : null}
+        {state.step === 3 ? (
+          <PolicyStep
+            onBack={() => update({ step: 2 })}
+            onNext={(policyId) => update({ step: 4, policyId })}
+          />
+        ) : null}
+        {state.step === 4 ? (
+          <KeyStep
+            agentId={state.agentId}
+            agentName={state.agentName}
+            onBack={() => update({ step: 3 })}
+            onNext={(apiKey, apiKeyName) => update({ step: 5, apiKey, apiKeyName })}
+          />
+        ) : null}
+        {state.step === 5 ? (
+          <CurlStep
+            apiKey={state.apiKey}
+            apiKeyName={state.apiKeyName}
+            onBack={() => update({ step: 4 })}
+            onNext={() => update({ step: 6 })}
+            onSkip={() => update({ step: 6 })}
+          />
+        ) : null}
+        {state.step === 6 ? (
+          <DoneStep
+            onFinish={() => {
+              sessionStorage.removeItem(STORAGE_KEY);
+              router.push('/app/audit');
+            }}
+          />
+        ) : null}
       </section>
     </main>
   );
@@ -82,16 +180,16 @@ export default function OnboardingPage() {
 
 function Stepper({ step }: { step: number }) {
   return (
-    <ol className="mt-10 grid grid-cols-3 gap-px overflow-hidden rounded-sm border border-aegis-line bg-aegis-line">
+    <ol className="mt-10 grid grid-cols-3 gap-px overflow-hidden rounded-sm border border-aegis-line bg-aegis-line md:grid-cols-6">
       {STEP_LABELS.map((label, i) => {
-        const idx = (i + 1) as 1 | 2 | 3;
+        const idx = i + 1;
         const active = idx === step;
         const done = idx < step;
         return (
           <li
             key={label}
             className={cn(
-              'flex items-center gap-3 px-5 py-4 transition-colors',
+              'flex items-center gap-3 px-4 py-4 transition-colors',
               active && 'bg-aegis-surface-2',
               done && 'bg-aegis-surface',
               !active && !done && 'bg-aegis-ink',
@@ -153,6 +251,7 @@ function ConnectStep({ onNext }: { onNext: () => void }) {
   const [error, setError] = useState<string | null>(null);
   const connections = trpc.oauth.list.useQuery();
   const connectedSet = new Set((connections.data ?? []).map((c) => c.connector));
+  const hasConnection = connectedSet.size > 0;
 
   async function connect(id: ConnectorId) {
     setError(null);
@@ -178,14 +277,17 @@ function ConnectStep({ onNext }: { onNext: () => void }) {
       footer={
         <div className="flex items-center justify-between">
           <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-aegis-faint">
-            don&rsquo;t have an OAuth app yet? skip — connect later.
+            {hasConnection
+              ? 'you have at least one connection — continue'
+              : 'an OAuth connection is required before the next step'}
           </p>
           <button
             type="button"
             onClick={onNext}
-            className="group inline-flex items-center gap-2 rounded-sm border border-aegis-line px-4 py-2 font-mono text-[11px] uppercase tracking-[0.18em] text-aegis-paper transition-colors hover:border-aegis-line-strong"
+            disabled={!hasConnection}
+            className="group inline-flex items-center gap-2 rounded-sm bg-aegis-signal px-5 py-2.5 font-mono text-[11px] uppercase tracking-[0.18em] text-aegis-ink transition-colors hover:bg-aegis-signal/90 disabled:cursor-not-allowed disabled:opacity-40"
           >
-            Skip for now
+            Continue
             <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
           </button>
         </div>
@@ -242,14 +344,19 @@ function ConnectStep({ onNext }: { onNext: () => void }) {
   );
 }
 
-function AgentStep({ onNext }: { onNext: () => void }) {
+interface CreatedAgent {
+  id: string;
+  name: string;
+}
+
+function AgentStep({ onNext }: { onNext: (agent: CreatedAgent) => void }) {
   const [name, setName] = useState('release-bot');
   const [error, setError] = useState<string | null>(null);
   const utils = trpc.useUtils();
   const create = trpc.agents.create.useMutation({
-    onSuccess: () => {
+    onSuccess: (agent) => {
       utils.agents.list.invalidate();
-      onNext();
+      onNext({ id: agent.id, name: agent.name });
     },
     onError: (err) => setError(err.message),
   });
@@ -262,7 +369,7 @@ function AgentStep({ onNext }: { onNext: () => void }) {
           Register your <em>first</em> App.
         </>
       }
-      copy="An App is the credential slot for one piece of code that calls our PDP — your AI agent, MCP server, script, or service. Each App gets a stable DID + API key, revealed once on the detail page."
+      copy="An App is the credential slot for one piece of code that calls our PDP — your AI agent, MCP server, script, or service. Each App gets a stable DID + API key, revealed once on the next step."
       footer={
         <div className="flex items-center justify-end">
           <button
@@ -304,12 +411,23 @@ function AgentStep({ onNext }: { onNext: () => void }) {
   );
 }
 
-function PolicyStep({ onDone }: { onDone: () => void }) {
-  const [name, setName] = useState('Default policy');
-  const [text, setText] = useState(STARTER_POLICY);
+function PolicyStep({
+  onBack,
+  onNext,
+}: {
+  onBack: () => void;
+  onNext: (policyId: string) => void;
+}) {
+  const githubTemplates = templatesFor('github');
+  const seedTemplate = githubTemplates[0];
+  const seedText =
+    seedTemplate?.cedarText ??
+    `permit (\n  principal,\n  action == Action::"/github/issue/create",\n  resource\n);`;
+  const [name, setName] = useState(seedTemplate?.name ?? 'github-starter');
+  const [text, setText] = useState(seedText);
   const [error, setError] = useState<string | null>(null);
   const upsert = trpc.policies.upsert.useMutation({
-    onSuccess: () => onDone(),
+    onSuccess: (p) => onNext(p.id),
     onError: (err) => setError(err.message),
   });
 
@@ -318,26 +436,26 @@ function PolicyStep({ onDone }: { onDone: () => void }) {
       eyebrow="step 03 · author"
       title={
         <>
-          Save a <em>starter</em> policy.
+          Save your <em>first</em> policy.
         </>
       }
-      copy="Cedar policy enforced at the PDP. Tweak later in the policy editor — visual or text, your choice."
+      copy="Pre-seeded with a GitHub starter. The PDP enforces it on every call your App makes. Visual editing lives at /app/policies after onboarding."
       footer={
         <div className="flex items-center justify-between">
           <button
             type="button"
-            onClick={onDone}
+            onClick={onBack}
             className="font-mono text-[11px] uppercase tracking-[0.18em] text-aegis-mute hover:text-aegis-paper"
           >
-            skip and finish
+            ← back
           </button>
           <button
             type="button"
-            onClick={() => upsert.mutate({ name, cedarText: text })}
+            onClick={() => upsert.mutate({ name, cedarText: text, integrationId: 'github' })}
             disabled={upsert.isPending || !name || !text}
             className="group inline-flex items-center gap-2 rounded-sm bg-aegis-signal px-5 py-2.5 font-mono text-[11px] uppercase tracking-[0.18em] text-aegis-ink transition-colors hover:bg-aegis-signal/90 disabled:opacity-50"
           >
-            {upsert.isPending ? 'saving…' : 'finish'}
+            {upsert.isPending ? 'saving…' : 'save policy'}
             <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
           </button>
         </div>
@@ -382,6 +500,276 @@ function PolicyStep({ onDone }: { onDone: () => void }) {
           {error}
         </div>
       ) : null}
+    </PanelShell>
+  );
+}
+
+function KeyStep({
+  agentId,
+  agentName,
+  onBack,
+  onNext,
+}: {
+  agentId: string | null;
+  agentName: string | null;
+  onBack: () => void;
+  onNext: (plaintext: string, name: string) => void;
+}) {
+  const [keyName, setKeyName] = useState(`${agentName ?? 'app'}-key`);
+  const [error, setError] = useState<string | null>(null);
+  const create = trpc.apiKeys.create.useMutation({
+    onSuccess: (res) => onNext(res.plaintextOnce, res.name),
+    onError: (err) => setError(err.message),
+  });
+
+  if (!agentId) {
+    return (
+      <PanelShell
+        eyebrow="step 04 · mint"
+        title="Missing App"
+        copy="No App registered in this session. Go back to step 2."
+      >
+        <button
+          type="button"
+          onClick={onBack}
+          className="font-mono text-[11px] uppercase tracking-[0.18em] text-aegis-mute hover:text-aegis-paper"
+        >
+          ← back to register
+        </button>
+      </PanelShell>
+    );
+  }
+
+  return (
+    <PanelShell
+      eyebrow="step 04 · mint"
+      title={
+        <>
+          Issue your App&rsquo;s <em>first</em> key.
+        </>
+      }
+      copy="The API key authenticates your code to Nomos so it can ask the PDP to mint UCANs. The plaintext shows once — copy it on the next screen."
+      footer={
+        <div className="flex items-center justify-between">
+          <button
+            type="button"
+            onClick={onBack}
+            className="font-mono text-[11px] uppercase tracking-[0.18em] text-aegis-mute hover:text-aegis-paper"
+          >
+            ← back
+          </button>
+          <button
+            type="button"
+            onClick={() => create.mutate({ agentId, name: keyName })}
+            disabled={create.isPending || !keyName}
+            className="group inline-flex items-center gap-2 rounded-sm bg-aegis-signal px-5 py-2.5 font-mono text-[11px] uppercase tracking-[0.18em] text-aegis-ink transition-colors hover:bg-aegis-signal/90 disabled:opacity-50"
+          >
+            {create.isPending ? 'minting…' : 'mint key'}
+            <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+          </button>
+        </div>
+      }
+    >
+      <div>
+        <label
+          htmlFor="key-name"
+          className="block font-mono text-[10px] uppercase tracking-[0.18em] text-aegis-faint"
+        >
+          Key name
+        </label>
+        <input
+          id="key-name"
+          value={keyName}
+          onChange={(e) => setKeyName(e.target.value)}
+          className="mt-2 block w-full rounded-sm border border-aegis-line bg-aegis-ink px-4 py-3 text-sm text-aegis-paper focus:border-aegis-signal focus:outline-none focus:ring-1 focus:ring-aegis-signal/40"
+        />
+      </div>
+      {error ? (
+        <div
+          role="alert"
+          className="mt-4 rounded-sm border border-aegis-coral/40 bg-aegis-coral/10 px-4 py-3 font-mono text-xs text-aegis-coral"
+        >
+          {error}
+        </div>
+      ) : null}
+    </PanelShell>
+  );
+}
+
+function CurlStep({
+  apiKey,
+  apiKeyName,
+  onBack,
+  onNext,
+  onSkip,
+}: {
+  apiKey: string | null;
+  apiKeyName: string | null;
+  onBack: () => void;
+  onNext: () => void;
+  onSkip: () => void;
+}) {
+  const [copied, setCopied] = useState(false);
+  const cpUrl = clientEnv.controlPlaneUrl;
+  const curl = apiKey
+    ? `curl -X POST ${cpUrl}/v1/proxy \\
+  -H "authorization: Bearer ${apiKey}" \\
+  -H "content-type: application/json" \\
+  -d '{
+    "command": "/github/user/read",
+    "apiCall": { "method": "GET", "path": "/user" },
+    "resource": {}
+  }'`
+    : '';
+
+  async function copy() {
+    if (!apiKey) return;
+    try {
+      await navigator.clipboard.writeText(curl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // clipboard blocked — fall through, user can select text manually
+    }
+  }
+
+  return (
+    <PanelShell
+      eyebrow="step 05 · first call"
+      title={
+        <>
+          Make your <em>first</em> proxied call.
+        </>
+      }
+      copy="Run this curl in any terminal. Nomos issues a UCAN, evaluates the policy, then proxies through your encrypted GitHub token. The decision lands in the audit chain in milliseconds."
+      footer={
+        <div className="flex items-center justify-between">
+          <button
+            type="button"
+            onClick={onBack}
+            className="font-mono text-[11px] uppercase tracking-[0.18em] text-aegis-mute hover:text-aegis-paper"
+          >
+            ← back
+          </button>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={onSkip}
+              className="font-mono text-[11px] uppercase tracking-[0.18em] text-aegis-mute hover:text-aegis-paper"
+            >
+              skip — view audit
+            </button>
+            <button
+              type="button"
+              onClick={onNext}
+              className="group inline-flex items-center gap-2 rounded-sm bg-aegis-signal px-5 py-2.5 font-mono text-[11px] uppercase tracking-[0.18em] text-aegis-ink transition-colors hover:bg-aegis-signal/90"
+            >
+              I ran it
+              <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+            </button>
+          </div>
+        </div>
+      }
+    >
+      {apiKey ? (
+        <>
+          <div className="rounded-sm border border-aegis-line bg-aegis-ink p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.18em] text-aegis-faint">
+                <Terminal className="h-3 w-3" />
+                {apiKeyName ?? 'api-key'} · plaintext shown once
+              </div>
+              <button
+                type="button"
+                onClick={copy}
+                className="inline-flex items-center gap-1.5 rounded-sm border border-aegis-line px-2 py-1 font-mono text-[10px] uppercase tracking-[0.16em] text-aegis-paper hover:border-aegis-line-strong"
+              >
+                <Copy className="h-3 w-3" />
+                {copied ? 'copied' : 'copy'}
+              </button>
+            </div>
+            <pre className="mt-3 overflow-x-auto whitespace-pre text-[12px] leading-relaxed text-aegis-paper">
+              {curl}
+            </pre>
+          </div>
+          <p className="mt-4 max-w-[520px] text-xs leading-relaxed text-aegis-mute">
+            We don&rsquo;t store the plaintext key. If you lose it, mint a new one from{' '}
+            <code className="font-mono text-aegis-paper">/app/agents</code>.
+          </p>
+        </>
+      ) : (
+        <p className="text-sm text-aegis-mute">No API key in session — go back and mint one.</p>
+      )}
+    </PanelShell>
+  );
+}
+
+function DoneStep({ onFinish }: { onFinish: () => void }) {
+  return (
+    <PanelShell
+      eyebrow="step 06 · audit"
+      title={
+        <>
+          You&rsquo;re <em>live</em>.
+        </>
+      }
+      copy="Every authorize and proxy decision your App makes lands in the hash-chained audit log. Daily roots are signed Ed25519 — anyone holding the proof can verify offline with the audit-verify CLI."
+      footer={
+        <div className="flex items-center justify-end">
+          <button
+            type="button"
+            onClick={onFinish}
+            className="group inline-flex items-center gap-2 rounded-sm bg-aegis-signal px-5 py-2.5 font-mono text-[11px] uppercase tracking-[0.18em] text-aegis-ink transition-colors hover:bg-aegis-signal/90"
+          >
+            Open audit chain
+            <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+          </button>
+        </div>
+      }
+    >
+      <ul className="grid gap-3 text-sm text-aegis-mute sm:grid-cols-2">
+        <li className="rounded-sm border border-aegis-line bg-aegis-ink px-4 py-3">
+          <span className="block font-mono text-[10px] uppercase tracking-[0.18em] text-aegis-faint">
+            next · register more apps
+          </span>
+          <Link
+            href="/app/agents"
+            className="mt-1 inline-flex items-center gap-1 text-aegis-paper hover:underline"
+          >
+            /app/agents <ArrowRight className="h-3 w-3" />
+          </Link>
+        </li>
+        <li className="rounded-sm border border-aegis-line bg-aegis-ink px-4 py-3">
+          <span className="block font-mono text-[10px] uppercase tracking-[0.18em] text-aegis-faint">
+            edit policy · visual builder
+          </span>
+          <Link
+            href="/app/policies"
+            className="mt-1 inline-flex items-center gap-1 text-aegis-paper hover:underline"
+          >
+            /app/policies <ArrowRight className="h-3 w-3" />
+          </Link>
+        </li>
+        <li className="rounded-sm border border-aegis-line bg-aegis-ink px-4 py-3">
+          <span className="block font-mono text-[10px] uppercase tracking-[0.18em] text-aegis-faint">
+            verify proofs · CLI
+          </span>
+          <code className="mt-1 block font-mono text-[12px] text-aegis-paper">
+            npx @auto-nomos/audit-verify
+          </code>
+        </li>
+        <li className="rounded-sm border border-aegis-line bg-aegis-ink px-4 py-3">
+          <span className="block font-mono text-[10px] uppercase tracking-[0.18em] text-aegis-faint">
+            settings · passkeys + Telegram
+          </span>
+          <Link
+            href="/app/settings"
+            className="mt-1 inline-flex items-center gap-1 text-aegis-paper hover:underline"
+          >
+            /app/settings <ArrowRight className="h-3 w-3" />
+          </Link>
+        </li>
+      </ul>
     </PanelShell>
   );
 }
