@@ -1,6 +1,6 @@
 {
   "name": "@auto-nomos/schema-packs",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "license": "MIT",
   "private": false,
   "type": "module",
