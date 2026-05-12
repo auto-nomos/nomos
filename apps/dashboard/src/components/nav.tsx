@@ -13,6 +13,7 @@ const NAV_ITEMS = [
   { href: '/app/connections', label: 'Connections' },
   { href: '/app/policies', label: 'Policies' },
   { href: '/app/audit', label: 'Audit' },
+  { href: '/app/billing', label: 'Billing' },
 ];
 
 export function AppNav() {

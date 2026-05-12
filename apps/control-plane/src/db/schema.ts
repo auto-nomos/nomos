@@ -745,3 +745,41 @@ export const chainContextFactsRelations = relations(chainContextFacts, ({ one })
     references: [customers.id],
   }),
 }));
+
+/**
+ * Per-tenant monthly usage counters. The wedge plan meters mint-ucan
+ * (every authorized agent request walks through CP mint) and proxy
+ * calls (PDP /v1/proxy). One row per (customer_id, period_start)
+ * keeps the math idempotent: incrementMint upserts on conflict.
+ *
+ * `period_start` is the first instant of the calendar month (UTC),
+ * so the free-tier cap resets at month boundaries without a cron.
+ * Stripe meter sync (deferred) reads this same row and posts deltas.
+ */
+export const usageCounters = pgTable(
+  'usage_counters',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    customerId: uuid('customer_id')
+      .notNull()
+      .references(() => customers.id, { onDelete: 'cascade' }),
+    periodStart: timestamp('period_start', { withTimezone: true }).notNull(),
+    mintCount: integer('mint_count').notNull().default(0),
+    proxyCount: integer('proxy_count').notNull().default(0),
+    lastAt: timestamp('last_at', { withTimezone: true }).notNull().defaultNow(),
+    stripeMeterPending: integer('stripe_meter_pending').notNull().default(0),
+  },
+  (t) => ({
+    customerPeriodIdx: uniqueIndex('usage_counters_customer_period_idx').on(
+      t.customerId,
+      t.periodStart,
+    ),
+  }),
+);
+
+export const usageCountersRelations = relations(usageCounters, ({ one }) => ({
+  customer: one(customers, {
+    fields: [usageCounters.customerId],
+    references: [customers.id],
+  }),
+}));

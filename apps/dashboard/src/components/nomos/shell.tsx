@@ -9,6 +9,7 @@ import {
   CircleDot,
   Cog,
   FileLock2,
+  Gauge,
   KeyRound,
   Layers,
   LogOut,
@@ -53,6 +54,7 @@ const NAV_GROUPS: { id: string; label: string; items: NavItem[] }[] = [
     id: 'account',
     label: 'Account',
     items: [
+      { href: '/app/billing', label: 'Billing', icon: Gauge, hint: 'usage + plan' },
       { href: '/app/settings/security', label: 'Passkeys', icon: KeyRound, hint: 'step-up' },
       { href: '/app/settings/notifications', label: 'Notifications', icon: Layers },
       { href: '/app/guide/what-is-nomos', label: 'User guide', icon: BookOpen, hint: 'docs' },
@@ -77,6 +79,7 @@ export function NomosShell({ children }: { children: React.ReactNode }) {
   return (
     <div data-theme="aegis" className="relative isolate min-h-screen bg-aegis-ink text-aegis-paper">
       <DevWarningBanner />
+      <QuotaBanner />
       <div className="relative z-10 grid min-h-screen grid-cols-[260px_minmax(0,1fr)]">
         <Sidebar />
         <div className="flex min-h-screen flex-col">
@@ -84,6 +87,50 @@ export function NomosShell({ children }: { children: React.ReactNode }) {
           <main className="flex-1 px-10 py-10">{children}</main>
         </div>
       </div>
+    </div>
+  );
+}
+
+function QuotaBanner() {
+  const usage = trpc.billing.usage.useQuery(undefined, { refetchInterval: 60_000 });
+  if (!usage.data) return null;
+  const { plan, percentUsed, total, cap } = usage.data;
+  if (plan !== 'free') return null;
+  if (percentUsed < 80) return null;
+  const exhausted = total >= cap;
+  return (
+    <div
+      className={cn(
+        'sticky top-0 z-40 flex items-center justify-center gap-3 px-4 py-2 text-center text-sm font-medium shadow',
+        exhausted ? 'bg-aegis-coral text-aegis-ink' : 'bg-aegis-amber text-aegis-ink',
+      )}
+      data-testid="quota-banner"
+    >
+      {exhausted ? (
+        <>
+          <span>
+            {cap.toLocaleString()} calls reached this month. Upgrade to keep agents working.
+          </span>
+          <Link
+            href="/app/billing"
+            className="rounded-sm border border-aegis-ink/30 bg-aegis-ink/10 px-3 py-1 font-mono text-[11px] uppercase tracking-[0.18em] hover:bg-aegis-ink/20"
+          >
+            Upgrade
+          </Link>
+        </>
+      ) : (
+        <>
+          <span>
+            {(cap - total).toLocaleString()} of {cap.toLocaleString()} calls left this month
+          </span>
+          <Link
+            href="/app/billing"
+            className="rounded-sm border border-aegis-ink/30 bg-aegis-ink/10 px-3 py-1 font-mono text-[11px] uppercase tracking-[0.18em] hover:bg-aegis-ink/20"
+          >
+            Billing
+          </Link>
+        </>
+      )}
     </div>
   );
 }

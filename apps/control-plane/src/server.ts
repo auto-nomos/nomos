@@ -20,6 +20,7 @@ import type { PolicyInvalidator } from './services/policy-invalidator.js';
 import type { RevocationPublisher } from './services/revocation-publisher.js';
 import type { StepUpNotifier } from './services/stepup/notify.js';
 import type { WebAuthnConfig } from './services/stepup/webauthn.js';
+import { createUsageService } from './services/usage.js';
 import { handleTrpc } from './trpc/handler.js';
 
 export interface ServerDeps {
@@ -108,9 +109,11 @@ export function createServer(deps: ServerDeps): Hono {
 
   app.route('/', createHealthRoutes({ db: deps.db }));
 
+  const usage = createUsageService({ db: deps.db });
+
   // SDK ↔ control-plane: trade an API key for short-lived UCANs. The PDP
   // never sees API keys; this route is the only one that does.
-  app.route('/', createMintUcanRoutes({ db: deps.db, signing }));
+  app.route('/', createMintUcanRoutes({ db: deps.db, signing, usage }));
 
   // SDK ↔ control-plane: dynamic per-request scope narrowing via the
   // Approval Envelope model. Mounted only when step-up is configured —
