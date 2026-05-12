@@ -42,6 +42,17 @@ export function parseUcanJwt(jwt: string): ParsedUcan | { error: 'malformed_ucan
   return { header, payload, signature, headerEnc, payloadEnc };
 }
 
+/** Read `meta.customer_id` from a UCAN JWT. Returns undefined on parse
+ *  failure or when the field is absent. Best-effort — does not verify the
+ *  signature. PDP edge callers must run chain validation (decide()) before
+ *  trusting the returned value as authenticated tenant identity. */
+export function extractCustomerId(jwt: string): string | undefined {
+  const parsed = parseUcanJwt(jwt);
+  if ('error' in parsed) return undefined;
+  const meta = parsed.payload.meta as Record<string, unknown> | undefined;
+  return typeof meta?.customer_id === 'string' ? meta.customer_id : undefined;
+}
+
 /** Read `meta.agent_id` from a UCAN JWT. Returns undefined on parse failure
  *  or when the field is absent. Best-effort — does not verify the signature.
  *  Callers that need authenticated identity must run full chain validation

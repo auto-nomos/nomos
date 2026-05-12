@@ -17,7 +17,13 @@ import { getLog } from '../middleware/logger.js';
 import { recordAuthorize } from '../observability/metrics.js';
 import { validateCosigner } from '../services/cosigner-validate.js';
 import { evaluateStepUpPotential, shouldDetectStepUp } from '../services/stepup.js';
-import { CUSTOMER_HEADER, extractAgentDid, extractAgentId, isKnownCommand } from './_shared.js';
+import {
+  CUSTOMER_HEADER,
+  deriveCustomerId,
+  extractAgentDid,
+  extractAgentId,
+  isKnownCommand,
+} from './_shared.js';
 
 export interface AuthorizeRouteDeps {
   policyCache: PolicyCache;
@@ -59,10 +65,7 @@ export function createAuthorizeRoutes(deps: AuthorizeRouteDeps): Hono {
 
   app.post('/v1/authorize', async (c) => {
     const log = getLog(c);
-    const customerId = c.req.header(CUSTOMER_HEADER);
-    if (!customerId) {
-      return c.json({ error: 'missing x-cb-customer header' }, 400);
-    }
+    const headerCustomerId = c.req.header(CUSTOMER_HEADER);
 
     const body = await c.req.json().catch(() => null);
     if (!body) {
@@ -74,6 +77,28 @@ export function createAuthorizeRoutes(deps: AuthorizeRouteDeps): Hono {
       return c.json({ error: 'invalid request shape', issues: parsed.error.issues }, 400);
     }
     const request = parsed.data;
+
+    const derive = deriveCustomerId(headerCustomerId, request.ucan);
+    if (!derive.ok) {
+      if (derive.code === 'mismatch') {
+        log.warn(
+          {
+            header: derive.headerCustomerId,
+            ucan: derive.ucanCustomerId,
+          },
+          'customerId mismatch between header and UCAN — rejecting',
+        );
+        return c.json({ error: derive.message, error_code: 'customer_id_mismatch' }, 400);
+      }
+      return c.json({ error: derive.message, error_code: 'missing_customer_id' }, 400);
+    }
+    const customerId = derive.customerId;
+    if (derive.source === 'header') {
+      log.warn(
+        { customerId },
+        'customerId from header (legacy); mint with meta.customer_id to remove deprecation warning',
+      );
+    }
 
     if (!isKnownCommand(request.command)) {
       log.warn({ command: request.command, customerId }, 'unknown command rejected');

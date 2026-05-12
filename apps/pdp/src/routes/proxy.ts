@@ -37,7 +37,13 @@ import { sanitizeResponseBody } from '../middleware/sanitize-response.js';
 import { recordAuthorize } from '../observability/metrics.js';
 import { validateCosigner } from '../services/cosigner-validate.js';
 import { evaluateStepUpPotential, shouldDetectStepUp } from '../services/stepup.js';
-import { CUSTOMER_HEADER, extractAgentDid, extractAgentId, isKnownCommand } from './_shared.js';
+import {
+  CUSTOMER_HEADER,
+  deriveCustomerId,
+  extractAgentDid,
+  extractAgentId,
+  isKnownCommand,
+} from './_shared.js';
 import type { AuditEmitInput } from './authorize.js';
 
 const ProxyRequestSchema = z.object({
@@ -92,10 +98,7 @@ export function createProxyRoutes(deps: ProxyRouteDeps): Hono {
 
   app.post('/v1/proxy/:command{.+}', async (c) => {
     const log = getLog(c);
-    const customerId = c.req.header(CUSTOMER_HEADER);
-    if (!customerId) {
-      return c.json({ error: 'missing x-cb-customer header' }, 400);
-    }
+    const headerCustomerId = c.req.header(CUSTOMER_HEADER);
     const command = `/${c.req.param('command')}`;
 
     const raw = await c.req.json().catch(() => null);
@@ -110,6 +113,32 @@ export function createProxyRoutes(deps: ProxyRouteDeps): Hono {
       return c.json({ error: 'invalid authorize request', issues: requestParse.error.issues }, 400);
     }
     const request = requestParse.data;
+
+    // D2: derive customerId from UCAN meta when present; reject mismatched
+    // headers. For chained UCANs the leaf carries the same meta.customer_id
+    // as the root because chain attenuation never widens the tenant.
+    const firstUcan = Array.isArray(parsed.data.ucan) ? parsed.data.ucan[0] : parsed.data.ucan;
+    if (!firstUcan) {
+      return c.json({ error: 'missing UCAN', error_code: 'missing_ucan' }, 400);
+    }
+    const derive = deriveCustomerId(headerCustomerId, firstUcan);
+    if (!derive.ok) {
+      if (derive.code === 'mismatch') {
+        log.warn(
+          { header: derive.headerCustomerId, ucan: derive.ucanCustomerId },
+          'customerId mismatch between header and UCAN — rejecting',
+        );
+        return c.json({ error: derive.message, error_code: 'customer_id_mismatch' }, 400);
+      }
+      return c.json({ error: derive.message, error_code: 'missing_customer_id' }, 400);
+    }
+    const customerId = derive.customerId;
+    if (derive.source === 'header') {
+      log.warn(
+        { customerId },
+        'customerId from header (legacy); mint with meta.customer_id to remove deprecation warning',
+      );
+    }
 
     if (request.command !== command) {
       return c.json(

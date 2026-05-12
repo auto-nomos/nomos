@@ -135,7 +135,15 @@ export async function mintUcan(input: MintInput, deps: MintDeps): Promise<MintRe
 
   const nowMs = deps.now ? deps.now() : Date.now();
   const nowSec = Math.floor(nowMs / 1000);
-  const meta: Record<string, unknown> = { agent_id: agent.id };
+  // D2 (Lane B): meta.customer_id makes the UCAN the authoritative source of
+  // tenant identity at the PDP edge. Without this the `x-cb-customer` header
+  // is trustless and an attacker presenting a valid UCAN minted for customer
+  // A could spoof a header for customer B, causing audit pollution and
+  // information disclosure against B's cached policy bundle.
+  const meta: Record<string, unknown> = {
+    agent_id: agent.id,
+    customer_id: input.customerId,
+  };
   if (input.policyId) meta.policy_id = input.policyId;
   if (input.oauthConnectionId) meta.oauth_connection_id = input.oauthConnectionId;
   if (input.contextHints && Object.keys(input.contextHints).length > 0) {
