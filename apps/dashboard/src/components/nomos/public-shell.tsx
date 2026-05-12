@@ -25,6 +25,7 @@ interface NavLink {
 const NAV: NavLink[] = [
   { href: '/docs', label: 'Docs' },
   { href: '/integrations', label: 'Integrations' },
+  { href: '/pricing', label: 'Pricing' },
   { href: '/security', label: 'Security' },
   { href: '/changelog', label: 'Changelog' },
 ];
@@ -108,6 +109,7 @@ function PublicFooter() {
         <FooterColumn label="Product">
           <FooterLink href="/docs">Documentation</FooterLink>
           <FooterLink href="/integrations">Integrations</FooterLink>
+          <FooterLink href="/pricing">Pricing</FooterLink>
           <FooterLink href="/security">Security</FooterLink>
           <FooterLink href="/changelog">Changelog</FooterLink>
         </FooterColumn>
