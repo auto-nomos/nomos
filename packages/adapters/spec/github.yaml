@@ -87,6 +87,38 @@ actions:
         required: true
         type: integer
 
+  - id: create_repo
+    description: Create a new GitHub repository under the authenticated user or org.
+    expected_use: Scaffold a new project or mirror repo as part of an automation workflow.
+    auto_execute: false
+    required_scopes:
+      - repo
+    risk:
+      category: write
+      sensitivity: high
+    http:
+      method: POST
+      path: "/user/repos"
+    params:
+      - name: name
+        in: body
+        required: true
+        type: string
+        description: Repository name.
+      - name: description
+        in: body
+        type: string
+        description: Short description of the repository.
+      - name: private
+        in: body
+        type: boolean
+        default: true
+        description: Whether the repository is private.
+      - name: auto_init
+        in: body
+        type: boolean
+        description: Initialize with a README.
+
   - id: create_issue
     description: Open a new issue.
     expected_use: File a bug or task as part of triage.

@@ -9,6 +9,7 @@ export const READS = [
   '/github/pr/read',
 ] as const;
 export const WRITES = [
+  '/github/repo/create',
   '/github/issue/create',
   '/github/issue/comment',
   '/github/issue/close',

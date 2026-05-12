@@ -22,6 +22,25 @@ const MergePrInput = RepoInput.extend({
 });
 type MergePrInput = z.infer<typeof MergePrInput>;
 
+const CreateRepoInput = z.object({
+  name: z.string().min(1).max(100),
+  description: z.string().optional(),
+  private: z.boolean().default(true),
+  autoInit: z.boolean().optional(),
+});
+type CreateRepoInput = z.infer<typeof CreateRepoInput>;
+
+const ListReposInput = z.object({
+  perPage: z.number().int().min(1).max(100).default(30),
+});
+type ListReposInput = z.infer<typeof ListReposInput>;
+
+const ListIssuesInput = RepoInput.extend({
+  state: z.enum(['open', 'closed', 'all']).default('open'),
+  perPage: z.number().int().min(1).max(100).default(30),
+});
+type ListIssuesInput = z.infer<typeof ListIssuesInput>;
+
 export const githubTools: ToolDefinition[] = [
   {
     name: 'github_read_user',
@@ -83,6 +102,65 @@ export const githubTools: ToolDefinition[] = [
         {
           method: 'PUT',
           path: `/repos/${input.owner}/${input.repo}/pulls/${input.prNumber}/merge`,
+        },
+      );
+    },
+  },
+  {
+    name: 'github_create_repo',
+    title: 'Create GitHub repository',
+    description:
+      'Creates a new GitHub repository under the authenticated user (gated by Credential Broker policy).',
+    inputSchema: CreateRepoInput.shape,
+    handler: async (guard, raw) => {
+      const input: CreateRepoInput = CreateRepoInput.parse(raw);
+      return runGuarded(
+        guard,
+        '/github/repo/create',
+        {},
+        {
+          method: 'POST',
+          path: '/user/repos',
+          body: {
+            name: input.name,
+            ...(input.description !== undefined ? { description: input.description } : {}),
+            private: input.private,
+            ...(input.autoInit !== undefined ? { auto_init: input.autoInit } : {}),
+          },
+        },
+      );
+    },
+  },
+  {
+    name: 'github_list_repos',
+    title: 'List GitHub repositories',
+    description:
+      'Lists repositories for the authenticated user (gated by Credential Broker policy).',
+    inputSchema: ListReposInput.shape,
+    handler: async (guard, raw) => {
+      const input: ListReposInput = ListReposInput.parse(raw);
+      return runGuarded(
+        guard,
+        '/github/repo/list',
+        {},
+        { method: 'GET', path: `/user/repos?per_page=${input.perPage}&sort=updated` },
+      );
+    },
+  },
+  {
+    name: 'github_list_issues',
+    title: 'List GitHub issues',
+    description: 'Lists issues in a repository (gated by Credential Broker policy).',
+    inputSchema: ListIssuesInput.shape,
+    handler: async (guard, raw) => {
+      const input: ListIssuesInput = ListIssuesInput.parse(raw);
+      return runGuarded(
+        guard,
+        '/github/issue/list',
+        { repo: `${input.owner}/${input.repo}` },
+        {
+          method: 'GET',
+          path: `/repos/${input.owner}/${input.repo}/issues?state=${input.state}&per_page=${input.perPage}`,
         },
       );
     },
