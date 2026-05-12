@@ -59,9 +59,23 @@ const NAV_GROUPS: { id: string; label: string; items: NavItem[] }[] = [
   },
 ];
 
+function DevWarningBanner() {
+  return (
+    <div className="sticky top-0 z-50 flex items-center justify-center gap-3 bg-red-600 px-4 py-2.5 text-center text-sm font-semibold text-white shadow-lg">
+      <span className="text-red-200">⚠</span>
+      <span>
+        <strong>Under active development.</strong> Do not connect this to your agents or tools —
+        things will break. You may log in and explore, but agent configuration is not stable yet.
+      </span>
+      <span className="text-red-200">⚠</span>
+    </div>
+  );
+}
+
 export function NomosShell({ children }: { children: React.ReactNode }) {
   return (
     <div data-theme="aegis" className="relative isolate min-h-screen bg-aegis-ink text-aegis-paper">
+      <DevWarningBanner />
       <div className="relative z-10 grid min-h-screen grid-cols-[260px_minmax(0,1fr)]">
         <Sidebar />
         <div className="flex min-h-screen flex-col">

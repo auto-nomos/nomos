@@ -20,64 +20,74 @@ interface Props {
 
 export function AuthShell({ eyebrow, title, copy, children, footer }: Props) {
   return (
-    <div className="relative z-10 grid min-h-screen lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
-      <aside className="relative hidden flex-col justify-between border-r border-aegis-line bg-aegis-surface/40 p-10 backdrop-blur lg:flex">
-        <Link href="/" aria-label="Nomos home">
-          <NomosLogo size={28} />
-        </Link>
-
-        <div data-stagger>
-          <div className="eyebrow flex items-center gap-3">
-            <span className="pulse" />
-            <span>{eyebrow}</span>
-          </div>
-          <h1 className="display mt-7 max-w-[18ch] text-[64px] leading-[0.95] text-aegis-paper">
-            {title}
-          </h1>
-          <p className="mt-7 max-w-[420px] text-sm leading-relaxed text-aegis-mute">{copy}</p>
-          <ul className="mt-10 space-y-3 font-mono text-xs uppercase tracking-[0.18em] text-aegis-faint">
-            <li>· UCAN delegation</li>
-            <li>· Cedar policy gates</li>
-            <li>· WebAuthn step-up</li>
-            <li>· Hash-chained audit</li>
-          </ul>
-        </div>
-
-        <div className="rounded-sm border border-aegis-line bg-aegis-ink/60 p-5">
-          <div className="eyebrow mb-3">field log</div>
-          <p className="font-mono text-[11px] leading-relaxed text-aegis-mute">
-            “Nomos closed the gap between &lsquo;the agent could&rsquo; and &lsquo;the agent
-            did&rsquo;. We replay every decision before shipping a policy change.”
-          </p>
-          <p className="mt-4 font-mono text-[10px] uppercase tracking-[0.18em] text-aegis-faint">
-            — staff eng · platform team
-          </p>
-        </div>
-      </aside>
-
-      <main className="relative flex flex-col">
-        <header className="flex h-16 items-center justify-between border-b border-aegis-line px-6 lg:hidden">
+    <>
+      <div className="sticky top-0 z-50 flex items-center justify-center gap-3 bg-red-600 px-4 py-2.5 text-center text-sm font-semibold text-white shadow-lg">
+        <span className="text-red-200">⚠</span>
+        <span>
+          <strong>Under active development.</strong> Do not connect this to your agents or tools —
+          things will break. You may log in and explore, but agent configuration is not stable yet.
+        </span>
+        <span className="text-red-200">⚠</span>
+      </div>
+      <div className="relative z-10 grid min-h-screen lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
+        <aside className="relative hidden flex-col justify-between border-r border-aegis-line bg-aegis-surface/40 p-10 backdrop-blur lg:flex">
           <Link href="/" aria-label="Nomos home">
-            <NomosLogo size={22} />
+            <NomosLogo size={28} />
           </Link>
-          <Link
-            href="/"
-            className="font-mono text-[10px] uppercase tracking-[0.18em] text-aegis-mute hover:text-aegis-paper"
-          >
-            ← back home
-          </Link>
-        </header>
 
-        <div className="flex flex-1 items-center justify-center px-6 py-16 md:px-10">
-          <div className="w-full max-w-[420px]">{children}</div>
-        </div>
+          <div data-stagger>
+            <div className="eyebrow flex items-center gap-3">
+              <span className="pulse" />
+              <span>{eyebrow}</span>
+            </div>
+            <h1 className="display mt-7 max-w-[18ch] text-[64px] leading-[0.95] text-aegis-paper">
+              {title}
+            </h1>
+            <p className="mt-7 max-w-[420px] text-sm leading-relaxed text-aegis-mute">{copy}</p>
+            <ul className="mt-10 space-y-3 font-mono text-xs uppercase tracking-[0.18em] text-aegis-faint">
+              <li>· UCAN delegation</li>
+              <li>· Cedar policy gates</li>
+              <li>· WebAuthn step-up</li>
+              <li>· Hash-chained audit</li>
+            </ul>
+          </div>
 
-        {footer ? (
-          <footer className="border-t border-aegis-line px-6 py-5 md:px-10">
-            <div className="mx-auto max-w-[420px] text-center">{footer}</div>
-          </footer>
-        ) : null}
-      </main>
-    </div>
+          <div className="rounded-sm border border-aegis-line bg-aegis-ink/60 p-5">
+            <div className="eyebrow mb-3">field log</div>
+            <p className="font-mono text-[11px] leading-relaxed text-aegis-mute">
+              “Nomos closed the gap between &lsquo;the agent could&rsquo; and &lsquo;the agent
+              did&rsquo;. We replay every decision before shipping a policy change.”
+            </p>
+            <p className="mt-4 font-mono text-[10px] uppercase tracking-[0.18em] text-aegis-faint">
+              — staff eng · platform team
+            </p>
+          </div>
+        </aside>
+
+        <main className="relative flex flex-col">
+          <header className="flex h-16 items-center justify-between border-b border-aegis-line px-6 lg:hidden">
+            <Link href="/" aria-label="Nomos home">
+              <NomosLogo size={22} />
+            </Link>
+            <Link
+              href="/"
+              className="font-mono text-[10px] uppercase tracking-[0.18em] text-aegis-mute hover:text-aegis-paper"
+            >
+              ← back home
+            </Link>
+          </header>
+
+          <div className="flex flex-1 items-center justify-center px-6 py-16 md:px-10">
+            <div className="w-full max-w-[420px]">{children}</div>
+          </div>
+
+          {footer ? (
+            <footer className="border-t border-aegis-line px-6 py-5 md:px-10">
+              <div className="mx-auto max-w-[420px] text-center">{footer}</div>
+            </footer>
+          ) : null}
+        </main>
+      </div>
+    </>
   );
 }
