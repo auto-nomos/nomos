@@ -58,13 +58,12 @@ describe('loadConfig', () => {
     ).toThrow(ConfigError);
   });
 
-  it('rejects empty integrations list', () => {
-    expect(() =>
-      loadConfig([], {
-        CB_API_KEY: VALID_KEY,
-        CB_PDP_URL: 'https://pdp.test',
-        CB_CONTROL_PLANE_URL: 'https://api.test',
-      } as NodeJS.ProcessEnv),
-    ).toThrow(ConfigError);
+  it('allows empty integrations — bin.ts will fetch from control plane', () => {
+    const cfg = loadConfig([], {
+      CB_API_KEY: VALID_KEY,
+      CB_PDP_URL: 'https://pdp.test',
+      CB_CONTROL_PLANE_URL: 'https://api.test',
+    } as NodeJS.ProcessEnv);
+    expect(cfg.integrations).toEqual([]);
   });
 });

@@ -8,6 +8,7 @@ import type { Db } from './db/index.js';
 import type { Logger } from './logger.js';
 import { loggerMiddleware } from './middleware/logger.js';
 import { requestId } from './middleware/request-id.js';
+import { createAgentMeRoutes } from './routes/agent-me.js';
 import { createHealthRoutes } from './routes/health.js';
 import { createIntentRoutes } from './routes/intent.js';
 import { createInternalRoutes } from './routes/internal.js';
@@ -114,6 +115,11 @@ export function createServer(deps: ServerDeps): Hono {
   // SDK ↔ control-plane: trade an API key for short-lived UCANs. The PDP
   // never sees API keys; this route is the only one that does.
   app.route('/', createMintUcanRoutes({ db: deps.db, signing, usage }));
+
+  // MCP-server / agent discovery: which integrations + commands are
+  // available to this API key? Derived from the customer's policy set so
+  // the platform stays single-source-of-truth (no CB_INTEGRATIONS drift).
+  app.route('/', createAgentMeRoutes({ db: deps.db }));
 
   // SDK ↔ control-plane: dynamic per-request scope narrowing via the
   // Approval Envelope model. Mounted only when step-up is configured —
