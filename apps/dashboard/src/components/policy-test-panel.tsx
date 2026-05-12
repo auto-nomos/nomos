@@ -1,6 +1,6 @@
 'use client';
 
-import { CheckCircle2, XCircle } from 'lucide-react';
+import { CheckCircle2, ChevronDown, ChevronRight, RefreshCw, XCircle } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { trpc } from '../lib/trpc';
 import { Button } from './ui/button';
@@ -44,7 +44,9 @@ export function PolicyTestPanel({ policyId, integrationId }: PolicyTestPanelProp
     JSON.stringify({ now: new Date().toISOString(), agent_role: 'owner' }, null, 2),
   );
   const [parseError, setParseError] = useState<string | null>(null);
+  const [runError, setRunError] = useState<string | null>(null);
   const [result, setResult] = useState<DryRunResult | null>(null);
+  const [traceOpen, setTraceOpen] = useState(false);
 
   const effectiveCommand = command || defaultCommand;
 
@@ -69,14 +71,22 @@ export function PolicyTestPanel({ policyId, integrationId }: PolicyTestPanelProp
       return;
     }
     setParseError(null);
+    setRunError(null);
     setResult(null);
+    setTraceOpen(false);
     dryRun.mutate(
       { policyId, command: effectiveCommand, resource, context },
       {
         onSuccess: (r) => setResult(r),
-        onError: (err) => setParseError(err.message),
+        onError: (err) => setRunError(err.message),
       },
     );
+  }
+
+  function reset() {
+    setResult(null);
+    setRunError(null);
+    setTraceOpen(false);
   }
 
   return (
@@ -84,8 +94,8 @@ export function PolicyTestPanel({ policyId, integrationId }: PolicyTestPanelProp
       <CardHeader>
         <CardTitle className="text-base">Test panel</CardTitle>
         <CardDescription>
-          Evaluate this policy against a synthetic authorize request. Nothing is persisted; the PDP
-          is not contacted.
+          Runs the same Cedar engine the PDP uses, scoped to this single policy. Nothing persists;
+          no agent UCAN required.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -141,32 +151,102 @@ export function PolicyTestPanel({ policyId, integrationId }: PolicyTestPanelProp
         </div>
 
         {parseError && (
-          <p className="text-sm text-destructive" role="alert">
+          <p className="text-sm text-destructive" role="alert" data-testid="test-parse-error">
             {parseError}
           </p>
         )}
 
-        {result &&
-          (result.allow ? (
-            <div className="flex items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900 dark:border-emerald-900/40 dark:bg-emerald-950/40 dark:text-emerald-100">
-              <CheckCircle2 className="h-4 w-4" />
-              <span className="font-medium">ALLOW</span>
-              <span className="font-mono text-xs">receipt {result.receiptId.slice(0, 16)}…</span>
-            </div>
-          ) : (
-            <div className="flex items-center gap-2 rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">
-              <XCircle className="h-4 w-4" />
-              <span className="font-medium">DENY</span>
-              {result.reason && <span className="font-mono text-xs">{result.reason}</span>}
-            </div>
-          ))}
+        {runError && (
+          <div
+            className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive"
+            role="alert"
+            data-testid="test-run-error"
+          >
+            <p className="font-medium">PDP unreachable</p>
+            <p className="mt-1 font-mono text-xs">{runError}</p>
+            <Button variant="ghost" size="sm" className="mt-2" onClick={run}>
+              <RefreshCw className="mr-1 h-3 w-3" /> Retry
+            </Button>
+          </div>
+        )}
 
-        <div className="flex justify-end">
+        {!result && !runError && !parseError && !dryRun.isPending && (
+          <p className="text-xs text-muted-foreground" data-testid="test-empty">
+            Click Run to evaluate the request against this policy.
+          </p>
+        )}
+
+        {result && (
+          <div data-testid="test-result">
+            {result.allow ? (
+              <DecisionCard tone="allow">
+                <CheckCircle2 className="h-6 w-6" aria-hidden />
+                <div className="flex-1">
+                  <p className="text-2xl font-semibold tracking-tight">ALLOW</p>
+                  <p className="font-mono text-xs opacity-80">receipt {result.receiptId}</p>
+                </div>
+              </DecisionCard>
+            ) : (
+              <DecisionCard tone="deny">
+                <XCircle className="h-6 w-6" aria-hidden />
+                <div className="flex-1">
+                  <p className="text-2xl font-semibold tracking-tight">DENY</p>
+                  {result.reason && (
+                    <p className="font-mono text-xs opacity-80">reason: {result.reason}</p>
+                  )}
+                  <p className="font-mono text-xs opacity-60">receipt {result.receiptId}</p>
+                </div>
+              </DecisionCard>
+            )}
+
+            <button
+              type="button"
+              onClick={() => setTraceOpen((v) => !v)}
+              className="mt-3 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+              data-testid="test-trace-toggle"
+            >
+              {traceOpen ? (
+                <ChevronDown className="h-3 w-3" />
+              ) : (
+                <ChevronRight className="h-3 w-3" />
+              )}
+              {traceOpen ? 'Hide' : 'Show'} policy Cedar
+            </button>
+            {traceOpen && (
+              <pre
+                className="mt-2 max-h-64 overflow-auto rounded-md border bg-muted/30 p-3 text-xs leading-relaxed"
+                data-testid="test-trace"
+              >
+                {result.cedarText}
+              </pre>
+            )}
+          </div>
+        )}
+
+        <div className="flex justify-end gap-2">
+          {result && (
+            <Button variant="ghost" onClick={reset}>
+              Clear
+            </Button>
+          )}
           <Button onClick={run} disabled={buttonDisabled}>
-            {dryRun.isPending ? 'Running…' : 'Run'}
+            {dryRun.isPending ? 'Running decision…' : result ? 'Re-run' : 'Run'}
           </Button>
         </div>
       </CardContent>
     </Card>
   );
+}
+
+interface DecisionCardProps {
+  tone: 'allow' | 'deny';
+  children: React.ReactNode;
+}
+
+function DecisionCard({ tone, children }: DecisionCardProps) {
+  const cls =
+    tone === 'allow'
+      ? 'border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-900/40 dark:bg-emerald-950/40 dark:text-emerald-100'
+      : 'border-destructive/40 bg-destructive/5 text-destructive';
+  return <div className={`flex items-center gap-3 rounded-md border p-4 ${cls}`}>{children}</div>;
 }
