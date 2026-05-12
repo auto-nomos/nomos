@@ -94,6 +94,7 @@ export function createServer(deps: ServerDeps): Hono {
     app.route(
       '/',
       createInternalRoutes({
+        policyCache: deps.policyCache,
         revocationCache: deps.revocationCache,
         serviceToken: deps.internal.serviceToken,
         logger: deps.logger,
@@ -112,6 +113,14 @@ export function createServer(deps: ServerDeps): Hono {
           ? { refreshOAuthToken: deps.oauthProxy.refreshOAuthToken }
           : {}),
         ...(deps.emitAudit !== undefined ? { emitAudit: deps.emitAudit } : {}),
+        ...(deps.stepup
+          ? {
+              stepup: {
+                create: deps.stepup.create,
+                fetchApproval: deps.stepup.getStepUp,
+              },
+            }
+          : {}),
         ...(deps.oauthProxy.upstreamFetch !== undefined
           ? { upstreamFetch: deps.oauthProxy.upstreamFetch }
           : {}),

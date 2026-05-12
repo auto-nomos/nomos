@@ -1,9 +1,11 @@
 import { Hono } from 'hono';
+import type { PolicyCache } from '../cache/policies.js';
 import type { RevocationCache } from '../cache/revocations.js';
 import type { Logger } from '../logger.js';
 import { internalAuth } from '../middleware/internal-auth.js';
 
 export interface InternalDeps {
+  policyCache: PolicyCache;
   revocationCache: RevocationCache;
   serviceToken: string;
   logger: Logger;
@@ -37,6 +39,33 @@ export function createInternalRoutes(deps: InternalDeps): Hono {
       await deps.revocationCache.refresh(customerId);
     } catch (err) {
       deps.logger.error({ err, customerId }, 'push-driven revocation refresh failed');
+      return c.json({ error: 'refresh_failed' }, 500);
+    }
+    return c.json({ ok: true, customer_id: customerId });
+  });
+
+  /**
+   * P3 push-invalidation: control plane calls this after a grant upsert or
+   * policy save so the new bundle is live in seconds, not on the 60s tick.
+   */
+  app.post('/v1/internal/refresh-policies', async (c) => {
+    let body: unknown;
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ error: 'invalid_json' }, 400);
+    }
+    const customerId =
+      body && typeof body === 'object' && 'customer_id' in body
+        ? (body as { customer_id: unknown }).customer_id
+        : undefined;
+    if (typeof customerId !== 'string' || customerId.length === 0) {
+      return c.json({ error: 'customer_id required' }, 400);
+    }
+    try {
+      await deps.policyCache.refresh(customerId);
+    } catch (err) {
+      deps.logger.error({ err, customerId }, 'push-driven policy refresh failed');
       return c.json({ error: 'refresh_failed' }, 500);
     }
     return c.json({ ok: true, customer_id: customerId });

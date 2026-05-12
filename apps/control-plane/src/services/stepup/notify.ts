@@ -20,6 +20,8 @@ export interface StepUpNotifyArgs {
   ttlSeconds?: number;
   riskScore?: 'low' | 'medium' | 'high' | null;
   riskSummary?: string | null;
+  /** LLM-recommended scope for the human to start with (narrow/medium/broad). */
+  recommendedScope?: 'narrow' | 'medium' | 'broad' | null;
   /** Resolved per-user preferences. Knock workflow branches on these
    *  data fields; no client-side branching here. */
   prefs?: NotificationChannelPrefs;
@@ -66,6 +68,7 @@ export function createStepUpNotifier(opts: StepUpNotifierOptions): StepUpNotifie
         ttlSeconds: args.ttlSeconds ?? 60,
         ...(args.riskScore !== undefined ? { riskScore: args.riskScore } : {}),
         ...(args.riskSummary !== undefined ? { riskSummary: args.riskSummary } : {}),
+        ...(args.recommendedScope !== undefined ? { recommendedScope: args.recommendedScope } : {}),
       });
       if (sent) return;
       opts.logger.warn(
@@ -105,6 +108,9 @@ export function createStepUpNotifier(opts: StepUpNotifierOptions): StepUpNotifie
           prefs.telegramEnabled && prefs.telegramChatId ? prefs.telegramChatId : null,
         email_enabled: prefs.emailEnabled !== false,
         web_push_enabled: prefs.webPushEnabled !== false,
+        risk_score: args.riskScore ?? null,
+        risk_summary: args.riskSummary ?? null,
+        recommended_scope: args.recommendedScope ?? null,
       },
     });
 

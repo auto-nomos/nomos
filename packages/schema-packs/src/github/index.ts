@@ -1,4 +1,5 @@
 import type { IntegrationPack } from '../types.js';
+import { actionToCommand, resourceFor } from './actions.js';
 import { actions, templates } from './templates.js';
 
 export const githubPack: IntegrationPack = {
@@ -7,4 +8,4 @@ export const githubPack: IntegrationPack = {
   templates,
   actions: [...actions],
 };
-export { actions, templates };
+export { actions, actionToCommand, resourceFor, templates };

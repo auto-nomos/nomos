@@ -4,10 +4,12 @@ export const READS = [
   '/slack/channel/list',
   '/slack/channel/history',
   '/slack/message/read',
+  '/slack/user/read',
 ] as const;
 export const WRITES = [
   '/slack/message/post',
   '/slack/message/update',
+  '/slack/message/react',
   '/slack/channel/create',
 ] as const;
 export const actions = [...READS, ...WRITES] as const;

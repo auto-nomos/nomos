@@ -32,6 +32,8 @@
     "clean": "rm -rf dist .turbo"
   },
   "dependencies": {
+    "@auto-nomos/adapters": "workspace:*",
+    "@auto-nomos/schema-packs": "workspace:*",
     "@auto-nomos/sdk": "workspace:*",
     "@modelcontextprotocol/sdk": "1.18.1",
     "zod": "3.25.76"

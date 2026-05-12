@@ -1,11 +1,11 @@
 import { generateKeypair } from '@auto-nomos/crypto';
 import type { UcanPayload } from '@auto-nomos/shared-types';
-import { issueUcan } from '@auto-nomos/ucan';
+import { computeCid, issueUcan } from '@auto-nomos/ucan';
 import pino from 'pino';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { createPolicyCache } from '../cache/policies.js';
 import { createRevocationCache } from '../cache/revocations.js';
-import type { OAuthTokenResponse } from '../control-plane/client.js';
+import type { OAuthTokenResponse, StepUpStateResponse } from '../control-plane/client.js';
 import { createServer } from '../server.js';
 
 const CUSTOMER = '550e8400-e29b-41d4-a716-446655440000';
@@ -38,16 +38,21 @@ function makePayload(iss: string, aud: string, overrides: Partial<UcanPayload> =
 interface ProxyAppFixture {
   app: ReturnType<typeof createServer>;
   policyCache: ReturnType<typeof createPolicyCache>;
-  audits: Array<{ command: string; allow: boolean }>;
+  audits: Array<{ command: string; allow: boolean; reason?: string }>;
   upstreamCalls: { url: string; method: string; headers: Record<string, string>; body?: string }[];
   tokenLookups: { customerId: string; connectionId: string }[];
+  stepupCreate?: ReturnType<typeof vi.fn>;
+  stepupState?: Map<string, StepUpStateResponse>;
 }
 
-function buildApp(opts: {
+interface BuildAppOpts {
   upstreamRespond?: (url: string) => Response;
   tokenResp?: OAuthTokenResponse | (() => Promise<never>);
   customerForToken?: string;
-}): ProxyAppFixture {
+  withStepup?: boolean;
+}
+
+function buildApp(opts: BuildAppOpts): ProxyAppFixture {
   const logger = pino({ level: 'silent' });
   const policyCache = createPolicyCache({
     fetchBundle: async () => undefined,
@@ -97,16 +102,53 @@ function buildApp(opts: {
     );
   };
 
+  const stepupState = new Map<string, StepUpStateResponse>();
+  const stepupCreate = vi.fn(
+    async (args: {
+      customerId: string;
+      agentId: string;
+      command: string;
+      resource: Record<string, unknown>;
+      originalUcanCid?: string;
+    }) => {
+      const id = `aprv-${Math.random().toString(16).slice(2, 10)}`;
+      stepupState.set(id, {
+        id,
+        customerId: args.customerId,
+        agentId: args.agentId,
+        command: args.command,
+        resource: args.resource,
+        state: 'pending',
+        expiresAt: new Date(Date.now() + 60_000).toISOString(),
+        decidedAt: null,
+        cosignerAttestationJwt: null,
+      });
+      return { id, deepLink: `http://localhost:3000/approve/${id}` };
+    },
+  );
+
   const app = createServer({
     logger,
     policyCache,
     revocationCache,
     emitAudit: async (ev) => {
-      audits.push({ command: ev.request.command, allow: ev.decision.allow });
+      audits.push({
+        command: ev.request.command,
+        allow: ev.decision.allow,
+        ...(ev.decision.reason !== undefined ? { reason: ev.decision.reason } : {}),
+      });
     },
     oauthProxy: { fetchOAuthToken, upstreamFetch: fakeUpstream },
+    ...(opts.withStepup
+      ? {
+          stepup: {
+            create: stepupCreate,
+            getStepUp: async (id) => stepupState.get(id),
+          },
+        }
+      : {}),
   });
-  return { app, policyCache, audits, upstreamCalls, tokenLookups };
+  return { app, policyCache, audits, upstreamCalls, tokenLookups, stepupCreate, stepupState };
 }
 
 describe('POST /v1/proxy/:command', () => {
@@ -307,6 +349,121 @@ describe('POST /v1/proxy/:command', () => {
       body: 'not valid json',
     });
     expect(res.status).toBe(400);
+  });
+
+  it('triggers step-up when policy denies but cosigner=true would allow', async () => {
+    const stepUpPolicy = `
+permit (
+  principal,
+  action == Action::"/github/repo/create",
+  resource
+) when { context.cosigner == true };
+`;
+    const fix = buildApp({ withStepup: true });
+    fix.policyCache.set(CUSTOMER, stepUpPolicy);
+
+    const issuer = generateKeypair();
+    const agent = generateKeypair();
+    const AGENT_ID = '22222222-2222-2222-2222-222222222222';
+    const ucan = issueUcan({
+      payload: makePayload(issuer.did, agent.did, {
+        cmd: '/github/repo/create',
+        meta: { oauth_connection_id: 'conn-1', agent_id: AGENT_ID },
+      }),
+      privateKey: issuer.privateKey,
+    });
+
+    const res = await fix.app.request('/v1/proxy/github/repo/create', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-cb-customer': CUSTOMER },
+      body: JSON.stringify({
+        ucan: ucan.jwt,
+        request: {
+          ucan: ucan.jwt,
+          command: '/github/repo/create',
+          resource: { name: 'test-repo-01' },
+          context: {},
+        },
+        apiCall: {
+          method: 'POST',
+          path: '/user/repos',
+          body: { name: 'test-repo-01', private: true },
+        },
+      }),
+    });
+    // step-up returns 200 (not 403) so SDK keeps decision intact
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      allow: boolean;
+      decision: {
+        allow: boolean;
+        reason?: string;
+        receiptId: string;
+        requiresStepUp?: boolean;
+        stepUpUrl?: string;
+        stepUpId?: string;
+      };
+    };
+    expect(body.allow).toBe(false);
+    expect(body.decision.requiresStepUp).toBe(true);
+    expect(body.decision.reason).toBe('step_up_required');
+    expect(body.decision.stepUpUrl).toMatch(/\/approve\//);
+    expect(body.decision.stepUpId).toMatch(/^aprv-/);
+    expect(typeof body.decision.receiptId).toBe('string');
+    expect(body.decision.receiptId.length).toBeGreaterThan(0);
+    expect(fix.stepupCreate).toHaveBeenCalledOnce();
+    expect(fix.stepupCreate?.mock.calls[0]?.[0]).toMatchObject({
+      customerId: CUSTOMER,
+      agentId: AGENT_ID,
+      command: '/github/repo/create',
+      resource: { name: 'test-repo-01' },
+      originalUcanCid: computeCid(ucan.jwt),
+    });
+    expect(fix.upstreamCalls).toHaveLength(0);
+  });
+
+  it('skips step-up when UCAN lacks meta.agent_id', async () => {
+    const stepUpPolicy = `
+permit (
+  principal,
+  action == Action::"/github/repo/create",
+  resource
+) when { context.cosigner == true };
+`;
+    const fix = buildApp({ withStepup: true });
+    fix.policyCache.set(CUSTOMER, stepUpPolicy);
+
+    const issuer = generateKeypair();
+    const agent = generateKeypair();
+    const ucan = issueUcan({
+      payload: makePayload(issuer.did, agent.did, {
+        cmd: '/github/repo/create',
+        meta: { oauth_connection_id: 'conn-1' },
+      }),
+      privateKey: issuer.privateKey,
+    });
+
+    const res = await fix.app.request('/v1/proxy/github/repo/create', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-cb-customer': CUSTOMER },
+      body: JSON.stringify({
+        ucan: ucan.jwt,
+        request: {
+          ucan: ucan.jwt,
+          command: '/github/repo/create',
+          resource: { name: 'test-repo-01' },
+          context: {},
+        },
+        apiCall: { method: 'POST', path: '/user/repos', body: { name: 'test-repo-01' } },
+      }),
+    });
+    expect(res.status).toBe(403);
+    const body = (await res.json()) as {
+      decision: { requiresStepUp?: boolean; receiptId: string };
+    };
+    expect(body.decision.requiresStepUp).toBeUndefined();
+    expect(typeof body.decision.receiptId).toBe('string');
+    expect(fix.stepupCreate).not.toHaveBeenCalled();
   });
 
   it('returns 404 when no policies cached for customer', async () => {

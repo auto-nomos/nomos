@@ -4,6 +4,7 @@ import type { Config } from '../config.js';
 import type { Db } from '../db/index.js';
 import type { Logger } from '../logger.js';
 import type { TelegramBot } from '../services/notify/telegram-bot.js';
+import type { PolicyInvalidator } from '../services/policy-invalidator.js';
 import type { RevocationPublisher } from '../services/revocation-publisher.js';
 import type { WebAuthnConfig } from '../services/stepup/webauthn.js';
 import { createContext } from './context.js';
@@ -15,6 +16,7 @@ export interface TrpcHandlerDeps {
   logger: Logger;
   signing: { signKey: Uint8Array; signerDid: string };
   revocationPublisher?: RevocationPublisher;
+  policyInvalidator?: PolicyInvalidator;
   webauthn?: WebAuthnConfig;
   oauth?: { config: Config; encryptionKey: Uint8Array };
   telegramBot?: TelegramBot;
@@ -32,6 +34,7 @@ export function handleTrpc(req: Request, deps: TrpcHandlerDeps): Promise<Respons
         logger: deps.logger,
         signing: deps.signing,
         ...(deps.revocationPublisher ? { revocationPublisher: deps.revocationPublisher } : {}),
+        ...(deps.policyInvalidator ? { policyInvalidator: deps.policyInvalidator } : {}),
         ...(deps.webauthn ? { webauthn: deps.webauthn } : {}),
         ...(deps.oauth ? { oauth: deps.oauth } : {}),
         ...(deps.telegramBot ? { telegramBot: deps.telegramBot } : {}),

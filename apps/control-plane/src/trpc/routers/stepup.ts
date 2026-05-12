@@ -184,6 +184,10 @@ export const stepupRouter = router({
         /** Grant scope when remember=true: 'exact' (this resource only)
          *  or 'any' (every resource the action operates on). */
         scope: z.enum(['exact', 'any']).optional(),
+        /** Which LLM-drafted cedar variant the operator picked.
+         *  When set, that variant's Cedar text persists verbatim into
+         *  the grant. Defaults to the approval row's recommended_scope. */
+        selectedVariant: z.enum(['narrow', 'medium', 'broad']).optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -224,12 +228,23 @@ export const stepupRouter = router({
               command: schema.pushApprovals.command,
               resource: schema.pushApprovals.resource,
               riskSummary: schema.pushApprovals.riskSummary,
+              cedarVariants: schema.pushApprovals.cedarVariants,
+              recommendedScope: schema.pushApprovals.recommendedScope,
             })
             .from(schema.pushApprovals)
             .leftJoin(schema.agents, eq(schema.pushApprovals.agentId, schema.agents.id))
             .where(eq(schema.pushApprovals.id, input.approvalId))
             .limit(1);
           if (approval && approval.agentName) {
+            const variantPick =
+              input.selectedVariant ??
+              (approval.recommendedScope as 'narrow' | 'medium' | 'broad' | null) ??
+              null;
+            const variants = approval.cedarVariants as Record<string, string> | null;
+            const chosenSnippet =
+              variantPick && variants && typeof variants[variantPick] === 'string'
+                ? variants[variantPick]
+                : undefined;
             await upsertGrant(ctx.db.drizzle, {
               customerId: ctx.customerId,
               agentId: approval.agentId,
@@ -241,7 +256,9 @@ export const stepupRouter = router({
               grantedBy: ctx.session.user.id,
               sourceApprovalId: input.approvalId,
               riskSummary: approval.riskSummary,
+              ...(chosenSnippet ? { cedarSnippet: chosenSnippet } : {}),
             });
+            ctx.policyInvalidator.invalidate(ctx.customerId);
           }
         }
         return {
@@ -304,6 +321,7 @@ export const stepupRouter = router({
             sourceApprovalId: input.approvalId,
             riskSummary: approval.riskSummary,
           });
+          ctx.policyInvalidator.invalidate(ctx.customerId);
         }
         return { ...result, remembered: true };
       }

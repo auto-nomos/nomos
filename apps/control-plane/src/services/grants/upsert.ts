@@ -14,6 +14,12 @@ export interface UpsertGrantInput {
   grantedBy: string;
   sourceApprovalId?: string;
   riskSummary?: string | null;
+  /**
+   * When set, this exact Cedar text is persisted as the grant's snippet
+   * instead of the deterministic preview. The dashboard's 3-variant
+   * picker uses this to record the variant the operator selected.
+   */
+  cedarSnippet?: string;
 }
 
 export interface UpsertedGrant {
@@ -31,7 +37,7 @@ export async function upsertGrant(
   db: DrizzleClient,
   input: UpsertGrantInput,
 ): Promise<UpsertedGrant> {
-  const cedarSnippet = buildCedarPreviewForGrant(input);
+  const cedarSnippet = input.cedarSnippet ?? buildCedarPreviewForGrant(input);
   return await db.transaction(async (tx) => {
     const active = await tx
       .select({ id: schema.agentGrants.id })

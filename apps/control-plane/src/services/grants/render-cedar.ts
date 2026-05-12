@@ -9,6 +9,10 @@ export interface GrantRow {
   resourcePattern: Record<string, unknown>;
   scope: 'exact' | 'any';
   decision: 'allow' | 'deny';
+  /** When set, emit this Cedar text verbatim inside the bundle instead of
+   *  re-deriving from command + resourcePattern. Set by the dashboard's
+   *  3-variant picker on grant approval. Null for legacy grants. */
+  cedarSnippet?: string | null;
 }
 
 export interface StepUpAgent {
@@ -38,6 +42,7 @@ export async function loadActiveGrantsForCustomer(
       resourcePattern: schema.agentGrants.resourcePattern,
       scope: schema.agentGrants.scope,
       decision: schema.agentGrants.decision,
+      cedarSnippet: schema.agentGrants.cedarSnippet,
     })
     .from(schema.agentGrants)
     .innerJoin(schema.agents, eq(schema.agentGrants.agentId, schema.agents.id))
@@ -51,6 +56,7 @@ export async function loadActiveGrantsForCustomer(
     resourcePattern: r.resourcePattern as Record<string, unknown>,
     scope: r.scope as 'exact' | 'any',
     decision: r.decision as 'allow' | 'deny',
+    cedarSnippet: r.cedarSnippet,
   }));
 }
 
@@ -73,12 +79,21 @@ function renderWhenClause(pattern: Record<string, unknown>): string {
 /**
  * Render a single grant row as a Cedar rule.
  *
- * - decision='allow' → `permit (...) when { ... }`
- * - decision='deny'  → `forbid (...) when { ... }` (forbid wins over permit)
- * - scope='any'      → no when clause; the rule matches every resource for the action
- * - scope='exact'    → when clause keyed on every resource_pattern field
+ * - When `cedarSnippet` is non-null, emit it verbatim. The dashboard's
+ *   3-variant picker writes the operator-selected Cedar text directly
+ *   into this column; re-deriving would lose the operator's intent.
+ * - Otherwise derive from command + resource_pattern (legacy path):
+ *   - decision='allow' → `permit (...) when { ... }`
+ *   - decision='deny'  → `forbid (...) when { ... }` (forbid wins over permit)
+ *   - scope='any'      → no when clause; the rule matches every resource for the action
+ *   - scope='exact'    → when clause keyed on every resource_pattern field
  */
 export function renderGrantToCedar(grant: GrantRow): string {
+  if (grant.cedarSnippet && grant.cedarSnippet.trim().length > 0) {
+    return grant.cedarSnippet.trim().endsWith(';')
+      ? grant.cedarSnippet.trim()
+      : `${grant.cedarSnippet.trim()};`;
+  }
   const verb = grant.decision === 'allow' ? 'permit' : 'forbid';
   const principal = `principal == Agent::"${escapeCedarString(grant.agentDid)}"`;
   const action = `action == Action::"${escapeCedarString(grant.command)}"`;

@@ -4,8 +4,11 @@ import * as schema from '../../db/schema.js';
 import type { Logger } from '../../logger.js';
 import {
   buildCedarPreview,
+  buildCedarVariants,
+  type CedarVariants,
   fallbackRiskSummary,
   type RiskSummarizer,
+  type VariantScope,
 } from '../grants/llm-risk-summary.js';
 import type { StepUpNotifier } from './notify.js';
 
@@ -75,6 +78,12 @@ export async function createStepUpApproval(
     command: input.command,
     resource: input.resource,
   });
+  let cedarVariants: CedarVariants = buildCedarVariants({
+    agentName: agent.name,
+    command: input.command,
+    resource: input.resource,
+  });
+  let recommendedScope: VariantScope = 'narrow';
   if (deps.riskSummarizer) {
     const r = await deps.riskSummarizer({
       agentName: agent.name,
@@ -85,6 +94,8 @@ export async function createStepUpApproval(
       riskScore = r.riskScore;
       riskSummary = r.summary;
       cedarPreview = r.cedarPreview;
+      cedarVariants = r.cedarVariants;
+      recommendedScope = r.recommendedScope;
     }
   }
   if (riskSummary === null) {
@@ -96,6 +107,8 @@ export async function createStepUpApproval(
     riskScore = fb.riskScore;
     riskSummary = fb.summary;
     cedarPreview = fb.cedarPreview;
+    cedarVariants = fb.cedarVariants;
+    recommendedScope = fb.recommendedScope;
   }
 
   const [owner] = await deps.db
@@ -144,6 +157,8 @@ export async function createStepUpApproval(
       riskScore,
       riskSummary,
       cedarPreview,
+      cedarVariants,
+      recommendedScope,
       ...(input.originalUcanCid ? { originalUcanCid: input.originalUcanCid } : {}),
     })
     .returning({ id: schema.pushApprovals.id, expiresAt: schema.pushApprovals.expiresAt });
@@ -166,6 +181,7 @@ export async function createStepUpApproval(
         ttlSeconds,
         riskScore,
         riskSummary,
+        recommendedScope,
         ...(ownerPrefs ? { prefs: ownerPrefs } : {}),
       })
       .catch((err) => {

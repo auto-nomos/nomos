@@ -1,6 +1,11 @@
 import type { PolicyTemplate } from '../types.js';
 
-export const READS = ['/notion/page/read', '/notion/database/query', '/notion/block/read'] as const;
+export const READS = [
+  '/notion/page/read',
+  '/notion/database/query',
+  '/notion/block/read',
+  '/notion/search',
+] as const;
 export const WRITES = [
   '/notion/page/create',
   '/notion/page/update',

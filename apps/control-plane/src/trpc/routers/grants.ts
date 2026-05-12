@@ -87,6 +87,7 @@ export const grantsRouter = router({
         grantedBy: ctx.session.user.id,
         riskSummary: row.riskSummary,
       });
+      ctx.policyInvalidator.invalidate(ctx.customerId);
       return { id: result.id, decision: result.decision };
     }),
 
@@ -102,6 +103,7 @@ export const grantsRouter = router({
       if (!ok) {
         throw new TRPCError({ code: 'NOT_FOUND', message: 'grant_not_found' });
       }
+      ctx.policyInvalidator.invalidate(ctx.customerId);
       return { revoked: true };
     }),
 });

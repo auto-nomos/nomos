@@ -16,6 +16,7 @@ import { createOAuthRoutes } from './routes/oauth.js';
 import { createSkillRoutes } from './routes/skill.js';
 import type { CoherenceVerifier } from './services/intent-coherence.js';
 import type { TelegramBot } from './services/notify/telegram-bot.js';
+import type { PolicyInvalidator } from './services/policy-invalidator.js';
 import type { RevocationPublisher } from './services/revocation-publisher.js';
 import type { StepUpNotifier } from './services/stepup/notify.js';
 import type { WebAuthnConfig } from './services/stepup/webauthn.js';
@@ -45,6 +46,9 @@ export interface ServerDeps {
   };
   /** Sprint 8 — push revocation. When omitted, ucans.revoke noop-publishes. */
   revocationPublisher?: RevocationPublisher;
+  /** P3 — push policy invalidation. When omitted, PDP picks up grant + policy
+   *  changes on the periodic refresh tick. */
+  policyInvalidator?: PolicyInvalidator;
   /** Sprint 9 step-up. When omitted, /v1/internal/stepup/* is not mounted. */
   stepup?: {
     notifier: StepUpNotifier;
@@ -134,6 +138,7 @@ export function createServer(deps: ServerDeps): Hono {
       logger: deps.logger,
       signing: signing,
       ...(deps.revocationPublisher ? { revocationPublisher: deps.revocationPublisher } : {}),
+      ...(deps.policyInvalidator ? { policyInvalidator: deps.policyInvalidator } : {}),
       ...(deps.webauthn ? { webauthn: deps.webauthn } : {}),
       ...(deps.oauth
         ? { oauth: { config: deps.oauth.config, encryptionKey: deps.oauth.encryptionKey } }

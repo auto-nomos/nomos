@@ -10,6 +10,7 @@ import { createRiskSummarizer } from './services/grants/llm-risk-summary.js';
 import { createCoherenceVerifier } from './services/intent-coherence.js';
 import { createTelegramBot, type TelegramBot } from './services/notify/telegram-bot.js';
 import { createOAuthSweep } from './services/oauth-sweep.js';
+import { createPolicyInvalidator } from './services/policy-invalidator.js';
 import { createRevocationPublisher } from './services/revocation-publisher.js';
 import { createStepUpNotifier } from './services/stepup/notify.js';
 import { deriveWebAuthnConfig } from './services/stepup/webauthn.js';
@@ -99,6 +100,21 @@ async function main(): Promise<void> {
     logger,
   });
 
+  // P3 push-invalidation: derive policy refresh URLs from the revocation
+  // URLs unless the operator pinned a separate set. Both routes live on
+  // the same PDP service token.
+  const pdpPolicyWebhookUrls = pdpWebhookUrls.map((u) =>
+    u.replace(/\/v1\/internal\/refresh-revocations$/, '/v1/internal/refresh-policies'),
+  );
+  if (pdpPolicyWebhookUrls.length > 0) {
+    logger.info({ count: pdpPolicyWebhookUrls.length }, 'push policy invalidation enabled');
+  }
+  const policyInvalidator = createPolicyInvalidator({
+    webhookUrls: pdpPolicyWebhookUrls,
+    serviceToken: config.CONTROL_PLANE_SERVICE_TOKEN,
+    logger,
+  });
+
   let telegramBot: TelegramBot | undefined;
   if (config.TELEGRAM_BOT_TOKEN && config.TELEGRAM_BOT_USERNAME) {
     telegramBot = createTelegramBot({
@@ -165,6 +181,7 @@ async function main(): Promise<void> {
     internal: { serviceToken: config.CONTROL_PLANE_SERVICE_TOKEN },
     oauth: { config, encryptionKey },
     revocationPublisher,
+    policyInvalidator,
     stepup: {
       notifier: stepUpNotifier,
       dashboardPublicUrl: config.DASHBOARD_PUBLIC_URL,

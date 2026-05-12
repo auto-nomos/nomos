@@ -69,6 +69,10 @@ export interface SendStepUpArgs {
   ttlSeconds: number;
   riskScore?: 'low' | 'medium' | 'high' | null;
   riskSummary?: string | null;
+  /** LLM-recommended scope hint for the operator (narrow/medium/broad).
+   *  Telegram message embeds it; the actual 3-variant picker lives on the
+   *  dashboard approve page. */
+  recommendedScope?: 'narrow' | 'medium' | 'broad' | null;
 }
 
 export interface MintTokenArgs {
@@ -381,6 +385,9 @@ export function createTelegramBot(opts: TelegramBotOptions): TelegramBot {
             : '🟢 *Low risk*'
         : '';
       const summaryLine = args.riskSummary ? `_${args.riskSummary}_` : '';
+      const scopeHint = args.recommendedScope
+        ? `_Suggested scope: *${args.recommendedScope}* — pick on dashboard_`
+        : '';
       const text = [
         '*Step-up requested*',
         ...(riskBadge ? [riskBadge] : []),
@@ -390,6 +397,7 @@ export function createTelegramBot(opts: TelegramBotOptions): TelegramBot {
         `*Expires in:* ${args.ttlSeconds}s`,
         '',
         `Resource: \`${resourceJson}\``,
+        ...(scopeHint ? ['', scopeHint] : []),
         '',
         '_Once = this call only · Always = remember decision_',
       ].join('\n');

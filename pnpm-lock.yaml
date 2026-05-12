@@ -609,6 +609,12 @@ importers:
 
   packages/mcp-server:
     dependencies:
+      '@auto-nomos/adapters':
+        specifier: workspace:*
+        version: link:../adapters
+      '@auto-nomos/schema-packs':
+        specifier: workspace:*
+        version: link:../schema-packs
       '@auto-nomos/sdk':
         specifier: workspace:*
         version: link:../sdk-typescript
@@ -9904,7 +9910,7 @@ snapshots:
       obug: 2.1.1
       std-env: 4.1.0
       tinyrainbow: 3.1.0
-      vitest: 4.1.5(@opentelemetry/api@1.9.1)(@types/node@22.10.5)(@vitest/coverage-v8@4.1.5)(happy-dom@15.11.7)(msw@2.7.0(@types/node@22.10.5)(typescript@5.7.2))(vite@8.0.11(@types/node@22.10.5)(esbuild@0.19.12)(jiti@1.21.7)(tsx@4.21.0)(yaml@2.8.4))
+      vitest: 4.1.5(@opentelemetry/api@1.9.1)(@types/node@22.10.5)(@vitest/coverage-v8@4.1.5)(happy-dom@15.11.7)(msw@2.7.0(@types/node@22.10.5)(typescript@5.7.2))(vite@8.0.11(@types/node@22.10.5)(esbuild@0.27.7)(jiti@1.21.7)(tsx@4.21.0)(yaml@2.8.4))
 
   '@vitest/expect@4.1.5':
     dependencies:

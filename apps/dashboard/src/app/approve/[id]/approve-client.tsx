@@ -6,7 +6,7 @@ import {
   startAuthentication,
   startRegistration,
 } from '@simplewebauthn/browser';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { type EnvelopeSpec, formatEnvelopeAsk, formatReason } from '../../../lib/format-envelope';
 import { trpc } from '../../../lib/trpc';
 
@@ -20,6 +20,8 @@ interface ApproveClientProps {
 
 type Status = 'idle' | 'registering' | 'asserting' | 'denying' | 'done' | 'error';
 
+type VariantScope = 'narrow' | 'medium' | 'broad';
+
 export function ApproveClient({ approvalId }: ApproveClientProps) {
   const [status, setStatus] = useState<Status>('idle');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -27,8 +29,18 @@ export function ApproveClient({ approvalId }: ApproveClientProps) {
   const [mode, setMode] = useState<'session' | 'standing'>('session');
   const [remember, setRemember] = useState<boolean>(false);
   const [grantScope, setGrantScope] = useState<'exact' | 'any'>('exact');
+  const [selectedVariant, setSelectedVariant] = useState<VariantScope | null>(null);
 
   const approval = trpc.stepup.getApproval.useQuery({ approvalId });
+
+  useEffect(() => {
+    if (!approval.data || selectedVariant) return;
+    const rec = (approval.data as { recommendedScope?: unknown }).recommendedScope;
+    if (rec === 'narrow' || rec === 'medium' || rec === 'broad') {
+      setSelectedVariant(rec);
+    }
+  }, [approval.data, selectedVariant]);
+
   const registerOptions = trpc.stepup.registerOptions.useMutation();
   const registerVerify = trpc.stepup.registerVerify.useMutation();
   const assertOptions = trpc.stepup.assertOptions.useMutation();
@@ -87,7 +99,13 @@ export function ApproveClient({ approvalId }: ApproveClientProps) {
         // biome-ignore lint/suspicious/noExplicitAny: WebAuthn payload is verified server-side; tRPC wire schema uses passthrough.
         response: response as any,
         mode,
-        ...(remember ? { remember: true, scope: grantScope } : {}),
+        ...(remember
+          ? {
+              remember: true,
+              scope: grantScope,
+              ...(selectedVariant ? { selectedVariant } : {}),
+            }
+          : {}),
       });
       setResultMsg(
         `Approved${remember ? ' & remembered' : ''}. Cosigner expires at ${new Date(r.expiresAt).toLocaleTimeString()}.`,
@@ -181,14 +199,65 @@ export function ApproveClient({ approvalId }: ApproveClientProps) {
             <dd className="mt-1 text-zinc-700">{a.riskSummary}</dd>
           </div>
         )}
-        {a.cedarPreview && (
-          <details className="text-xs">
-            <summary className="cursor-pointer text-zinc-500">
-              Cedar preview (what would be saved)
-            </summary>
-            <pre className="mt-1 whitespace-pre-wrap rounded bg-zinc-50 p-2">{a.cedarPreview}</pre>
-          </details>
-        )}
+        {(() => {
+          const variants = (a as { cedarVariants?: unknown }).cedarVariants as
+            | { narrow?: string; medium?: string; broad?: string }
+            | null
+            | undefined;
+          if (variants && (variants.narrow || variants.medium || variants.broad)) {
+            return (
+              <fieldset className="rounded-md border border-zinc-200 p-3 text-xs">
+                <legend className="px-1 text-xs font-medium text-zinc-500">
+                  Cedar policy preview (pick scope to save)
+                </legend>
+                {(['narrow', 'medium', 'broad'] as const).map((scope) => {
+                  const text = variants[scope];
+                  if (!text) return null;
+                  const label =
+                    scope === 'narrow'
+                      ? 'Narrow — this exact resource'
+                      : scope === 'medium'
+                        ? 'Medium — same container (repo / channel / dataset)'
+                        : 'Broad — any resource of this action';
+                  const isSelected = selectedVariant === scope;
+                  return (
+                    <label
+                      key={scope}
+                      className={`mt-2 block cursor-pointer rounded border p-2 ${isSelected ? 'border-zinc-700 bg-zinc-50' : 'border-zinc-200'}`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="radio"
+                          name="cedarVariant"
+                          value={scope}
+                          checked={isSelected}
+                          onChange={() => setSelectedVariant(scope)}
+                        />
+                        <span className="font-medium">{label}</span>
+                      </div>
+                      <pre className="mt-2 whitespace-pre-wrap rounded bg-white p-2 font-mono text-xs">
+                        {text}
+                      </pre>
+                    </label>
+                  );
+                })}
+              </fieldset>
+            );
+          }
+          if (a.cedarPreview) {
+            return (
+              <details className="text-xs">
+                <summary className="cursor-pointer text-zinc-500">
+                  Cedar preview (what would be saved)
+                </summary>
+                <pre className="mt-1 whitespace-pre-wrap rounded bg-zinc-50 p-2">
+                  {a.cedarPreview}
+                </pre>
+              </details>
+            );
+          }
+          return null;
+        })()}
       </dl>
 
       {expiredOrDecided ? (

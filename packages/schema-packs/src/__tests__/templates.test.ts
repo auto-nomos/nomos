@@ -3,11 +3,10 @@ import { describe, expect, it } from 'vitest';
 import { listTemplates, PACKS, templateById, templatesFor } from '../index.js';
 
 describe('schema-packs templates', () => {
-  it('ships 5 templates per integration', () => {
+  it('ships at least 5 templates per integration', () => {
     for (const pack of PACKS) {
-      expect(pack.templates).toHaveLength(5);
+      expect(pack.templates.length).toBeGreaterThanOrEqual(5);
     }
-    expect(listTemplates()).toHaveLength(PACKS.length * 5);
   });
 
   it('every template has a unique id', () => {
@@ -34,7 +33,7 @@ describe('schema-packs templates', () => {
   });
 
   it('templatesFor("github") returns the github pack', () => {
-    expect(templatesFor('github')).toHaveLength(5);
+    expect(templatesFor('github').length).toBeGreaterThanOrEqual(5);
     expect(templatesFor('github').every((t) => t.integrationId === 'github')).toBe(true);
   });
 

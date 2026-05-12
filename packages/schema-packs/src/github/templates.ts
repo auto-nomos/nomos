@@ -16,13 +16,24 @@ export const WRITES = [
   '/github/pr/create',
   '/github/pr/merge',
 ] as const;
+export const DELETES = ['/github/repo/delete'] as const;
 
-export const actions = [...READS, ...WRITES] as const;
+export const actions = [...READS, ...WRITES, ...DELETES] as const;
 
 const READ_LIST = READS.map((a) => `Action::"${a}"`).join(', ');
 const WRITE_LIST = WRITES.map((a) => `Action::"${a}"`).join(', ');
+const DELETE_LIST = DELETES.map((a) => `Action::"${a}"`).join(', ');
 
 export const templates: PolicyTemplate[] = [
+  {
+    id: 'github:safe-default',
+    integrationId: 'github',
+    name: 'Safe default',
+    description:
+      'Reads always; writes require a co-signer approval; destructive deletes always forbid.',
+    cedarText: `permit (\n  principal,\n  action in [${READ_LIST}],\n  resource\n);\n\npermit (\n  principal,\n  action in [${WRITE_LIST}],\n  resource\n)\nwhen { context.cosigner == true };\n\nforbid (\n  principal,\n  action in [${DELETE_LIST}],\n  resource\n);`,
+    visualReady: true,
+  },
   {
     id: 'github:read-only',
     integrationId: 'github',

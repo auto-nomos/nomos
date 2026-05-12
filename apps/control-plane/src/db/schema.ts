@@ -361,6 +361,15 @@ export const pushApprovals = pgTable(
     riskScore: riskScoreEnum('risk_score'),
     riskSummary: text('risk_summary'),
     cedarPreview: text('cedar_preview'),
+    /**
+     * Three LLM-drafted Cedar policy variants (narrow / medium / broad scope).
+     * Operator picks one in the dashboard /approve/:id flow; the chosen
+     * variant persists verbatim into `agent_grants.cedar_snippet`. Older
+     * rows (pre-P2) may have null here — the dashboard falls back to
+     * `cedar_preview`.
+     */
+    cedarVariants: jsonb('cedar_variants'),
+    recommendedScope: text('recommended_scope'),
     expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
   },
   (t) => ({

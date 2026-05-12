@@ -63,6 +63,7 @@ export const policiesRouter = router({
         if (!updated) {
           throw new TRPCError({ code: 'NOT_FOUND', message: 'policy not found' });
         }
+        ctx.policyInvalidator.invalidate(ctx.customerId);
         return updated;
       }
 
@@ -78,6 +79,7 @@ export const policiesRouter = router({
       if (!created) {
         throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'policy insert failed' });
       }
+      ctx.policyInvalidator.invalidate(ctx.customerId);
       return created;
     }),
 

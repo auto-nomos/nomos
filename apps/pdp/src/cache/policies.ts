@@ -3,6 +3,10 @@ import type { Logger } from '../logger.js';
 export interface PolicyCache {
   getPolicies(customerId: string): string | undefined;
   set(customerId: string, policies: string): void;
+  /** Force-fetch a single customer's bundle and update the cache. Used by
+   *  the control-plane push-invalidation webhook so an approved grant is
+   *  live in seconds rather than waiting for the next refresh tick. */
+  refresh(customerId: string): Promise<void>;
   start(): void;
   stop(): void;
 }
@@ -44,6 +48,7 @@ export function createPolicyCache(options: PolicyCacheOptions): PolicyCache {
     set(customerId, policies) {
       store.set(customerId, policies);
     },
+    refresh: refreshOne,
     start() {
       if (timer) return;
       timer = setInterval(() => {

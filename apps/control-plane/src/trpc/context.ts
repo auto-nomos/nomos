@@ -5,6 +5,7 @@ import type { Db } from '../db/index.js';
 import * as schema from '../db/schema.js';
 import type { Logger } from '../logger.js';
 import type { TelegramBot } from '../services/notify/telegram-bot.js';
+import { noopPolicyInvalidator, type PolicyInvalidator } from '../services/policy-invalidator.js';
 import {
   noopRevocationPublisher,
   type RevocationPublisher,
@@ -19,6 +20,8 @@ export interface ContextDeps {
   signing: { signKey: Uint8Array; signerDid: string };
   /** Sprint 8 — push revocation. Defaults to noop when unset (tests / dev). */
   revocationPublisher?: RevocationPublisher;
+  /** P3 — push policy invalidation. Defaults to noop when unset. */
+  policyInvalidator?: PolicyInvalidator;
   /** Sprint 9 — passkey origin/rpId. Required for stepup router. */
   webauthn?: WebAuthnConfig;
   /** OAuth refresh deps. Required for oauth.refresh / oauth.disconnect. */
@@ -32,6 +35,7 @@ export interface Context {
   logger: Logger;
   signing: { signKey: Uint8Array; signerDid: string };
   revocationPublisher: RevocationPublisher;
+  policyInvalidator: PolicyInvalidator;
   webauthn: WebAuthnConfig | null;
   oauth: { config: Config; encryptionKey: Uint8Array } | null;
   telegramBot: TelegramBot | null;
@@ -80,6 +84,7 @@ export async function createContext(req: Request, deps: ContextDeps): Promise<Co
     logger: deps.logger,
     signing: deps.signing,
     revocationPublisher: deps.revocationPublisher ?? noopRevocationPublisher(),
+    policyInvalidator: deps.policyInvalidator ?? noopPolicyInvalidator(),
     webauthn: deps.webauthn ?? null,
     oauth: deps.oauth ?? null,
     telegramBot: deps.telegramBot ?? null,
