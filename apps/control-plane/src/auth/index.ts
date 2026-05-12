@@ -55,6 +55,9 @@ export function createAuth(deps: AuthDeps) {
       'http://127.0.0.1',
       'http://127.0.0.1:3000',
       'http://127.0.0.1:8788',
+      'https://app.auto-nomos.com',
+      'https://auto-nomos.com',
+      'https://www.auto-nomos.com',
     ],
     emailAndPassword: {
       enabled: true,

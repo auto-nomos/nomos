@@ -78,6 +78,9 @@ export function createServer(deps: ServerDeps): Hono {
         if (
           origin === 'http://localhost:3000' ||
           origin === 'http://127.0.0.1:3000' ||
+          origin === 'https://app.auto-nomos.com' ||
+          origin === 'https://auto-nomos.com' ||
+          origin === 'https://www.auto-nomos.com' ||
           origin.endsWith('.trycloudflare.com') ||
           origin.endsWith('.ngrok-free.app')
         ) {
