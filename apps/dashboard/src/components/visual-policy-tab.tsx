@@ -2,6 +2,12 @@
 
 import { emitPolicySet, type VisualPolicy } from '@auto-nomos/policy-builder/browser';
 import { PolicyBuilder } from '@auto-nomos/policy-builder/components';
+import {
+  type IntegrationId,
+  PACKS,
+  type PolicyTemplate,
+  templatesFor,
+} from '@auto-nomos/schema-packs';
 import { CheckCircle2, XCircle } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { trpc } from '../lib/trpc';
@@ -10,13 +16,29 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 
 export interface VisualPolicyTabProps {
   cedarText: string;
+  /** Integration scope from the parent policy — drives the empty-state template gallery. */
+  integrationId?: string | null;
   /** Called when the user applies a structurally-changed IR back to Cedar. */
   onApply: (newCedarText: string) => void;
   /** Disables editing — used for read-only previews. */
   readOnly?: boolean;
 }
 
-export function VisualPolicyTab({ cedarText, onApply, readOnly = false }: VisualPolicyTabProps) {
+const KNOWN_PACK_IDS: ReadonlySet<string> = new Set(PACKS.map((p) => p.id));
+
+function pickTemplates(integrationId: string | null | undefined): PolicyTemplate[] {
+  if (integrationId && KNOWN_PACK_IDS.has(integrationId)) {
+    return templatesFor(integrationId as IntegrationId);
+  }
+  return PACKS.flatMap((p) => p.templates.slice(0, 3));
+}
+
+export function VisualPolicyTab({
+  cedarText,
+  integrationId = null,
+  onApply,
+  readOnly = false,
+}: VisualPolicyTabProps) {
   // Cedar → IR runs server-side because cedar-wasm is Node-only.
   // Debounce the input the same way the Cedar tab debounces preview parses.
   const [debouncedText, setDebouncedText] = useState(cedarText);
@@ -110,7 +132,16 @@ export function VisualPolicyTab({ cedarText, onApply, readOnly = false }: Visual
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        {policies.length === 0 ? (
+        {policies.length === 0 && unrepresentable.length === 0 ? (
+          <EmptyTemplateGallery
+            integrationId={integrationId}
+            onPick={(t) => {
+              onApply(t.cedarText);
+              setDirty(false);
+            }}
+            disabled={readOnly}
+          />
+        ) : policies.length === 0 ? (
           <p className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
             Nothing to render visually. Switch to the Cedar tab to keep editing.
           </p>
@@ -162,5 +193,49 @@ export function VisualPolicyTab({ cedarText, onApply, readOnly = false }: Visual
         </CardFooter>
       )}
     </Card>
+  );
+}
+
+interface EmptyTemplateGalleryProps {
+  integrationId: string | null | undefined;
+  disabled: boolean;
+  onPick: (t: PolicyTemplate) => void;
+}
+
+function EmptyTemplateGallery({ integrationId, disabled, onPick }: EmptyTemplateGalleryProps) {
+  const templates = pickTemplates(integrationId);
+  if (templates.length === 0) {
+    return (
+      <p className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
+        Empty policy — paste Cedar in the Cedar tab to get started.
+      </p>
+    );
+  }
+  return (
+    <div>
+      <p className="mb-3 text-sm text-muted-foreground">
+        Empty policy. Pick a template to fill the editor — you can tweak it after.
+      </p>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {templates.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            disabled={disabled}
+            onClick={() => onPick(t)}
+            className="text-left rounded-md border p-3 transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
+            data-testid={`empty-template-${t.id}`}
+          >
+            <div className="text-sm font-medium">{t.name}</div>
+            <p className="mt-1 text-xs text-muted-foreground">{t.description}</p>
+            {!t.visualReady && (
+              <p className="mt-2 text-[10px] uppercase tracking-wide text-amber-600 dark:text-amber-400">
+                Cedar-only
+              </p>
+            )}
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }
