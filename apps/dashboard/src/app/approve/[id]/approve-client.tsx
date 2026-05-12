@@ -25,6 +25,8 @@ export function ApproveClient({ approvalId }: ApproveClientProps) {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [resultMsg, setResultMsg] = useState<string | null>(null);
   const [mode, setMode] = useState<'session' | 'standing'>('session');
+  const [remember, setRemember] = useState<boolean>(false);
+  const [grantScope, setGrantScope] = useState<'exact' | 'any'>('exact');
 
   const approval = trpc.stepup.getApproval.useQuery({ approvalId });
   const registerOptions = trpc.stepup.registerOptions.useMutation();
@@ -80,9 +82,16 @@ export function ApproveClient({ approvalId }: ApproveClientProps) {
       const response = (await startAuthentication({
         optionsJSON: options,
       })) as AuthenticationResponseJSON;
-      // biome-ignore lint/suspicious/noExplicitAny: see registerVerify cast above.
-      const r = await approveMutation.mutateAsync({ approvalId, response: response as any, mode });
-      setResultMsg(`Approved. Cosigner expires at ${new Date(r.expiresAt).toLocaleTimeString()}.`);
+      const r = await approveMutation.mutateAsync({
+        approvalId,
+        // biome-ignore lint/suspicious/noExplicitAny: WebAuthn payload is verified server-side; tRPC wire schema uses passthrough.
+        response: response as any,
+        mode,
+        ...(remember ? { remember: true, scope: grantScope } : {}),
+      });
+      setResultMsg(
+        `Approved${remember ? ' & remembered' : ''}. Cosigner expires at ${new Date(r.expiresAt).toLocaleTimeString()}.`,
+      );
       setStatus('done');
       await approval.refetch();
     } catch (err) {
@@ -95,8 +104,11 @@ export function ApproveClient({ approvalId }: ApproveClientProps) {
     try {
       setStatus('denying');
       setErrorMsg(null);
-      await denyMutation.mutateAsync({ approvalId });
-      setResultMsg('Denied.');
+      await denyMutation.mutateAsync({
+        approvalId,
+        ...(remember ? { remember: true, scope: grantScope } : {}),
+      });
+      setResultMsg(`Denied${remember ? ' & remembered' : ''}.`);
       setStatus('done');
       await approval.refetch();
     } catch (err) {
@@ -151,6 +163,32 @@ export function ApproveClient({ approvalId }: ApproveClientProps) {
           <dt className="text-zinc-500">Expires</dt>
           <dd>{new Date(a.expiresAt).toLocaleTimeString()}</dd>
         </div>
+        {a.riskScore && (
+          <div className="flex justify-between">
+            <dt className="text-zinc-500">Risk</dt>
+            <dd className="font-medium">
+              {a.riskScore === 'high'
+                ? '🔴 High'
+                : a.riskScore === 'medium'
+                  ? '🟡 Medium'
+                  : '🟢 Low'}
+            </dd>
+          </div>
+        )}
+        {a.riskSummary && (
+          <div>
+            <dt className="text-zinc-500">Summary</dt>
+            <dd className="mt-1 text-zinc-700">{a.riskSummary}</dd>
+          </div>
+        )}
+        {a.cedarPreview && (
+          <details className="text-xs">
+            <summary className="cursor-pointer text-zinc-500">
+              Cedar preview (what would be saved)
+            </summary>
+            <pre className="mt-1 whitespace-pre-wrap rounded bg-zinc-50 p-2">{a.cedarPreview}</pre>
+          </details>
+        )}
       </dl>
 
       {expiredOrDecided ? (
@@ -192,6 +230,55 @@ export function ApproveClient({ approvalId }: ApproveClientProps) {
               </label>
             </fieldset>
           ) : null}
+          <fieldset className="rounded-md border border-zinc-200 p-3 text-sm">
+            <legend className="px-1 text-xs font-medium text-zinc-500">
+              Remember this decision
+            </legend>
+            <label className="mb-2 flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={remember}
+                onChange={(e) => setRemember(e.target.checked)}
+              />
+              <span>
+                <span className="font-medium">Remember for next time</span> — saves an agent_grant
+                so this exact request auto-{remember ? 'resolves' : 'allows/denies'} without
+                prompting.
+              </span>
+            </label>
+            {remember && (
+              <div className="ml-6 mt-2 space-y-1">
+                <label className="flex items-start gap-2">
+                  <input
+                    type="radio"
+                    name="grantScope"
+                    value="exact"
+                    checked={grantScope === 'exact'}
+                    onChange={() => setGrantScope('exact')}
+                    className="mt-1"
+                  />
+                  <span>
+                    <span className="font-medium">This resource only</span> —{' '}
+                    <code className="text-xs">{JSON.stringify(a.resource).slice(0, 60)}</code>
+                  </span>
+                </label>
+                <label className="flex items-start gap-2">
+                  <input
+                    type="radio"
+                    name="grantScope"
+                    value="any"
+                    checked={grantScope === 'any'}
+                    onChange={() => setGrantScope('any')}
+                    className="mt-1"
+                  />
+                  <span>
+                    <span className="font-medium">Any resource</span> — every future call to{' '}
+                    <code className="text-xs">{a.command}</code>
+                  </span>
+                </label>
+              </div>
+            )}
+          </fieldset>
           <button
             type="button"
             onClick={handleApprove}
@@ -200,9 +287,13 @@ export function ApproveClient({ approvalId }: ApproveClientProps) {
           >
             {status === 'asserting'
               ? 'Approving…'
-              : mode === 'standing'
-                ? 'Approve as standing grant'
-                : 'Approve with passkey'}
+              : remember
+                ? grantScope === 'any'
+                  ? 'Always allow (any resource)'
+                  : 'Always allow (this resource)'
+                : mode === 'standing'
+                  ? 'Approve as standing grant'
+                  : 'Allow once'}
           </button>
           <button
             type="button"
@@ -218,7 +309,13 @@ export function ApproveClient({ approvalId }: ApproveClientProps) {
             disabled={status !== 'idle'}
             className="rounded-md bg-red-600 px-4 py-2 text-white disabled:opacity-50"
           >
-            {status === 'denying' ? 'Denying…' : 'Deny'}
+            {status === 'denying'
+              ? 'Denying…'
+              : remember
+                ? grantScope === 'any'
+                  ? 'Always deny (any resource)'
+                  : 'Always deny (this resource)'
+                : 'Deny once'}
           </button>
         </div>
       )}

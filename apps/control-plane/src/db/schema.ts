@@ -59,6 +59,9 @@ export const pushApprovalStateEnum = pgEnum('push_approval_state', [
   'denied',
   'expired',
 ]);
+export const grantDecisionEnum = pgEnum('grant_decision', ['allow', 'deny']);
+export const grantScopeEnum = pgEnum('grant_scope', ['exact', 'any']);
+export const riskScoreEnum = pgEnum('risk_score', ['low', 'medium', 'high']);
 
 // ===== Better-Auth tables (auth identity) =====
 
@@ -173,6 +176,7 @@ export const agents = pgTable(
     apiKeyHash: text('api_key_hash'),
     status: agentStatusEnum('status').notNull().default('active'),
     mode: agentModeEnum('mode').notNull().default('static'),
+    stepUpOnDeny: boolean('step_up_on_deny').notNull().default(true),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     lastActiveAt: timestamp('last_active_at', { withTimezone: true }),
     connectionApprovedAt: timestamp('connection_approved_at', { withTimezone: true }),
@@ -354,11 +358,47 @@ export const pushApprovals = pgTable(
      * any cosigner whose `cosigner_for` doesn't match the request's UCAN.
      */
     originalUcanCid: text('original_ucan_cid'),
+    riskScore: riskScoreEnum('risk_score'),
+    riskSummary: text('risk_summary'),
+    cedarPreview: text('cedar_preview'),
     expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
   },
   (t) => ({
     customerIdx: index('push_approvals_customer_idx').on(t.customerId),
     stateIdx: index('push_approvals_state_idx').on(t.state),
+  }),
+);
+
+export const agentGrants = pgTable(
+  'agent_grants',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    customerId: uuid('customer_id')
+      .notNull()
+      .references(() => customers.id, { onDelete: 'cascade' }),
+    agentId: uuid('agent_id')
+      .notNull()
+      .references(() => agents.id, { onDelete: 'cascade' }),
+    command: text('command').notNull(),
+    resourcePattern: jsonb('resource_pattern')
+      .$type<Record<string, unknown>>()
+      .notNull()
+      .default({}),
+    scope: grantScopeEnum('scope').notNull().default('exact'),
+    decision: grantDecisionEnum('decision').notNull(),
+    cedarSnippet: text('cedar_snippet'),
+    riskSummary: text('risk_summary'),
+    sourceApprovalId: uuid('source_approval_id').references(() => pushApprovals.id, {
+      onDelete: 'set null',
+    }),
+    grantedBy: uuid('granted_by').references(() => user.id),
+    grantedAt: timestamp('granted_at', { withTimezone: true }).notNull().defaultNow(),
+    revokedAt: timestamp('revoked_at', { withTimezone: true }),
+    revokedBy: uuid('revoked_by').references(() => user.id),
+  },
+  (t) => ({
+    customerAgentIdx: index('agent_grants_customer_agent_idx').on(t.customerId, t.agentId),
+    activeLookupIdx: index('agent_grants_lookup_idx').on(t.agentId, t.command),
   }),
 );
 
@@ -558,6 +598,17 @@ export const oauthConnectionsRelations = relations(oauthConnections, ({ one }) =
 export const pushApprovalsRelations = relations(pushApprovals, ({ one }) => ({
   customer: one(customers, { fields: [pushApprovals.customerId], references: [customers.id] }),
   agent: one(agents, { fields: [pushApprovals.agentId], references: [agents.id] }),
+}));
+
+export const agentGrantsRelations = relations(agentGrants, ({ one }) => ({
+  customer: one(customers, { fields: [agentGrants.customerId], references: [customers.id] }),
+  agent: one(agents, { fields: [agentGrants.agentId], references: [agents.id] }),
+  sourceApproval: one(pushApprovals, {
+    fields: [agentGrants.sourceApprovalId],
+    references: [pushApprovals.id],
+  }),
+  grantedByUser: one(user, { fields: [agentGrants.grantedBy], references: [user.id] }),
+  revokedByUser: one(user, { fields: [agentGrants.revokedBy], references: [user.id] }),
 }));
 
 export const mcpServersRelations = relations(mcpServers, ({ one }) => ({

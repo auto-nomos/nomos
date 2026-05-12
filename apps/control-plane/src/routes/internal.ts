@@ -29,6 +29,7 @@ export interface InternalDeps {
     notifier: StepUpNotifier;
     dashboardPublicUrl: string;
     defaultTtlSeconds?: number;
+    riskSummarizer?: import('../services/grants/llm-risk-summary.js').RiskSummarizer;
   };
 }
 
@@ -144,6 +145,7 @@ export function createInternalRoutes(deps: InternalDeps): Hono {
             notifier: stepup.notifier,
             dashboardPublicUrl: stepup.dashboardPublicUrl,
             ...(stepup.defaultTtlSeconds ? { defaultTtlSeconds: stepup.defaultTtlSeconds } : {}),
+            ...(stepup.riskSummarizer ? { riskSummarizer: stepup.riskSummarizer } : {}),
             logger: noopLogger,
           },
         );

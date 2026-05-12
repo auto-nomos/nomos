@@ -13,6 +13,7 @@ import { TRPCError } from '@trpc/server';
 import { and, desc, eq, gt } from 'drizzle-orm';
 import { z } from 'zod';
 import * as schema from '../../db/schema.js';
+import { upsertGrant } from '../../services/grants/upsert.js';
 import {
   CosignerError,
   denyApproval,
@@ -177,6 +178,12 @@ export const stepupRouter = router({
          *  meaningful for envelope-class approvals — ignored for
          *  request-class step-ups. */
         mode: z.enum(['session', 'standing']).optional(),
+        /** When true, write an active agent_grant so future identical
+         *  requests are auto-allowed without prompting. */
+        remember: z.boolean().optional(),
+        /** Grant scope when remember=true: 'exact' (this resource only)
+         *  or 'any' (every resource the action operates on). */
+        scope: z.enum(['exact', 'any']).optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -209,10 +216,39 @@ export const stepupRouter = router({
             signerDid: ctx.signing.signerDid,
           },
         );
+        if (input.remember) {
+          const [approval] = await ctx.db.drizzle
+            .select({
+              agentId: schema.pushApprovals.agentId,
+              agentName: schema.agents.name,
+              command: schema.pushApprovals.command,
+              resource: schema.pushApprovals.resource,
+              riskSummary: schema.pushApprovals.riskSummary,
+            })
+            .from(schema.pushApprovals)
+            .leftJoin(schema.agents, eq(schema.pushApprovals.agentId, schema.agents.id))
+            .where(eq(schema.pushApprovals.id, input.approvalId))
+            .limit(1);
+          if (approval && approval.agentName) {
+            await upsertGrant(ctx.db.drizzle, {
+              customerId: ctx.customerId,
+              agentId: approval.agentId,
+              agentName: approval.agentName,
+              command: approval.command,
+              resource: approval.resource as Record<string, unknown>,
+              scope: input.scope ?? 'exact',
+              decision: 'allow',
+              grantedBy: ctx.session.user.id,
+              sourceApprovalId: input.approvalId,
+              riskSummary: approval.riskSummary,
+            });
+          }
+        }
         return {
           approvalId: cosigner.approvalId,
           cosignerJwt: cosigner.cosignerJwt,
           expiresAt: cosigner.expiresAt.toISOString(),
+          ...(input.remember ? { remembered: true } : {}),
         };
       } catch (err) {
         if (err instanceof CosignerError) {
@@ -223,7 +259,15 @@ export const stepupRouter = router({
     }),
 
   deny: tenantProcedure
-    .input(z.object({ approvalId: z.string().uuid() }))
+    .input(
+      z.object({
+        approvalId: z.string().uuid(),
+        /** When true, write a deny grant so future identical requests
+         *  are auto-denied without prompting. */
+        remember: z.boolean().optional(),
+        scope: z.enum(['exact', 'any']).optional(),
+      }),
+    )
     .mutation(async ({ ctx, input }) => {
       const result = await denyApproval(
         input.approvalId,
@@ -233,6 +277,35 @@ export const stepupRouter = router({
       );
       if (!result.ok) {
         throw new TRPCError({ code: 'BAD_REQUEST', message: 'approval_not_pending' });
+      }
+      if (input.remember) {
+        const [approval] = await ctx.db.drizzle
+          .select({
+            agentId: schema.pushApprovals.agentId,
+            agentName: schema.agents.name,
+            command: schema.pushApprovals.command,
+            resource: schema.pushApprovals.resource,
+            riskSummary: schema.pushApprovals.riskSummary,
+          })
+          .from(schema.pushApprovals)
+          .leftJoin(schema.agents, eq(schema.pushApprovals.agentId, schema.agents.id))
+          .where(eq(schema.pushApprovals.id, input.approvalId))
+          .limit(1);
+        if (approval && approval.agentName) {
+          await upsertGrant(ctx.db.drizzle, {
+            customerId: ctx.customerId,
+            agentId: approval.agentId,
+            agentName: approval.agentName,
+            command: approval.command,
+            resource: approval.resource as Record<string, unknown>,
+            scope: input.scope ?? 'exact',
+            decision: 'deny',
+            grantedBy: ctx.session.user.id,
+            sourceApprovalId: input.approvalId,
+            riskSummary: approval.riskSummary,
+          });
+        }
+        return { ...result, remembered: true };
       }
       return result;
     }),

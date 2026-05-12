@@ -3,6 +3,12 @@ import { bytesToBase64url, canonicalize } from '@auto-nomos/ucan';
 import { eq } from 'drizzle-orm';
 import type { DrizzleClient } from '../db/index.js';
 import * as schema from '../db/schema.js';
+import {
+  loadActiveGrantsForCustomer,
+  loadStepUpAgentsForCustomer,
+  renderGrantsBlock,
+  renderStepUpBaseline,
+} from './grants/render-cedar.js';
 
 export interface BundlePolicy {
   id: string;
@@ -47,21 +53,49 @@ export async function generateBundle(
   customerId: string,
   deps: BundleServiceDeps,
 ): Promise<SignedBundle> {
-  const policies = await deps.db.query.policies.findMany({
-    where: eq(schema.policies.customerId, customerId),
-  });
+  const [policies, grants, stepUpAgents] = await Promise.all([
+    deps.db.query.policies.findMany({
+      where: eq(schema.policies.customerId, customerId),
+    }),
+    loadActiveGrantsForCustomer(deps.db, customerId),
+    loadStepUpAgentsForCustomer(deps.db, customerId),
+  ]);
+
+  const bundlePolicies: BundlePolicy[] = policies.map((p) => ({
+    id: p.id,
+    name: p.name,
+    integrationId: p.integrationId,
+    cedarText: p.cedarText,
+    version: p.version,
+  }));
+
+  const grantsBlock = renderGrantsBlock(grants);
+  if (grantsBlock) {
+    bundlePolicies.push({
+      id: `dynamic-grants:${customerId}`,
+      name: 'Dynamic agent grants',
+      integrationId: null,
+      cedarText: grantsBlock,
+      version: 1,
+    });
+  }
+
+  const baselineBlock = renderStepUpBaseline(stepUpAgents);
+  if (baselineBlock) {
+    bundlePolicies.push({
+      id: `stepup-baseline:${customerId}`,
+      name: 'Step-up baseline',
+      integrationId: null,
+      cedarText: baselineBlock,
+      version: 1,
+    });
+  }
 
   const bundle: BundleBody = {
     customer_id: customerId,
     version: 1,
     generated_at: new Date().toISOString(),
-    policies: policies.map((p) => ({
-      id: p.id,
-      name: p.name,
-      integrationId: p.integrationId,
-      cedarText: p.cedarText,
-      version: p.version,
-    })),
+    policies: bundlePolicies,
     // Schema-pack hash placeholder until Sprint 10 wires real packs in.
     schema_hash: sha256Hex(canonicalize({ schemas: [] })),
   };

@@ -18,6 +18,8 @@ export interface StepUpNotifyArgs {
   resource: Record<string, unknown>;
   deepLink: string;
   ttlSeconds?: number;
+  riskScore?: 'low' | 'medium' | 'high' | null;
+  riskSummary?: string | null;
   /** Resolved per-user preferences. Knock workflow branches on these
    *  data fields; no client-side branching here. */
   prefs?: NotificationChannelPrefs;
@@ -62,6 +64,8 @@ export function createStepUpNotifier(opts: StepUpNotifierOptions): StepUpNotifie
         resource: args.resource,
         deepLink: args.deepLink,
         ttlSeconds: args.ttlSeconds ?? 60,
+        ...(args.riskScore !== undefined ? { riskScore: args.riskScore } : {}),
+        ...(args.riskSummary !== undefined ? { riskSummary: args.riskSummary } : {}),
       });
       if (sent) return;
       opts.logger.warn(

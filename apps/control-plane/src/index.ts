@@ -6,6 +6,7 @@ import { type Config, loadConfig } from './config.js';
 import { createDb, seedSchemas } from './db/index.js';
 import { createLogger, type Logger } from './logger.js';
 import { createServer } from './server.js';
+import { createRiskSummarizer } from './services/grants/llm-risk-summary.js';
 import { createCoherenceVerifier } from './services/intent-coherence.js';
 import { createTelegramBot, type TelegramBot } from './services/notify/telegram-bot.js';
 import { createOAuthSweep } from './services/oauth-sweep.js';
@@ -133,6 +134,18 @@ async function main(): Promise<void> {
           timeoutMs: config.INTENT_COHERENCE_TIMEOUT_MS,
         })
       : undefined;
+
+  const riskSummarizer = config.ANTHROPIC_API_KEY
+    ? createRiskSummarizer({
+        apiKey: config.ANTHROPIC_API_KEY,
+        timeoutMs: config.INTENT_COHERENCE_TIMEOUT_MS,
+      })
+    : undefined;
+  if (riskSummarizer) {
+    logger.info('step-up risk summarizer enabled (Haiku 4.5, fail-open)');
+  } else {
+    logger.info('ANTHROPIC_API_KEY missing — step-up risk summary uses deterministic fallback');
+  }
   if (config.INTENT_COHERENCE_ENABLED && !config.ANTHROPIC_API_KEY) {
     logger.warn(
       'INTENT_COHERENCE_ENABLED=true but ANTHROPIC_API_KEY missing — coherence verifier disabled',
@@ -156,6 +169,7 @@ async function main(): Promise<void> {
       notifier: stepUpNotifier,
       dashboardPublicUrl: config.DASHBOARD_PUBLIC_URL,
       defaultTtlSeconds: Math.floor(config.STEPUP_DEFAULT_TTL_MS / 1_000),
+      ...(riskSummarizer ? { riskSummarizer } : {}),
     },
     webauthn: deriveWebAuthnConfig(config.DASHBOARD_PUBLIC_URL),
     ...(coherenceVerifier ? { coherenceVerifier } : {}),

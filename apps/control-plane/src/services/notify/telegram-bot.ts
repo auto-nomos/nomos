@@ -17,8 +17,14 @@
 import { randomBytes } from 'node:crypto';
 import { and, eq } from 'drizzle-orm';
 import type { DrizzleClient } from '../../db/index.js';
-import { customerTelegramLinks, pushApprovals, telegramLinkTokens } from '../../db/schema.js';
+import {
+  agents as agentsTable,
+  customerTelegramLinks,
+  pushApprovals,
+  telegramLinkTokens,
+} from '../../db/schema.js';
 import type { Logger } from '../../logger.js';
+import { upsertGrant } from '../grants/upsert.js';
 
 interface TgChat {
   id: number;
@@ -61,6 +67,8 @@ export interface SendStepUpArgs {
   resource: Record<string, unknown>;
   deepLink: string;
   ttlSeconds: number;
+  riskScore?: 'low' | 'medium' | 'high' | null;
+  riskSummary?: string | null;
 }
 
 export interface MintTokenArgs {
@@ -220,14 +228,63 @@ export function createTelegramBot(opts: TelegramBotOptions): TelegramBot {
     return updated.length > 0;
   }
 
+  /**
+   * Write an allow/deny grant for the approval's (agent, command, resource).
+   *
+   * Telegram taps don't carry a Better-Auth user session, so `grantedBy` is
+   * left null until we wire telegram-user-to-user-id resolution. The grant
+   * still takes effect through the Cedar bundle pipeline.
+   */
+  async function persistGrantFromTelegram(
+    approvalId: string,
+    decision: 'allow' | 'deny',
+  ): Promise<void> {
+    const [row] = await opts.db
+      .select({
+        customerId: pushApprovals.customerId,
+        agentId: pushApprovals.agentId,
+        agentName: agentsTable.name,
+        command: pushApprovals.command,
+        resource: pushApprovals.resource,
+        riskSummary: pushApprovals.riskSummary,
+      })
+      .from(pushApprovals)
+      .leftJoin(agentsTable, eq(pushApprovals.agentId, agentsTable.id))
+      .where(eq(pushApprovals.id, approvalId))
+      .limit(1);
+    if (!row || !row.agentName) return;
+    try {
+      await upsertGrant(opts.db, {
+        customerId: row.customerId,
+        agentId: row.agentId,
+        agentName: row.agentName,
+        command: row.command,
+        resource: row.resource as Record<string, unknown>,
+        scope: 'exact',
+        decision,
+        grantedBy: row.customerId,
+        sourceApprovalId: approvalId,
+        riskSummary: row.riskSummary,
+      });
+    } catch (err) {
+      opts.logger.warn({ err, approvalId, decision }, 'telegram-bot: upsertGrant failed');
+    }
+  }
+
   async function handleCallback(q: TgCallbackQuery): Promise<void> {
-    const m = q.data.match(/^(approve|deny):(.+)$/);
+    const m = q.data.match(
+      /^(approve_once|approve_always|deny_once|deny_always|approve|deny):(.+)$/,
+    );
     if (!m) {
       await answer(q.id, 'Unknown action');
       return;
     }
-    const [, action, approvalId] = m as [string, 'approve' | 'deny', string];
-    const ok = await resolveApproval(approvalId, action === 'approve' ? 'approved' : 'denied');
+    const [, rawAction, approvalId] = m as [string, string, string];
+    const action =
+      rawAction === 'approve' ? 'approve_once' : rawAction === 'deny' ? 'deny_once' : rawAction;
+    const isApprove = action === 'approve_once' || action === 'approve_always';
+    const isAlways = action === 'approve_always' || action === 'deny_always';
+    const ok = await resolveApproval(approvalId, isApprove ? 'approved' : 'denied');
     if (!ok) {
       await answer(q.id, 'Already decided or expired.');
       await editText({
@@ -237,7 +294,16 @@ export function createTelegramBot(opts: TelegramBotOptions): TelegramBot {
       });
       return;
     }
-    const verb = action === 'approve' ? '✓ Approved' : '✗ Denied';
+    if (isAlways) {
+      await persistGrantFromTelegram(approvalId, isApprove ? 'allow' : 'deny');
+    }
+    const verb = isApprove
+      ? isAlways
+        ? '✓ Approved (remembered)'
+        : '✓ Approved'
+      : isAlways
+        ? '✗ Denied (remembered)'
+        : '✗ Denied';
     await answer(q.id, verb);
     await editText({
       chatId: q.message.chat.id,
@@ -307,13 +373,25 @@ export function createTelegramBot(opts: TelegramBotOptions): TelegramBot {
   async function sendStepUp(args: SendStepUpArgs): Promise<boolean> {
     try {
       const resourceJson = JSON.stringify(args.resource).slice(0, 200);
+      const riskBadge = args.riskScore
+        ? args.riskScore === 'high'
+          ? '🔴 *High risk*'
+          : args.riskScore === 'medium'
+            ? '🟡 *Medium risk*'
+            : '🟢 *Low risk*'
+        : '';
+      const summaryLine = args.riskSummary ? `_${args.riskSummary}_` : '';
       const text = [
         '*Step-up requested*',
+        ...(riskBadge ? [riskBadge] : []),
+        ...(summaryLine ? [summaryLine] : []),
         '',
         `*Action:* \`${args.command}\``,
         `*Expires in:* ${args.ttlSeconds}s`,
         '',
         `Resource: \`${resourceJson}\``,
+        '',
+        '_Once = this call only · Always = remember decision_',
       ].join('\n');
       await sendMessage({
         chatId: args.chatId,
@@ -321,8 +399,12 @@ export function createTelegramBot(opts: TelegramBotOptions): TelegramBot {
         replyMarkup: {
           inline_keyboard: [
             [
-              { text: '✓ Approve', callback_data: `approve:${args.approvalId}` },
-              { text: '✗ Deny', callback_data: `deny:${args.approvalId}` },
+              { text: '✓ Allow once', callback_data: `approve_once:${args.approvalId}` },
+              { text: '✓ Always allow', callback_data: `approve_always:${args.approvalId}` },
+            ],
+            [
+              { text: '✗ Deny once', callback_data: `deny_once:${args.approvalId}` },
+              { text: '✗ Always deny', callback_data: `deny_always:${args.approvalId}` },
             ],
             [{ text: 'Open in browser', url: args.deepLink }],
           ],

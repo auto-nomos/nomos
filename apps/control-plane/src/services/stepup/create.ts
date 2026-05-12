@@ -2,6 +2,11 @@ import { and, eq } from 'drizzle-orm';
 import type { DrizzleClient } from '../../db/index.js';
 import * as schema from '../../db/schema.js';
 import type { Logger } from '../../logger.js';
+import {
+  buildCedarPreview,
+  fallbackRiskSummary,
+  type RiskSummarizer,
+} from '../grants/llm-risk-summary.js';
 import type { StepUpNotifier } from './notify.js';
 
 export class StepUpCreateError extends Error {
@@ -35,6 +40,8 @@ export interface StepUpCreateDeps {
   dashboardPublicUrl: string;
   defaultTtlSeconds?: number;
   logger: Logger;
+  /** Optional LLM-backed risk summarizer; falls back to deterministic if absent. */
+  riskSummarizer?: RiskSummarizer;
   now?: () => Date;
 }
 
@@ -49,12 +56,46 @@ export async function createStepUpApproval(
   const expiresAt = new Date(now.getTime() + ttlSeconds * 1_000);
 
   const [agent] = await deps.db
-    .select({ id: schema.agents.id, customerId: schema.agents.customerId })
+    .select({
+      id: schema.agents.id,
+      customerId: schema.agents.customerId,
+      name: schema.agents.name,
+    })
     .from(schema.agents)
     .where(and(eq(schema.agents.id, input.agentId), eq(schema.agents.customerId, input.customerId)))
     .limit(1);
   if (!agent) {
     throw new StepUpCreateError('agent_not_found', 'agent not found for this customer');
+  }
+
+  let riskScore: 'low' | 'medium' | 'high' = 'medium';
+  let riskSummary: string | null = null;
+  let cedarPreview = buildCedarPreview({
+    agentName: agent.name,
+    command: input.command,
+    resource: input.resource,
+  });
+  if (deps.riskSummarizer) {
+    const r = await deps.riskSummarizer({
+      agentName: agent.name,
+      command: input.command,
+      resource: input.resource,
+    });
+    if (r) {
+      riskScore = r.riskScore;
+      riskSummary = r.summary;
+      cedarPreview = r.cedarPreview;
+    }
+  }
+  if (riskSummary === null) {
+    const fb = fallbackRiskSummary({
+      agentName: agent.name,
+      command: input.command,
+      resource: input.resource,
+    });
+    riskScore = fb.riskScore;
+    riskSummary = fb.summary;
+    cedarPreview = fb.cedarPreview;
   }
 
   const [owner] = await deps.db
@@ -100,6 +141,9 @@ export async function createStepUpApproval(
       state: 'pending',
       requestedAt: now,
       expiresAt,
+      riskScore,
+      riskSummary,
+      cedarPreview,
       ...(input.originalUcanCid ? { originalUcanCid: input.originalUcanCid } : {}),
     })
     .returning({ id: schema.pushApprovals.id, expiresAt: schema.pushApprovals.expiresAt });
@@ -120,6 +164,8 @@ export async function createStepUpApproval(
         resource: input.resource,
         deepLink,
         ttlSeconds,
+        riskScore,
+        riskSummary,
         ...(ownerPrefs ? { prefs: ownerPrefs } : {}),
       })
       .catch((err) => {

@@ -50,6 +50,7 @@ export interface ServerDeps {
     notifier: StepUpNotifier;
     dashboardPublicUrl: string;
     defaultTtlSeconds?: number;
+    riskSummarizer?: import('./services/grants/llm-risk-summary.js').RiskSummarizer;
   };
   /** Sprint 9 — WebAuthn config (RP id + origin) for passkey approval. */
   webauthn?: WebAuthnConfig;

@@ -45,6 +45,7 @@ export interface IntentRouteDeps {
     notifier: StepUpNotifier;
     dashboardPublicUrl: string;
     defaultTtlSeconds?: number;
+    riskSummarizer?: import('../services/grants/llm-risk-summary.js').RiskSummarizer;
   };
   /** Optional LLM coherence verifier. Wired in index.ts when
    *  INTENT_COHERENCE_ENABLED + ANTHROPIC_API_KEY are set. */
@@ -190,6 +191,7 @@ export function createIntentRoutes(
         ...(deps.stepup.defaultTtlSeconds !== undefined
           ? { defaultTtlSeconds: deps.stepup.defaultTtlSeconds }
           : {}),
+        ...(deps.stepup.riskSummarizer ? { riskSummarizer: deps.stepup.riskSummarizer } : {}),
         logger: log,
       },
     );

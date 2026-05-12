@@ -105,7 +105,16 @@ export default function AgentDetailPage({ params }: { params: Promise<{ id: stri
     <div className="space-y-6">
       <header className="space-y-1">
         <p className="text-xs uppercase tracking-wide text-muted-foreground">App</p>
-        <h1 className="text-2xl font-semibold tracking-tight">{agent.name}</h1>
+        <div className="flex items-center justify-between gap-4">
+          <h1 className="text-2xl font-semibold tracking-tight">{agent.name}</h1>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => router.push(`/app/agents/${id}/grants`)}
+          >
+            Granted permissions →
+          </Button>
+        </div>
         <p className="font-mono text-xs text-muted-foreground">{agent.did}</p>
       </header>
 

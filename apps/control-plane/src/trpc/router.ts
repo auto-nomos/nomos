@@ -4,6 +4,7 @@ import { apiKeysRouter } from './routers/api-keys.js';
 import { auditRouter } from './routers/audit.js';
 import { customersRouter } from './routers/customers.js';
 import { envelopesRouter } from './routers/envelopes.js';
+import { grantsRouter } from './routers/grants.js';
 import { notificationPreferencesRouter } from './routers/notification-preferences.js';
 import { oauthRouter } from './routers/oauth.js';
 import { policiesRouter } from './routers/policies.js';
@@ -22,6 +23,7 @@ export const appRouter = router({
   stepup: stepupRouter,
   oauth: oauthRouter,
   envelopes: envelopesRouter,
+  grants: grantsRouter,
   notificationPreferences: notificationPreferencesRouter,
 });
 
