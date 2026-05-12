@@ -6,6 +6,8 @@
  * `actions`, `defaultPolicies`, and `connector` so the PDP can validate
  * authorize requests against per-integration vocab.
  */
+import type { z } from 'zod';
+
 export type IntegrationId =
   | 'github'
   | 'slack'
@@ -34,6 +36,22 @@ export interface PolicyTemplate {
   visualReady: boolean;
 }
 
+/**
+ * D3 (Lane B): per-action input shape used by the PDP to enforce
+ * schema-pack validation BEFORE Cedar evaluation. The PDP runs
+ * `apiCallSchema` against the `/v1/proxy` body and `resourceSchema` against
+ * `request.resource` on both `/v1/authorize` and `/v1/proxy`. Schemas are
+ * optional per-action so packs that haven't been filled in yet keep their
+ * existing pass-through behavior — only declared (command, schema) pairs
+ * enforce.
+ */
+export interface ActionSchemas {
+  /** Zod schema for the proxy `apiCall` payload (method, path, body, query). */
+  apiCallSchema?: z.ZodTypeAny;
+  /** Zod schema for the Cedar `request.resource` object. */
+  resourceSchema?: z.ZodTypeAny;
+}
+
 export interface IntegrationPack {
   id: IntegrationId;
   name: string;
@@ -44,4 +62,10 @@ export interface IntegrationPack {
    * authors and SDK callers in sync.
    */
   actions: string[];
+  /**
+   * Map keyed by full command (e.g. `/github/issue/create`) carrying the
+   * schemas the PDP enforces before decide() runs. Undefined or partial
+   * coverage is OK — the PDP treats missing entries as pass-through.
+   */
+  actionSchemas?: Partial<Record<string, ActionSchemas>>;
 }

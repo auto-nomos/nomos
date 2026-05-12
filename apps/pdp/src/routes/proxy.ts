@@ -13,7 +13,6 @@
 import type { Schema } from '@auto-nomos/cedar';
 import { type DecideInput, decide } from '@auto-nomos/core';
 import { sha256Hex } from '@auto-nomos/crypto';
-import { actionsFor, PACKS } from '@auto-nomos/schema-packs';
 import {
   type AuthorizeDecision,
   AuthorizeRequest as AuthorizeRequestSchema,
@@ -38,9 +37,16 @@ import { sanitizeResponseBody } from '../middleware/sanitize-response.js';
 import { recordAuthorize } from '../observability/metrics.js';
 import { validateCosigner } from '../services/cosigner-validate.js';
 import { evaluateStepUpPotential, shouldDetectStepUp } from '../services/stepup.js';
+import {
+  CUSTOMER_HEADER,
+  deriveCustomerId,
+  extractAgentDid,
+  extractAgentId,
+  isKnownCommand,
+  validateApiCall,
+  validateResource,
+} from './_shared.js';
 import type { AuditEmitInput } from './authorize.js';
-
-const CUSTOMER_HEADER = 'x-cb-customer';
 
 const ProxyRequestSchema = z.object({
   ucan: z.union([z.string().min(1), z.array(z.string().min(1)).min(1)]),
@@ -94,10 +100,7 @@ export function createProxyRoutes(deps: ProxyRouteDeps): Hono {
 
   app.post('/v1/proxy/:command{.+}', async (c) => {
     const log = getLog(c);
-    const customerId = c.req.header(CUSTOMER_HEADER);
-    if (!customerId) {
-      return c.json({ error: 'missing x-cb-customer header' }, 400);
-    }
+    const headerCustomerId = c.req.header(CUSTOMER_HEADER);
     const command = `/${c.req.param('command')}`;
 
     const raw = await c.req.json().catch(() => null);
@@ -112,6 +115,32 @@ export function createProxyRoutes(deps: ProxyRouteDeps): Hono {
       return c.json({ error: 'invalid authorize request', issues: requestParse.error.issues }, 400);
     }
     const request = requestParse.data;
+
+    // D2: derive customerId from UCAN meta when present; reject mismatched
+    // headers. For chained UCANs the leaf carries the same meta.customer_id
+    // as the root because chain attenuation never widens the tenant.
+    const firstUcan = Array.isArray(parsed.data.ucan) ? parsed.data.ucan[0] : parsed.data.ucan;
+    if (!firstUcan) {
+      return c.json({ error: 'missing UCAN', error_code: 'missing_ucan' }, 400);
+    }
+    const derive = deriveCustomerId(headerCustomerId, firstUcan);
+    if (!derive.ok) {
+      if (derive.code === 'mismatch') {
+        log.warn(
+          { header: derive.headerCustomerId, ucan: derive.ucanCustomerId },
+          'customerId mismatch between header and UCAN — rejecting',
+        );
+        return c.json({ error: derive.message, error_code: 'customer_id_mismatch' }, 400);
+      }
+      return c.json({ error: derive.message, error_code: 'missing_customer_id' }, 400);
+    }
+    const customerId = derive.customerId;
+    if (derive.source === 'header') {
+      log.warn(
+        { customerId },
+        'customerId from header (legacy); mint with meta.customer_id to remove deprecation warning',
+      );
+    }
 
     if (request.command !== command) {
       return c.json(
@@ -151,6 +180,57 @@ export function createProxyRoutes(deps: ProxyRouteDeps): Hono {
         404,
       );
     }
+
+    // D3: schema-pack enforcement. Runs after policy cache so a tenant the
+    // PDP doesn't recognize gets a 404 (operability) before paying for two
+    // zod parses. Packs without per-action schemas pass through unchanged.
+    const apiCallCheck = validateApiCall(request.command, parsed.data.apiCall);
+    if (!apiCallCheck.ok) {
+      log.info(
+        { command: request.command, customerId, issues: apiCallCheck.issues },
+        'schema-pack apiCall validation failed',
+      );
+      const denyDecision: AuthorizeDecision = {
+        allow: false,
+        reason: 'schema_violation',
+        receiptId: sha256Hex(`schema-violation|${request.command}|apiCall`),
+      };
+      recordAuthorize(decisionToAudit(denyDecision), denyDecision.reason);
+      if (deps.emitAudit) {
+        await deps.emitAudit({
+          customerId,
+          request,
+          decision: { ...denyDecision },
+          ts: Date.now(),
+          agentDid: extractAgentDid(firstUcan),
+        });
+      }
+      return c.json({ allow: false, decision: denyDecision, error_code: 'schema_violation' }, 403);
+    }
+    const resourceCheck = validateResource(request.command, request.resource);
+    if (!resourceCheck.ok) {
+      log.info(
+        { command: request.command, customerId, issues: resourceCheck.issues },
+        'schema-pack resource validation failed',
+      );
+      const denyDecision: AuthorizeDecision = {
+        allow: false,
+        reason: 'schema_violation',
+        receiptId: sha256Hex(`schema-violation|${request.command}|resource`),
+      };
+      recordAuthorize(decisionToAudit(denyDecision), denyDecision.reason);
+      if (deps.emitAudit) {
+        await deps.emitAudit({
+          customerId,
+          request,
+          decision: { ...denyDecision },
+          ts: Date.now(),
+          agentDid: extractAgentDid(firstUcan),
+        });
+      }
+      return c.json({ allow: false, decision: denyDecision, error_code: 'schema_violation' }, 403);
+    }
+
     const revokedCids = deps.revocationCache.getRevoked(customerId);
     const schema = deps.schemaForCustomer?.(customerId);
 
@@ -430,22 +510,6 @@ export function createProxyRoutes(deps: ProxyRouteDeps): Hono {
   return app;
 }
 
-/** Cached set of every command the schema-packs declare. Commands of the
- *  shape `/integration/*` map to actionsFor(integration); anything not in
- *  the union is rejected as `unknown_command` before decide() runs.
- *  Unknown integrations (unmapped first segment) pass through so generic
- *  Cedar policies can still match arbitrary action namespaces in tests. */
-const KNOWN_COMMANDS: ReadonlySet<string> = new Set(PACKS.flatMap((pack) => actionsFor(pack.id)));
-const KNOWN_INTEGRATIONS: ReadonlySet<string> = new Set(PACKS.map((p) => p.id));
-
-function isKnownCommand(command: string): boolean {
-  if (KNOWN_COMMANDS.has(command)) return true;
-  const seg = command.split('/')[1];
-  if (!seg) return false;
-  // Integrations the schema-packs don't ship for: leave the call to Cedar.
-  return !KNOWN_INTEGRATIONS.has(seg);
-}
-
 function leafUcan(jwts: string | string[]) {
   const list = Array.isArray(jwts) ? jwts : [jwts];
   const last = list[list.length - 1];
@@ -453,17 +517,4 @@ function leafUcan(jwts: string | string[]) {
   const parsed = parseUcanJwt(last);
   if ('error' in parsed) return null;
   return parsed;
-}
-
-function extractAgentId(jwt: string): string | undefined {
-  const parsed = parseUcanJwt(jwt);
-  if ('error' in parsed) return undefined;
-  const meta = parsed.payload.meta as Record<string, unknown> | undefined;
-  return typeof meta?.agent_id === 'string' ? meta.agent_id : undefined;
-}
-
-function extractAgentDid(jwt: string): string {
-  const parsed = parseUcanJwt(jwt);
-  if ('error' in parsed) return 'unknown';
-  return parsed.payload.aud;
 }

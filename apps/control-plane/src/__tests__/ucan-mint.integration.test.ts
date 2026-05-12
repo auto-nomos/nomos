@@ -103,6 +103,7 @@ describe.skipIf(!RUN)('mintUcan service (requires postgres)', () => {
     expect(result.payload.cmd).toBe('/github/issue/create');
     expect(result.payload.meta).toEqual({
       agent_id: agentId,
+      customer_id: customerId,
       oauth_connection_id: conn.id,
       mode: 'static',
     });
@@ -232,7 +233,11 @@ describe.skipIf(!RUN)('mintUcan service (requires postgres)', () => {
       },
       { db: db.drizzle, ...signing },
     );
-    expect(result.payload.meta).toEqual({ agent_id: agentId, mode: 'static' });
+    expect(result.payload.meta).toEqual({
+      agent_id: agentId,
+      customer_id: customerId,
+      mode: 'static',
+    });
   });
 
   it('D-5: stamps contextHints into meta.context_hints when provided', async () => {
@@ -251,6 +256,7 @@ describe.skipIf(!RUN)('mintUcan service (requires postgres)', () => {
     );
     expect(result.payload.meta).toEqual({
       agent_id: agentId,
+      customer_id: customerId,
       context_hints: { user: { department: 'engineering', role: 'staff' } },
       mode: 'static',
     });
@@ -270,7 +276,11 @@ describe.skipIf(!RUN)('mintUcan service (requires postgres)', () => {
       },
       { db: db.drizzle, ...signing },
     );
-    expect(result.payload.meta).toEqual({ agent_id: agentId, mode: 'static' });
+    expect(result.payload.meta).toEqual({
+      agent_id: agentId,
+      customer_id: customerId,
+      mode: 'static',
+    });
   });
 
   it('uses injected `now` for deterministic exp/nbf', async () => {

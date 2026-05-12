@@ -1,14 +1,13 @@
 import type { Schema } from '@auto-nomos/cedar';
 import { type DecideInput, decide } from '@auto-nomos/core';
 import { sha256Hex } from '@auto-nomos/crypto';
-import { actionsFor, PACKS } from '@auto-nomos/schema-packs';
 import {
   type AuthorizeDecision,
   type AuthorizeRequest,
   AuthorizeRequest as AuthorizeRequestSchema,
   type DenyReason,
 } from '@auto-nomos/shared-types';
-import { canonicalize, computeCid, parseUcanJwt } from '@auto-nomos/ucan';
+import { canonicalize, computeCid } from '@auto-nomos/ucan';
 import { Hono } from 'hono';
 import { decisionToAudit } from '../audit/emit.js';
 import type { PolicyCache } from '../cache/policies.js';
@@ -18,6 +17,14 @@ import { getLog } from '../middleware/logger.js';
 import { recordAuthorize } from '../observability/metrics.js';
 import { validateCosigner } from '../services/cosigner-validate.js';
 import { evaluateStepUpPotential, shouldDetectStepUp } from '../services/stepup.js';
+import {
+  CUSTOMER_HEADER,
+  deriveCustomerId,
+  extractAgentDid,
+  extractAgentId,
+  isKnownCommand,
+  validateResource,
+} from './_shared.js';
 
 export interface AuthorizeRouteDeps {
   policyCache: PolicyCache;
@@ -54,40 +61,12 @@ export interface AuditEmitInput {
   agentDid: string;
 }
 
-const CUSTOMER_HEADER = 'x-cb-customer';
-
-function extractAgentId(jwt: string): string | undefined {
-  const parsed = parseUcanJwt(jwt);
-  if ('error' in parsed) return undefined;
-  const meta = parsed.payload.meta as Record<string, unknown> | undefined;
-  return typeof meta?.agent_id === 'string' ? meta.agent_id : undefined;
-}
-
-function extractAgentDid(jwt: string): string {
-  const parsed = parseUcanJwt(jwt);
-  if ('error' in parsed) return 'unknown';
-  return parsed.payload.aud;
-}
-
-const KNOWN_COMMANDS: ReadonlySet<string> = new Set(PACKS.flatMap((pack) => actionsFor(pack.id)));
-const KNOWN_INTEGRATIONS: ReadonlySet<string> = new Set(PACKS.map((p) => p.id));
-
-function isKnownCommand(command: string): boolean {
-  if (KNOWN_COMMANDS.has(command)) return true;
-  const seg = command.split('/')[1];
-  if (!seg) return false;
-  return !KNOWN_INTEGRATIONS.has(seg);
-}
-
 export function createAuthorizeRoutes(deps: AuthorizeRouteDeps): Hono {
   const app = new Hono();
 
   app.post('/v1/authorize', async (c) => {
     const log = getLog(c);
-    const customerId = c.req.header(CUSTOMER_HEADER);
-    if (!customerId) {
-      return c.json({ error: 'missing x-cb-customer header' }, 400);
-    }
+    const headerCustomerId = c.req.header(CUSTOMER_HEADER);
 
     const body = await c.req.json().catch(() => null);
     if (!body) {
@@ -100,12 +79,62 @@ export function createAuthorizeRoutes(deps: AuthorizeRouteDeps): Hono {
     }
     const request = parsed.data;
 
+    const derive = deriveCustomerId(headerCustomerId, request.ucan);
+    if (!derive.ok) {
+      if (derive.code === 'mismatch') {
+        log.warn(
+          {
+            header: derive.headerCustomerId,
+            ucan: derive.ucanCustomerId,
+          },
+          'customerId mismatch between header and UCAN — rejecting',
+        );
+        return c.json({ error: derive.message, error_code: 'customer_id_mismatch' }, 400);
+      }
+      return c.json({ error: derive.message, error_code: 'missing_customer_id' }, 400);
+    }
+    const customerId = derive.customerId;
+    if (derive.source === 'header') {
+      log.warn(
+        { customerId },
+        'customerId from header (legacy); mint with meta.customer_id to remove deprecation warning',
+      );
+    }
+
     if (!isKnownCommand(request.command)) {
       log.warn({ command: request.command, customerId }, 'unknown command rejected');
       const denyDecision: AuthorizeDecision = {
         allow: false,
         reason: 'unknown_command',
         receiptId: sha256Hex(`unknown-command|${request.command}`),
+      };
+      recordAuthorize(decisionToAudit(denyDecision), denyDecision.reason);
+      if (deps.emitAudit) {
+        await deps.emitAudit({
+          customerId,
+          request,
+          decision: { ...denyDecision },
+          ts: Date.now(),
+          agentDid: extractAgentDid(request.ucan),
+        });
+      }
+      return c.json(denyDecision, 200);
+    }
+
+    // D3: schema-pack resource validation. Runs before decide() so a
+    // malformed resource shape never reaches Cedar — engineers debugging a
+    // policy match failure see schema_violation, not a confusing Cedar
+    // miss. Packs without per-action schemas pass through unchanged.
+    const resourceCheck = validateResource(request.command, request.resource);
+    if (!resourceCheck.ok) {
+      log.info(
+        { command: request.command, customerId, issues: resourceCheck.issues },
+        'schema-pack resource validation failed',
+      );
+      const denyDecision: AuthorizeDecision = {
+        allow: false,
+        reason: 'schema_violation',
+        receiptId: sha256Hex(`schema-violation|${request.command}|resource`),
       };
       recordAuthorize(decisionToAudit(denyDecision), denyDecision.reason);
       if (deps.emitAudit) {

@@ -305,4 +305,115 @@ describe('POST /v1/authorize', () => {
     expect(audits).toHaveLength(1);
     expect(audits[0]).toEqual({ command: '/github/issue/create', allow: true });
   });
+
+  it('D2 — rejects when header customerId mismatches UCAN meta.customer_id', async () => {
+    const { app, policyCache } = buildApp();
+    policyCache.set(CUSTOMER, githubPolicy);
+
+    const issuer = generateKeypair();
+    const agent = generateKeypair();
+    // UCAN bound to CUSTOMER (the "real" tenant). Attacker presents this
+    // UCAN with a header spoofing a different tenant.
+    const ucan = issueUcan({
+      payload: makePayload(issuer.did, agent.did, { meta: { customer_id: CUSTOMER } }),
+      privateKey: issuer.privateKey,
+    });
+    const otherTenant = '11111111-2222-4333-9444-555555555555';
+
+    const res = await app.request('/v1/authorize', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-cb-customer': otherTenant },
+      body: JSON.stringify({
+        ucan: ucan.jwt,
+        command: '/github/issue/create',
+        resource: { repo: 'acme/billing' },
+        context: {},
+      }),
+    });
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error_code: string };
+    expect(body.error_code).toBe('customer_id_mismatch');
+  });
+
+  it('D2 — derives customerId from UCAN meta when header is absent', async () => {
+    const { app, policyCache, audits } = buildApp();
+    policyCache.set(CUSTOMER, githubPolicy);
+
+    const issuer = generateKeypair();
+    const agent = generateKeypair();
+    const ucan = issueUcan({
+      payload: makePayload(issuer.did, agent.did, { meta: { customer_id: CUSTOMER } }),
+      privateKey: issuer.privateKey,
+    });
+
+    const res = await app.request('/v1/authorize', {
+      method: 'POST',
+      // No x-cb-customer header — should fall through to UCAN-derived value.
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        ucan: ucan.jwt,
+        command: '/github/issue/create',
+        resource: { repo: 'acme/billing' },
+        context: {},
+      }),
+    });
+    expect(res.status).toBe(200);
+    expect(audits).toHaveLength(1);
+    expect(audits[0]?.allow).toBe(true);
+  });
+
+  it('D3 — denies with schema_violation when resource has invalid type', async () => {
+    const { app, policyCache, audits } = buildApp();
+    policyCache.set(CUSTOMER, githubPolicy);
+
+    const issuer = generateKeypair();
+    const agent = generateKeypair();
+    const ucan = issueUcan({
+      payload: makePayload(issuer.did, agent.did, { meta: { customer_id: CUSTOMER } }),
+      privateKey: issuer.privateKey,
+    });
+
+    const res = await app.request('/v1/authorize', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-cb-customer': CUSTOMER },
+      body: JSON.stringify({
+        ucan: ucan.jwt,
+        command: '/github/issue/create',
+        resource: { issue_number: 'not-a-number' }, // schema expects positive int
+        context: {},
+      }),
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { allow: boolean; reason: string };
+    expect(body.allow).toBe(false);
+    expect(body.reason).toBe('schema_violation');
+    expect(audits).toHaveLength(1);
+    expect(audits[0]?.allow).toBe(false);
+  });
+
+  it('D2 — rejects when neither header nor UCAN meta.customer_id is present', async () => {
+    const { app, policyCache } = buildApp();
+    policyCache.set(CUSTOMER, githubPolicy);
+
+    const issuer = generateKeypair();
+    const agent = generateKeypair();
+    const ucan = issueUcan({
+      payload: makePayload(issuer.did, agent.did), // no meta.customer_id
+      privateKey: issuer.privateKey,
+    });
+
+    const res = await app.request('/v1/authorize', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' }, // no x-cb-customer
+      body: JSON.stringify({
+        ucan: ucan.jwt,
+        command: '/github/issue/create',
+        resource: { repo: 'acme/billing' },
+        context: {},
+      }),
+    });
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error_code: string };
+    expect(body.error_code).toBe('missing_customer_id');
+  });
 });

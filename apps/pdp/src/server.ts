@@ -5,7 +5,7 @@ import type { RevocationCache } from './cache/revocations.js';
 import type { OAuthTokenResponse, StepUpStateResponse } from './control-plane/client.js';
 import type { Logger } from './logger.js';
 import { loggerMiddleware } from './middleware/logger.js';
-import { requestId } from './middleware/request-id.js';
+import { getRequestId, requestId } from './middleware/request-id.js';
 import { type AuditEmitInput, createAuthorizeRoutes } from './routes/authorize.js';
 import { healthRoutes } from './routes/health.js';
 import { createInternalRoutes } from './routes/internal.js';
@@ -129,11 +129,12 @@ export function createServer(deps: ServerDeps): Hono {
   }
 
   app.onError((err, c) => {
-    deps.logger.error({ err }, 'unhandled error');
-    return c.json({ error: 'internal_error' }, 500);
+    const requestId = getRequestId(c);
+    deps.logger.error({ err, requestId }, 'unhandled error');
+    return c.json({ error: 'internal_error', request_id: requestId }, 500);
   });
 
-  app.notFound((c) => c.json({ error: 'not_found' }, 404));
+  app.notFound((c) => c.json({ error: 'not_found', request_id: getRequestId(c) }, 404));
 
   return app;
 }

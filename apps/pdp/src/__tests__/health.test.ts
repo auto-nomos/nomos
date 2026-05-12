@@ -53,4 +53,16 @@ describe('health routes', () => {
     const res = await app.request('/healthz');
     expect(res.headers.get('x-request-id')).toMatch(/^[0-9a-f]{16}$/);
   });
+
+  it('404 response body includes request_id matching the header', async () => {
+    const app = buildTestServer();
+    const res = await app.request('/no-such-path', {
+      headers: { 'x-request-id': 'rid-404-test' },
+    });
+    expect(res.status).toBe(404);
+    const body = (await res.json()) as { error: string; request_id: string };
+    expect(body.error).toBe('not_found');
+    expect(body.request_id).toBe('rid-404-test');
+    expect(res.headers.get('x-request-id')).toBe('rid-404-test');
+  });
 });

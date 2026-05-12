@@ -260,7 +260,7 @@ describe('POST /v1/proxy/:command', () => {
           resource: { repo: 'acme/billing' },
           context: {},
         },
-        apiCall: { method: 'GET', path: '/repos/acme/billing' },
+        apiCall: { method: 'POST', path: '/repos/acme/billing/issues', body: { title: 't' } },
       }),
     });
     expect(res.status).toBe(400);
@@ -321,7 +321,7 @@ describe('POST /v1/proxy/:command', () => {
           resource: { repo: 'acme/billing' },
           context: {},
         },
-        apiCall: { method: 'GET', path: '/repos/acme/billing' },
+        apiCall: { method: 'POST', path: '/repos/acme/billing/issues', body: { title: 't' } },
       }),
     });
     expect(res.status).toBe(502);
@@ -491,5 +491,78 @@ permit (
       }),
     });
     expect(res.status).toBe(404);
+  });
+
+  it('D3 — denies with schema_violation when apiCall method mismatches command', async () => {
+    const fix = buildApp({});
+    fix.policyCache.set(CUSTOMER, githubPolicy);
+
+    const issuer = generateKeypair();
+    const agent = generateKeypair();
+    const ucan = issueUcan({
+      payload: makePayload(issuer.did, agent.did, {
+        meta: { oauth_connection_id: 'conn-1', customer_id: CUSTOMER },
+      }),
+      privateKey: issuer.privateKey,
+    });
+
+    const res = await fix.app.request('/v1/proxy/github/issue/create', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-cb-customer': CUSTOMER },
+      body: JSON.stringify({
+        ucan: ucan.jwt,
+        request: {
+          ucan: ucan.jwt,
+          command: '/github/issue/create',
+          resource: { repo: 'acme/billing' },
+          context: {},
+        },
+        // issue/create requires POST; GET triggers schema_violation
+        apiCall: { method: 'GET', path: '/repos/acme/billing/issues' },
+      }),
+    });
+    expect(res.status).toBe(403);
+    const body = (await res.json()) as { error_code: string; decision: { reason: string } };
+    expect(body.error_code).toBe('schema_violation');
+    expect(body.decision.reason).toBe('schema_violation');
+    // upstream must not be called when schema-pack denies pre-decide
+    expect(fix.upstreamCalls).toHaveLength(0);
+  });
+
+  it('D3 — rejects path traversal in apiCall path', async () => {
+    const fix = buildApp({});
+    fix.policyCache.set(CUSTOMER, githubPolicy);
+
+    const issuer = generateKeypair();
+    const agent = generateKeypair();
+    const ucan = issueUcan({
+      payload: makePayload(issuer.did, agent.did, {
+        meta: { oauth_connection_id: 'conn-1', customer_id: CUSTOMER },
+      }),
+      privateKey: issuer.privateKey,
+    });
+
+    const res = await fix.app.request('/v1/proxy/github/issue/create', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-cb-customer': CUSTOMER },
+      body: JSON.stringify({
+        ucan: ucan.jwt,
+        request: {
+          ucan: ucan.jwt,
+          command: '/github/issue/create',
+          resource: { repo: 'acme/billing' },
+          context: {},
+        },
+        apiCall: {
+          method: 'POST',
+          path: '/repos/acme/../etc/passwd',
+          body: { title: 't' },
+        },
+      }),
+    });
+    expect(res.status).toBe(403);
+    const body = (await res.json()) as { error_code: string };
+    expect(body.error_code).toBe('schema_violation');
+    expect(fix.upstreamCalls).toHaveLength(0);
   });
 });

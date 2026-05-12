@@ -683,6 +683,9 @@ importers:
       '@auto-nomos/cedar':
         specifier: workspace:*
         version: link:../cedar
+      zod:
+        specifier: 3.25.76
+        version: 3.25.76
     devDependencies:
       '@auto-nomos/policy-builder':
         specifier: workspace:*
