@@ -36,7 +36,7 @@ interface Section {
 }
 
 const SECTIONS: Section[] = [
-  { id: 'what-is-aegis', label: 'What Nomos is', group: 'Foundations', icon: ShieldCheck },
+  { id: 'what-is-nomos', label: 'What Nomos is', group: 'Foundations', icon: ShieldCheck },
   { id: 'mental-model', label: 'Mental model', group: 'Foundations', icon: Workflow },
   { id: 'quickstart', label: 'Quickstart', group: 'Foundations', icon: Cpu },
   { id: 'connections', label: 'Connections', group: 'Build', icon: Plug },
@@ -304,7 +304,7 @@ function Callout({
 
 function WhatIsNomos() {
   return (
-    <Section id="what-is-aegis" eyebrow="01 · what" title="What Nomos is.">
+    <Section id="what-is-nomos" eyebrow="01 · what" title="What Nomos is.">
       <P>
         Nomos is an authorization layer for AI agents. It sits between your agents and every SaaS
         API you connect — GitHub, Slack, Linear, Stripe, Google, Notion, your filesystem. The agent
