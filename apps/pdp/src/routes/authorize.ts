@@ -1,14 +1,13 @@
 import type { Schema } from '@auto-nomos/cedar';
 import { type DecideInput, decide } from '@auto-nomos/core';
 import { sha256Hex } from '@auto-nomos/crypto';
-import { actionsFor, PACKS } from '@auto-nomos/schema-packs';
 import {
   type AuthorizeDecision,
   type AuthorizeRequest,
   AuthorizeRequest as AuthorizeRequestSchema,
   type DenyReason,
 } from '@auto-nomos/shared-types';
-import { canonicalize, computeCid, parseUcanJwt } from '@auto-nomos/ucan';
+import { canonicalize, computeCid } from '@auto-nomos/ucan';
 import { Hono } from 'hono';
 import { decisionToAudit } from '../audit/emit.js';
 import type { PolicyCache } from '../cache/policies.js';
@@ -18,6 +17,7 @@ import { getLog } from '../middleware/logger.js';
 import { recordAuthorize } from '../observability/metrics.js';
 import { validateCosigner } from '../services/cosigner-validate.js';
 import { evaluateStepUpPotential, shouldDetectStepUp } from '../services/stepup.js';
+import { CUSTOMER_HEADER, extractAgentDid, extractAgentId, isKnownCommand } from './_shared.js';
 
 export interface AuthorizeRouteDeps {
   policyCache: PolicyCache;
@@ -52,31 +52,6 @@ export interface AuditEmitInput {
   decision: { allow: boolean; reason?: string; receiptId: string };
   ts: number;
   agentDid: string;
-}
-
-const CUSTOMER_HEADER = 'x-cb-customer';
-
-function extractAgentId(jwt: string): string | undefined {
-  const parsed = parseUcanJwt(jwt);
-  if ('error' in parsed) return undefined;
-  const meta = parsed.payload.meta as Record<string, unknown> | undefined;
-  return typeof meta?.agent_id === 'string' ? meta.agent_id : undefined;
-}
-
-function extractAgentDid(jwt: string): string {
-  const parsed = parseUcanJwt(jwt);
-  if ('error' in parsed) return 'unknown';
-  return parsed.payload.aud;
-}
-
-const KNOWN_COMMANDS: ReadonlySet<string> = new Set(PACKS.flatMap((pack) => actionsFor(pack.id)));
-const KNOWN_INTEGRATIONS: ReadonlySet<string> = new Set(PACKS.map((p) => p.id));
-
-function isKnownCommand(command: string): boolean {
-  if (KNOWN_COMMANDS.has(command)) return true;
-  const seg = command.split('/')[1];
-  if (!seg) return false;
-  return !KNOWN_INTEGRATIONS.has(seg);
 }
 
 export function createAuthorizeRoutes(deps: AuthorizeRouteDeps): Hono {
