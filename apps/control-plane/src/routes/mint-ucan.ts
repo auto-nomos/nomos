@@ -18,6 +18,7 @@ import * as schema from '../db/schema.js';
 import { type ApiKeyAuthVariables, apiKeyAuth } from '../middleware/api-key-auth.js';
 import { getLog } from '../middleware/logger.js';
 import { MintError, mintUcan } from '../services/ucan-mint.js';
+import { QuotaExceededError, type UsageService } from '../services/usage.js';
 
 const COMMAND_RE = /^\/[a-z0-9_-]+(\/[a-z0-9_-]+)*$/;
 const MAX_TTL_SECONDS = 3_600;
@@ -32,6 +33,7 @@ const MintBodySchema = z.object({
 export interface MintUcanRouteDeps {
   db: Db;
   signing: { signKey: Uint8Array; signerDid: string };
+  usage: UsageService;
 }
 
 export function createMintUcanRoutes(
@@ -43,6 +45,28 @@ export function createMintUcanRoutes(
     const log = getLog(c);
     const customerId = c.get('customerId');
     const agentId = c.get('agentId');
+
+    try {
+      await deps.usage.increment(customerId, 'mint');
+    } catch (err) {
+      if (err instanceof QuotaExceededError) {
+        log.warn(
+          { customerId, kind: err.kind, plan: err.snapshot.plan },
+          'mint-ucan quota_exceeded',
+        );
+        return c.json(
+          {
+            error: 'monthly mint quota reached for this plan',
+            error_code: 'quota_exceeded',
+            plan: err.snapshot.plan,
+            mint_count: err.snapshot.mintCount,
+            cap: err.snapshot.cap.mintPerMonth,
+          },
+          402,
+        );
+      }
+      throw err;
+    }
 
     const raw = await c.req.json().catch(() => null);
     if (!raw) {

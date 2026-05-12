@@ -113,6 +113,13 @@
       "when": 1779000000000,
       "tag": "0015_api_key_client_identity",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1779100000000,
+      "tag": "0016_usage_counters",
+      "breakpoints": true
     }
   ]
 }
