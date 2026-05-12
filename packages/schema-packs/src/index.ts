@@ -44,3 +44,22 @@ export function templateById(id: string): PolicyTemplate | undefined {
 export function actionsFor(integrationId: IntegrationId): string[] {
   return PACKS.find((p) => p.id === integrationId)?.actions ?? [];
 }
+
+export const KNOWN_COMMANDS: ReadonlySet<string> = new Set(
+  PACKS.flatMap((pack) => actionsFor(pack.id)),
+);
+export const KNOWN_INTEGRATIONS: ReadonlySet<string> = new Set(PACKS.map((p) => p.id));
+
+/**
+ * Command admission check used at the PDP edge. Returns true when:
+ *   - the exact command is declared by a pack's `actions` (KNOWN_COMMANDS), or
+ *   - the integration namespace (first path segment) is NOT one schema-packs
+ *     declares — preserves the existing pass-through for arbitrary Cedar action
+ *     namespaces in tests and bespoke deployments.
+ */
+export function isKnownCommand(command: string): boolean {
+  if (KNOWN_COMMANDS.has(command)) return true;
+  const seg = command.split('/')[1];
+  if (!seg) return false;
+  return !KNOWN_INTEGRATIONS.has(seg);
+}
