@@ -611,15 +611,26 @@ function CurlStep({
 }) {
   const [copied, setCopied] = useState(false);
   const cpUrl = clientEnv.controlPlaneUrl;
+  const pdpUrl = clientEnv.pdpUrl;
+  // Two-step demo: mint a UCAN for /github/user/read from CP (uses API key),
+  // then proxy through PDP (uses the UCAN). The PDP never sees the API key —
+  // that separation is the whole point of Nomos, so the curl mirrors it.
+  // `jq` is required to splice the minted JWT into the second call.
   const curl = apiKey
-    ? `curl -X POST ${cpUrl}/v1/proxy \\
+    ? `# 1. Trade your API key for a short-lived UCAN
+UCAN=$(curl -sX POST ${cpUrl}/v1/mint-ucan \\
   -H "authorization: Bearer ${apiKey}" \\
   -H "content-type: application/json" \\
-  -d '{
-    "command": "/github/user/read",
-    "apiCall": { "method": "GET", "path": "/user" },
-    "resource": {}
-  }'`
+  -d '{"commands":["/github/user/read"]}' | jq -r '.ucans[0].jwt')
+
+# 2. Use the UCAN to proxy a GitHub call through the PDP
+curl -X POST ${pdpUrl}/v1/proxy/github/user/read \\
+  -H "content-type: application/json" \\
+  -d "{
+    \\"ucan\\": \\"$UCAN\\",
+    \\"request\\": { \\"command\\": \\"/github/user/read\\", \\"action\\": \\"read\\", \\"resource\\": {} },
+    \\"apiCall\\": { \\"method\\": \\"GET\\", \\"path\\": \\"/user\\" }
+  }"`
     : '';
 
   async function copy() {
@@ -641,7 +652,7 @@ function CurlStep({
           Make your <em>first</em> proxied call.
         </>
       }
-      copy="Run this curl in any terminal. Nomos issues a UCAN, evaluates the policy, then proxies through your encrypted GitHub token. The decision lands in the audit chain in milliseconds."
+      copy="Two curls. First mints a short-lived UCAN from your API key. Second uses that UCAN to proxy a GitHub call through the PDP — Nomos evaluates the policy, attaches your encrypted GitHub token, and writes the decision to the audit chain. Requires jq for the JWT splice."
       footer={
         <div className="flex items-center justify-between">
           <button
