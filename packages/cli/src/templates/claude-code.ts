@@ -1,4 +1,5 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { execSync } from 'node:child_process';
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, resolve } from 'node:path';
 
@@ -50,31 +51,24 @@ export function writeClaudeCodeSkill(opts: ClaudeCodeOptions): { path: string } 
 }
 
 function patchClaudeSettings(opts: ClaudeCodeOptions): void {
-  const settingsPath = resolve(homedir(), '.claude', 'settings.json');
-  let settings: Record<string, unknown> = {};
-  if (existsSync(settingsPath)) {
-    try {
-      settings = JSON.parse(readFileSync(settingsPath, 'utf8')) as Record<string, unknown>;
-    } catch {
-      // corrupt settings — start fresh rather than bail
-    }
+  const envFlags = [
+    `-e CB_API_KEY=${opts.apiKey ?? ''}`,
+    `-e CB_PDP_URL=${opts.pdpUrl}`,
+    `-e CB_CONTROL_PLANE_URL=${opts.controlPlaneUrl}`,
+    `-e CB_INTEGRATIONS=github,slack,google,notion`,
+  ].join(' ');
+  try {
+    execSync(`claude mcp add ${envFlags} --scope user nomos -- npx -y @auto-nomos/mcp-server`, {
+      stdio: 'pipe',
+    });
+  } catch {
+    // claude CLI not in PATH — print manual instructions
+    console.warn(
+      'Could not auto-register MCP server (claude CLI not found).\n' +
+        'Run manually:\n' +
+        `  claude mcp add ${envFlags} --scope user nomos -- npx -y @auto-nomos/mcp-server`,
+    );
   }
-
-  const mcpServers = (settings.mcpServers as Record<string, unknown> | undefined) ?? {};
-  mcpServers['nomos'] = {
-    type: 'stdio',
-    command: 'npx',
-    args: ['-y', '@auto-nomos/mcp-server'],
-    env: {
-      CB_API_KEY: opts.apiKey ?? '',
-      CB_PDP_URL: opts.pdpUrl,
-      CB_CONTROL_PLANE_URL: opts.controlPlaneUrl,
-    },
-  };
-  settings.mcpServers = mcpServers;
-
-  mkdirSync(resolve(homedir(), '.claude'), { recursive: true });
-  writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + '\n');
 }
 
 function deriveDashboard(cpUrl: string): string {

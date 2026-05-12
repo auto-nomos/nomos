@@ -25,13 +25,13 @@ function parseFlag(args: string[], flag: string): string | undefined {
 }
 
 function readSavedConfig(): { cp?: string; pdp?: string } {
-  const settingsPath = resolve(homedir(), '.claude', 'settings.json');
-  if (!existsSync(settingsPath)) return {};
+  // Claude Code stores user MCP servers in ~/.claude.json (not settings.json)
+  const claudeJson = resolve(homedir(), '.claude.json');
+  if (!existsSync(claudeJson)) return {};
   try {
-    const settings = JSON.parse(readFileSync(settingsPath, 'utf8')) as Record<string, unknown>;
-    const env = (
-      settings.mcpServers as Record<string, { env?: Record<string, string> }> | undefined
-    )?.nomos?.env;
+    const data = JSON.parse(readFileSync(claudeJson, 'utf8')) as Record<string, unknown>;
+    const env = (data.mcpServers as Record<string, { env?: Record<string, string> }> | undefined)
+      ?.nomos?.env;
     return { cp: env?.CB_CONTROL_PLANE_URL, pdp: env?.CB_PDP_URL };
   } catch {
     return {};
