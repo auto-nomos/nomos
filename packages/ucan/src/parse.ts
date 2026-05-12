@@ -41,3 +41,23 @@ export function parseUcanJwt(jwt: string): ParsedUcan | { error: 'malformed_ucan
   }
   return { header, payload, signature, headerEnc, payloadEnc };
 }
+
+/** Read `meta.agent_id` from a UCAN JWT. Returns undefined on parse failure
+ *  or when the field is absent. Best-effort — does not verify the signature.
+ *  Callers that need authenticated identity must run full chain validation
+ *  first. */
+export function extractAgentId(jwt: string): string | undefined {
+  const parsed = parseUcanJwt(jwt);
+  if ('error' in parsed) return undefined;
+  const meta = parsed.payload.meta as Record<string, unknown> | undefined;
+  return typeof meta?.agent_id === 'string' ? meta.agent_id : undefined;
+}
+
+/** Read the `aud` (audience / agent DID) from a UCAN JWT. Returns the
+ *  literal `"unknown"` on parse failure so callers can thread the value
+ *  into audit rows without conditional handling. */
+export function extractAgentDid(jwt: string): string {
+  const parsed = parseUcanJwt(jwt);
+  if ('error' in parsed) return 'unknown';
+  return parsed.payload.aud;
+}
