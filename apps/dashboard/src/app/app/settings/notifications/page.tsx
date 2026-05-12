@@ -99,8 +99,17 @@ export default function NotificationsSettingsPage() {
                 disabled={!telegramEnabled}
               />
               <p className="text-xs text-zinc-500">
-                Open <code>@credential_broker_bot</code> in Telegram and send <code>/start</code> —
-                it replies with your numeric chat id.
+                Open{' '}
+                <a
+                  href="https://t.me/autonomosagent_bot"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-aegis-signal hover:underline"
+                >
+                  @autonomosagent_bot
+                </a>{' '}
+                in Telegram and send <code>/start</code> — it replies with your numeric chat id.
+                Paste that number here.
               </p>
             </div>
           </div>

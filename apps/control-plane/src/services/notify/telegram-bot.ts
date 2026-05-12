@@ -255,7 +255,13 @@ export function createTelegramBot(opts: TelegramBotOptions): TelegramBot {
         if (text === '/start' || text === '/help') {
           await sendMessage({
             chatId: chat.id,
-            text: 'Nomos bot. Open the dashboard → Settings → Connect Telegram to link.',
+            text:
+              `Your Telegram chat ID is: \`${chat.id}\`\n\n` +
+              `To receive step-up approval alerts:\n` +
+              `1. Open the Nomos dashboard\n` +
+              `2. Go to Settings → Notifications\n` +
+              `3. Check *Telegram*, paste \`${chat.id}\` in the Chat ID field, and save.\n\n` +
+              `Use /unlink to stop notifications.`,
           });
           return;
         }

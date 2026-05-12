@@ -1,7 +1,5 @@
-'use client';
-
-import { GuideContent } from '../../../components/nomos/guide';
+import { redirect } from 'next/navigation';
 
 export default function GuidePage() {
-  return <GuideContent />;
+  redirect('/app/guide/what-is-nomos');
 }

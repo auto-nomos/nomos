@@ -8,6 +8,7 @@ import {
   Hash,
   KeyRound,
   Layers,
+  MessageCircle,
   Plug,
   ShieldAlert,
   ShieldCheck,
@@ -46,6 +47,7 @@ const SECTIONS: Section[] = [
   { id: 'standing-grants', label: 'Standing grants', group: 'Runtime', icon: Layers },
   { id: 'audit', label: 'Audit chain', group: 'Runtime', icon: Hash },
   { id: 'sdk', label: 'SDK & MCP', group: 'Integrate', icon: Terminal },
+  { id: 'telegram', label: 'Telegram notifications', group: 'Integrate', icon: MessageCircle },
   { id: 'faq', label: 'FAQ', group: 'Reference', icon: KeyRound },
 ];
 
@@ -90,6 +92,7 @@ export function GuideContent() {
           <StandingGrants />
           <AuditChain />
           <Sdk />
+          <TelegramSetup />
           <Faq />
         </article>
         <RightRail />
@@ -108,8 +111,9 @@ function Header() {
         How to use <em>Nomos</em>.
       </h1>
       <p className="mt-6 max-w-[640px] text-base text-aegis-mute">
-        A reading guide to the platform. Twelve short sections — read top to bottom for orientation,
-        or jump from the table of contents on the left. Code snippets are copy-paste ready.
+        A reading guide to the platform. Thirteen short sections — read top to bottom for
+        orientation, or jump from the table of contents on the left. Code snippets are copy-paste
+        ready.
       </p>
       <div className="mt-6 flex flex-wrap items-center gap-2 font-mono text-[11px] uppercase tracking-[0.16em] text-aegis-faint">
         <span>~12 min read</span>
@@ -594,9 +598,65 @@ function Sdk() {
   );
 }
 
+function TelegramSetup() {
+  return (
+    <Section id="telegram" eyebrow="12 · integrate" title="Telegram notifications.">
+      <P>
+        Nomos can push step-up approval prompts to your Telegram account. When an agent triggers a
+        high-risk action you&rsquo;ll get a message with{' '}
+        <strong className="text-aegis-paper">Approve</strong> /{' '}
+        <strong className="text-aegis-paper">Deny</strong> buttons — no dashboard tab required.
+      </P>
+
+      <ol className="ml-0 list-none space-y-4">
+        <Step n="01" title="Find your chat ID">
+          Open{' '}
+          <a
+            href="https://t.me/autonomosagent_bot"
+            target="_blank"
+            rel="noreferrer"
+            className="text-aegis-signal hover:underline"
+          >
+            @autonomosagent_bot
+          </a>{' '}
+          in Telegram and send <K>/start</K>. The bot replies with your numeric chat ID (e.g.{' '}
+          <K>1234567890</K>).
+        </Step>
+        <Step n="02" title="Enable in the dashboard">
+          Go to{' '}
+          <Link href="/app/settings/notifications" className="text-aegis-signal hover:underline">
+            Settings → Notifications
+          </Link>
+          , check <K>Telegram</K>, paste your chat ID, and click <K>Save</K>.
+        </Step>
+        <Step n="03" title="Test it">
+          Trigger a high-risk action (or use a policy that always step-ups). You should receive a
+          Telegram message within seconds. Tap <K>✓ Approve</K> — the agent call proceeds.
+        </Step>
+      </ol>
+
+      <Callout tone="info">
+        <strong className="text-aegis-paper">Deep links:</strong> The bot also supports a one-click
+        linking flow. From the dashboard, a Link button will generate a short-lived deep link that
+        automatically pairs your account without copying a chat ID.
+      </Callout>
+
+      <Callout tone="warn">
+        Telegram taps grant <em className="not-italic">soft approval</em> — they resolve the step-up
+        for low and medium-sensitivity actions. High-sensitivity actions (marked{' '}
+        <K>cosigner_required</K> in the policy) additionally require a passkey tap in the browser.
+      </Callout>
+
+      <Code lang="shell">{`# Verify the bot is configured on the control plane
+# (requires TELEGRAM_BOT_TOKEN in your .env)
+nomos status`}</Code>
+    </Section>
+  );
+}
+
 function Faq() {
   return (
-    <Section id="faq" eyebrow="12 · reference" title="FAQ.">
+    <Section id="faq" eyebrow="13 · reference" title="FAQ.">
       <Faqs
         items={[
           [
@@ -661,6 +721,130 @@ function Step({ n, title, children }: { n: string; title: string; children: Reac
         <div className="mt-1 text-[14px] text-aegis-mute">{children}</div>
       </div>
     </li>
+  );
+}
+
+/* ─── Diagrams ────────────────────────────────────────────────────────── */
+
+/* ─── Per-topic export ─────────────────────────────────────────────────── */
+
+export type TopicId =
+  | 'what-is-nomos'
+  | 'mental-model'
+  | 'quickstart'
+  | 'connections'
+  | 'apps'
+  | 'policies'
+  | 'dynamic-intent'
+  | 'step-up'
+  | 'standing-grants'
+  | 'audit'
+  | 'sdk'
+  | 'telegram'
+  | 'faq';
+
+const TOPIC_COMPONENTS: Record<TopicId, React.ComponentType> = {
+  'what-is-nomos': WhatIsNomos,
+  'mental-model': MentalModel,
+  quickstart: Quickstart,
+  connections: Connections,
+  apps: Apps,
+  policies: Policies,
+  'dynamic-intent': DynamicIntent,
+  'step-up': StepUp,
+  'standing-grants': StandingGrants,
+  audit: AuditChain,
+  sdk: Sdk,
+  telegram: TelegramSetup,
+  faq: Faq,
+};
+
+export function GuideTopic({ topic }: { topic: TopicId }) {
+  const idx = SECTIONS.findIndex((s) => s.id === topic);
+  const prev = idx > 0 ? SECTIONS[idx - 1] : null;
+  const next = idx < SECTIONS.length - 1 ? SECTIONS[idx + 1] : null;
+  const TopicContent = TOPIC_COMPONENTS[topic];
+
+  return (
+    <div className="mx-auto max-w-[1280px]">
+      <div className="mt-4 grid grid-cols-12 gap-10">
+        <GuideNav sections={SECTIONS} activeTopic={topic} />
+        <article className="col-span-12 max-w-[680px] lg:col-span-7">
+          <TopicContent />
+          <div className="mt-10 flex items-center justify-between border-t border-aegis-line pt-6">
+            {prev ? (
+              <Link
+                href={`/app/guide/${prev.id}`}
+                className="flex items-center gap-2 font-mono text-xs text-aegis-mute transition-colors hover:text-aegis-paper"
+              >
+                ← {prev.label}
+              </Link>
+            ) : (
+              <span />
+            )}
+            {next ? (
+              <Link
+                href={`/app/guide/${next.id}`}
+                className="flex items-center gap-2 font-mono text-xs text-aegis-mute transition-colors hover:text-aegis-paper"
+              >
+                {next.label} →
+              </Link>
+            ) : (
+              <span />
+            )}
+          </div>
+        </article>
+        <RightRail />
+      </div>
+    </div>
+  );
+}
+
+function GuideNav({ sections, activeTopic }: { sections: Section[]; activeTopic: string }) {
+  const groups = sections.reduce<Record<string, Section[]>>((acc, s) => {
+    const key = s.group ?? 'More';
+    (acc[key] = acc[key] ?? []).push(s);
+    return acc;
+  }, {});
+  return (
+    <nav className="col-span-12 lg:col-span-3 lg:sticky lg:top-24 lg:self-start">
+      <div className="eyebrow mb-3">contents</div>
+      {Object.entries(groups).map(([label, items]) => (
+        <div key={label} className="mb-6">
+          <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-aegis-faint">
+            {label}
+          </div>
+          <ul className="mt-2 space-y-1">
+            {items.map((s) => {
+              const isActive = activeTopic === s.id;
+              return (
+                <li key={s.id}>
+                  <Link
+                    href={`/app/guide/${s.id}`}
+                    className={cn(
+                      'group flex items-center gap-2 border-l border-aegis-line py-1.5 pl-3 text-sm transition-colors',
+                      isActive
+                        ? 'border-aegis-signal text-aegis-paper'
+                        : 'text-aegis-mute hover:border-aegis-line-strong hover:text-aegis-paper',
+                    )}
+                  >
+                    {s.icon ? (
+                      <s.icon
+                        className={cn(
+                          'h-3.5 w-3.5',
+                          isActive ? 'text-aegis-signal' : 'text-aegis-faint',
+                        )}
+                      />
+                    ) : null}
+                    {s.label}
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      ))}
+    </nav>
   );
 }
 

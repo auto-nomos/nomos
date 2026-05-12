@@ -52,7 +52,7 @@ const NAV_GROUPS: { id: string; label: string; items: NavItem[] }[] = [
     label: 'Account',
     items: [
       { href: '/app/settings/notifications', label: 'Notifications', icon: Layers },
-      { href: '/app/guide', label: 'User guide', icon: BookOpen, hint: 'docs' },
+      { href: '/app/guide/what-is-nomos', label: 'User guide', icon: BookOpen, hint: 'docs' },
     ],
   },
 ];
@@ -199,7 +199,7 @@ function Topbar() {
 
       <div className="flex items-center gap-2">
         <Link
-          href="/app/guide"
+          href="/app/guide/quickstart"
           className="hidden items-center gap-2 rounded-sm border border-aegis-line px-3 py-1.5 text-xs text-aegis-mute transition-colors hover:border-aegis-line-strong hover:text-aegis-paper md:flex"
         >
           <KeyRound className="h-3.5 w-3.5" />
@@ -236,6 +236,16 @@ const ROUTE_LABEL: Record<string, string> = {
   settings: 'settings',
   notifications: 'notifications',
   guide: 'user-guide',
+  telegram: 'telegram',
+  quickstart: 'quickstart',
+  'what-is-nomos': 'what is nomos',
+  'mental-model': 'mental model',
+  apps: 'apps',
+  'dynamic-intent': 'dynamic intent',
+  'step-up': 'step-up',
+  'standing-grants': 'standing grants',
+  sdk: 'sdk & mcp',
+  faq: 'faq',
 };
 
 function breadcrumbs(pathname: string): { href: string; label: string }[] {
