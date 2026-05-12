@@ -23,6 +23,7 @@ import {
   extractAgentDid,
   extractAgentId,
   isKnownCommand,
+  validateResource,
 } from './_shared.js';
 
 export interface AuthorizeRouteDeps {
@@ -106,6 +107,34 @@ export function createAuthorizeRoutes(deps: AuthorizeRouteDeps): Hono {
         allow: false,
         reason: 'unknown_command',
         receiptId: sha256Hex(`unknown-command|${request.command}`),
+      };
+      recordAuthorize(decisionToAudit(denyDecision), denyDecision.reason);
+      if (deps.emitAudit) {
+        await deps.emitAudit({
+          customerId,
+          request,
+          decision: { ...denyDecision },
+          ts: Date.now(),
+          agentDid: extractAgentDid(request.ucan),
+        });
+      }
+      return c.json(denyDecision, 200);
+    }
+
+    // D3: schema-pack resource validation. Runs before decide() so a
+    // malformed resource shape never reaches Cedar — engineers debugging a
+    // policy match failure see schema_violation, not a confusing Cedar
+    // miss. Packs without per-action schemas pass through unchanged.
+    const resourceCheck = validateResource(request.command, request.resource);
+    if (!resourceCheck.ok) {
+      log.info(
+        { command: request.command, customerId, issues: resourceCheck.issues },
+        'schema-pack resource validation failed',
+      );
+      const denyDecision: AuthorizeDecision = {
+        allow: false,
+        reason: 'schema_violation',
+        receiptId: sha256Hex(`schema-violation|${request.command}|resource`),
       };
       recordAuthorize(decisionToAudit(denyDecision), denyDecision.reason);
       if (deps.emitAudit) {

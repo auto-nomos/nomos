@@ -1,6 +1,7 @@
 import { extractCustomerId } from '@auto-nomos/ucan';
 
-export { isKnownCommand } from '@auto-nomos/schema-packs';
+export type { ValidateResult } from '@auto-nomos/schema-packs';
+export { isKnownCommand, validateApiCall, validateResource } from '@auto-nomos/schema-packs';
 export { extractAgentDid, extractAgentId } from '@auto-nomos/ucan';
 
 export const CUSTOMER_HEADER = 'x-cb-customer';

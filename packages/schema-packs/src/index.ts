@@ -63,3 +63,47 @@ export function isKnownCommand(command: string): boolean {
   if (!seg) return false;
   return !KNOWN_INTEGRATIONS.has(seg);
 }
+
+/** Find the pack that owns a command, if any. Returns undefined for
+ *  pass-through integrations (first segment not in KNOWN_INTEGRATIONS). */
+function packForCommand(command: string): IntegrationPack | undefined {
+  const seg = command.split('/')[1];
+  if (!seg) return undefined;
+  return PACKS.find((p) => p.id === seg);
+}
+
+export type ValidateResult = { ok: true } | { ok: false; reason: string; issues?: unknown };
+
+/**
+ * D3 (Lane B): Validate a proxy /v1/proxy `apiCall` against the schema-pack
+ * for its command. Returns `{ ok: true }` when:
+ *   - the pack defines no schema for the command (pass-through), OR
+ *   - the pack declares a schema and the apiCall conforms.
+ * Returns `{ ok: false, reason: 'schema_violation', issues }` otherwise.
+ *
+ * Callers should fail-closed on `ok: false` with deny + receipt.
+ */
+export function validateApiCall(command: string, apiCall: unknown): ValidateResult {
+  const pack = packForCommand(command);
+  if (!pack) return { ok: true }; // unknown integration → Cedar pass-through
+  const schema = pack.actionSchemas?.[command]?.apiCallSchema;
+  if (!schema) return { ok: true }; // pack hasn't declared per-action shape yet
+  const parsed = schema.safeParse(apiCall);
+  if (parsed.success) return { ok: true };
+  return { ok: false, reason: 'schema_violation', issues: parsed.error.issues };
+}
+
+/**
+ * D3 (Lane B): Validate a Cedar `request.resource` object against the
+ * schema-pack for its command. Same pass-through semantics as
+ * validateApiCall.
+ */
+export function validateResource(command: string, resource: unknown): ValidateResult {
+  const pack = packForCommand(command);
+  if (!pack) return { ok: true };
+  const schema = pack.actionSchemas?.[command]?.resourceSchema;
+  if (!schema) return { ok: true };
+  const parsed = schema.safeParse(resource);
+  if (parsed.success) return { ok: true };
+  return { ok: false, reason: 'schema_violation', issues: parsed.error.issues };
+}

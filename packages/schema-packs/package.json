@@ -40,7 +40,8 @@
     "clean": "rm -rf dist .turbo"
   },
   "dependencies": {
-    "@auto-nomos/cedar": "workspace:*"
+    "@auto-nomos/cedar": "workspace:*",
+    "zod": "3.25.76"
   },
   "devDependencies": {
     "@auto-nomos/policy-builder": "workspace:*",

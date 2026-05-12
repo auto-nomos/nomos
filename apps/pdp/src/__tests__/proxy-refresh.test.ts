@@ -199,7 +199,7 @@ describe('POST /v1/proxy/:command — refresh on 401 (Sprint 5.6)', () => {
           resource: { repo: 'acme/billing' },
           context: {},
         },
-        apiCall: { method: 'GET', path: '/repos/acme/billing' },
+        apiCall: { method: 'POST', path: '/repos/acme/billing/issues', body: { title: 't' } },
       }),
     });
     expect(res.status).toBe(502);
@@ -291,7 +291,7 @@ describe('POST /v1/proxy/:command — refresh on 401 (Sprint 5.6)', () => {
           resource: { repo: 'acme/billing' },
           context: {},
         },
-        apiCall: { method: 'GET', path: '/repos/acme/billing' },
+        apiCall: { method: 'POST', path: '/repos/acme/billing/issues', body: { title: 't' } },
       }),
     });
     // Without refresh wired, the 401 just bubbles up as the upstream response.

@@ -43,6 +43,8 @@ import {
   extractAgentDid,
   extractAgentId,
   isKnownCommand,
+  validateApiCall,
+  validateResource,
 } from './_shared.js';
 import type { AuditEmitInput } from './authorize.js';
 
@@ -178,6 +180,57 @@ export function createProxyRoutes(deps: ProxyRouteDeps): Hono {
         404,
       );
     }
+
+    // D3: schema-pack enforcement. Runs after policy cache so a tenant the
+    // PDP doesn't recognize gets a 404 (operability) before paying for two
+    // zod parses. Packs without per-action schemas pass through unchanged.
+    const apiCallCheck = validateApiCall(request.command, parsed.data.apiCall);
+    if (!apiCallCheck.ok) {
+      log.info(
+        { command: request.command, customerId, issues: apiCallCheck.issues },
+        'schema-pack apiCall validation failed',
+      );
+      const denyDecision: AuthorizeDecision = {
+        allow: false,
+        reason: 'schema_violation',
+        receiptId: sha256Hex(`schema-violation|${request.command}|apiCall`),
+      };
+      recordAuthorize(decisionToAudit(denyDecision), denyDecision.reason);
+      if (deps.emitAudit) {
+        await deps.emitAudit({
+          customerId,
+          request,
+          decision: { ...denyDecision },
+          ts: Date.now(),
+          agentDid: extractAgentDid(firstUcan),
+        });
+      }
+      return c.json({ allow: false, decision: denyDecision, error_code: 'schema_violation' }, 403);
+    }
+    const resourceCheck = validateResource(request.command, request.resource);
+    if (!resourceCheck.ok) {
+      log.info(
+        { command: request.command, customerId, issues: resourceCheck.issues },
+        'schema-pack resource validation failed',
+      );
+      const denyDecision: AuthorizeDecision = {
+        allow: false,
+        reason: 'schema_violation',
+        receiptId: sha256Hex(`schema-violation|${request.command}|resource`),
+      };
+      recordAuthorize(decisionToAudit(denyDecision), denyDecision.reason);
+      if (deps.emitAudit) {
+        await deps.emitAudit({
+          customerId,
+          request,
+          decision: { ...denyDecision },
+          ts: Date.now(),
+          agentDid: extractAgentDid(firstUcan),
+        });
+      }
+      return c.json({ allow: false, decision: denyDecision, error_code: 'schema_violation' }, 403);
+    }
+
     const revokedCids = deps.revocationCache.getRevoked(customerId);
     const schema = deps.schemaForCustomer?.(customerId);
 

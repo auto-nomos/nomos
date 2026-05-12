@@ -362,6 +362,35 @@ describe('POST /v1/authorize', () => {
     expect(audits[0]?.allow).toBe(true);
   });
 
+  it('D3 — denies with schema_violation when resource has invalid type', async () => {
+    const { app, policyCache, audits } = buildApp();
+    policyCache.set(CUSTOMER, githubPolicy);
+
+    const issuer = generateKeypair();
+    const agent = generateKeypair();
+    const ucan = issueUcan({
+      payload: makePayload(issuer.did, agent.did, { meta: { customer_id: CUSTOMER } }),
+      privateKey: issuer.privateKey,
+    });
+
+    const res = await app.request('/v1/authorize', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-cb-customer': CUSTOMER },
+      body: JSON.stringify({
+        ucan: ucan.jwt,
+        command: '/github/issue/create',
+        resource: { issue_number: 'not-a-number' }, // schema expects positive int
+        context: {},
+      }),
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { allow: boolean; reason: string };
+    expect(body.allow).toBe(false);
+    expect(body.reason).toBe('schema_violation');
+    expect(audits).toHaveLength(1);
+    expect(audits[0]?.allow).toBe(false);
+  });
+
   it('D2 — rejects when neither header nor UCAN meta.customer_id is present', async () => {
     const { app, policyCache } = buildApp();
     policyCache.set(CUSTOMER, githubPolicy);
