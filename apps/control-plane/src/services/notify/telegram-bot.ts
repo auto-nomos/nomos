@@ -25,6 +25,7 @@ import {
 } from '../../db/schema.js';
 import type { Logger } from '../../logger.js';
 import { upsertGrant } from '../grants/upsert.js';
+import type { PolicyInvalidator } from '../policy-invalidator.js';
 
 interface TgChat {
   id: number;
@@ -58,6 +59,9 @@ export interface TelegramBotOptions {
   db: DrizzleClient;
   logger: Logger;
   fetch?: typeof fetch;
+  /** Fires after telegram "always" tap writes a grant so PDP cache
+   *  refreshes within ~250ms instead of waiting for the periodic timer. */
+  policyInvalidator?: PolicyInvalidator;
 }
 
 export interface SendStepUpArgs {
@@ -264,12 +268,13 @@ export function createTelegramBot(opts: TelegramBotOptions): TelegramBot {
         agentName: row.agentName,
         command: row.command,
         resource: row.resource as Record<string, unknown>,
-        scope: 'exact',
+        scope: 'any',
         decision,
         grantedBy: row.customerId,
         sourceApprovalId: approvalId,
         riskSummary: row.riskSummary,
       });
+      opts.policyInvalidator?.invalidate(row.customerId);
     } catch (err) {
       opts.logger.warn({ err, approvalId, decision }, 'telegram-bot: upsertGrant failed');
     }

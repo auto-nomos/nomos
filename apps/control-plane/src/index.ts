@@ -123,6 +123,7 @@ async function main(): Promise<void> {
       pollTimeoutS: config.TELEGRAM_POLL_TIMEOUT_S,
       db: db.drizzle,
       logger,
+      policyInvalidator,
     });
     telegramBot.start();
   } else if (config.TELEGRAM_BOT_TOKEN || config.TELEGRAM_BOT_USERNAME) {
