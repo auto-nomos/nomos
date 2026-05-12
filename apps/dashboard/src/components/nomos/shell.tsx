@@ -2,6 +2,7 @@
 
 import {
   Activity,
+  BellRing,
   BookOpen,
   Boxes,
   ChevronsUpDown,
@@ -34,6 +35,7 @@ const NAV_GROUPS: { id: string; label: string; items: NavItem[] }[] = [
     label: 'Monitor',
     items: [
       { href: '/app', label: 'Overview', icon: CircleDot, hint: 'home' },
+      { href: '/app/approvals', label: 'Approvals', icon: BellRing, hint: 'pending step-ups' },
       { href: '/app/audit', label: 'Audit chain', icon: Activity, hint: 'every decision' },
       { href: '/app/grants', label: 'Standing grants', icon: ShieldCheck, hint: 'durable' },
     ],
