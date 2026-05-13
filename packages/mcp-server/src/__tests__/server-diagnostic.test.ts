@@ -1,5 +1,5 @@
 import type { AuthGuard } from '@auto-nomos/sdk';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import type { StartupDiagnostic } from '../diagnostic.js';
 import { createMcpServer } from '../server.js';
 
