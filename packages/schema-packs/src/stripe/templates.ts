@@ -14,12 +14,14 @@ export const READS = [
   '/stripe/invoice/list',
   '/stripe/subscription/read',
   '/stripe/subscription/list',
+  '/stripe/payment_intent/read',
+  '/stripe/payment_intent/list',
 ] as const;
 export const WRITES = [
   '/stripe/customer/create',
   '/stripe/invoice/create',
   '/stripe/invoice/send',
-  '/stripe/charge/refund',
+  '/stripe/refund/create',
   '/stripe/subscription/cancel',
 ] as const;
 export const actions = [...READS, ...WRITES] as const;

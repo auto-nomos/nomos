@@ -5,14 +5,19 @@ export const READS = [
   '/slack/channel/history',
   '/slack/message/read',
   '/slack/user/read',
+  '/slack/user/list',
+  '/slack/user/lookup',
 ] as const;
 export const WRITES = [
   '/slack/message/post',
   '/slack/message/update',
   '/slack/message/react',
+  '/slack/message/reply',
   '/slack/channel/create',
+  '/slack/file/upload',
 ] as const;
-export const actions = [...READS, ...WRITES] as const;
+export const DELETES = ['/slack/message/delete'] as const;
+export const actions = [...READS, ...WRITES, ...DELETES] as const;
 
 const READ_LIST = READS.map((a) => `Action::"${a}"`).join(', ');
 const WRITE_LIST = WRITES.map((a) => `Action::"${a}"`).join(', ');

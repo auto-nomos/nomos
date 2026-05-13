@@ -9,6 +9,8 @@ export const READS = [
   '/google/calendar/event/read',
   '/google/calendar/event/list',
   '/google/calendar/list/list',
+  '/google/calendar/list/read',
+  '/google/calendar/freebusy/read',
 ] as const;
 export const WRITES = [
   '/google/calendar/event/create',

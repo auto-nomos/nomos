@@ -20,6 +20,13 @@ export const actionToCommand: Record<string, string> = {
   comment_on_issue: '/github/issue/comment',
   close_issue: '/github/issue/close',
   delete_repo: '/github/repo/delete',
+  get_repo: '/github/repo/read',
+  list_branches: '/github/branch/list',
+  get_file_contents: '/github/content/read',
+  list_prs: '/github/pr/list',
+  get_pr: '/github/pr/read',
+  create_pr: '/github/pr/create',
+  merge_pr: '/github/pr/merge',
 };
 
 /**
@@ -52,6 +59,18 @@ export function resourceFor(
   if (issueNumber !== undefined && !Number.isNaN(issueNumber)) {
     base.issue_number = issueNumber;
   }
+
+  const pullNumber =
+    typeof params.pull_number === 'number'
+      ? params.pull_number
+      : typeof params.pull_number === 'string'
+        ? Number(params.pull_number)
+        : undefined;
+  if (pullNumber !== undefined && !Number.isNaN(pullNumber)) {
+    base.pull_number = pullNumber;
+  }
+  const path = typeof params.path === 'string' ? params.path : undefined;
+  if (path) base.path = path;
 
   switch (actionId) {
     case 'get_user':

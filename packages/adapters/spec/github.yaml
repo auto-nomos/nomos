@@ -280,6 +280,222 @@ actions:
         required: true
         type: string
 
+  - id: get_repo
+    description: Fetch metadata for a single repository.
+    expected_use: Read repo metadata (default branch, visibility, etc.) before further action.
+    auto_execute: true
+    required_scopes:
+      - repo
+    risk:
+      category: read
+      sensitivity: low
+    http:
+      method: GET
+      path: "/repos/{owner}/{repo}"
+    params:
+      - name: owner
+        in: path
+        required: true
+        type: string
+      - name: repo
+        in: path
+        required: true
+        type: string
+
+  - id: list_branches
+    description: List branches for a repository.
+    expected_use: Enumerate branches before opening a PR or for housekeeping summaries.
+    auto_execute: true
+    required_scopes:
+      - repo
+    risk:
+      category: read
+      sensitivity: low
+    http:
+      method: GET
+      path: "/repos/{owner}/{repo}/branches"
+    params:
+      - name: owner
+        in: path
+        required: true
+        type: string
+      - name: repo
+        in: path
+        required: true
+        type: string
+      - name: per_page
+        in: query
+        type: integer
+        default: 30
+
+  - id: get_file_contents
+    description: Read a file or directory from a repository at a ref.
+    expected_use: Inspect repo content (README, config, source) prior to a write or review.
+    auto_execute: true
+    required_scopes:
+      - repo
+    risk:
+      category: read
+      sensitivity: low
+    http:
+      method: GET
+      path: "/repos/{owner}/{repo}/contents/{path}"
+    params:
+      - name: owner
+        in: path
+        required: true
+        type: string
+      - name: repo
+        in: path
+        required: true
+        type: string
+      - name: path
+        in: path
+        required: true
+        type: string
+        description: File or directory path within the repo.
+      - name: ref
+        in: query
+        type: string
+        description: Branch, tag, or commit SHA. Defaults to default branch.
+
+  - id: list_prs
+    description: List pull requests for a repository.
+    expected_use: Triage open PRs or audit recently merged work.
+    auto_execute: true
+    required_scopes:
+      - repo
+    risk:
+      category: read
+      sensitivity: low
+    http:
+      method: GET
+      path: "/repos/{owner}/{repo}/pulls"
+    params:
+      - name: owner
+        in: path
+        required: true
+        type: string
+      - name: repo
+        in: path
+        required: true
+        type: string
+      - name: state
+        in: query
+        type: string
+        default: open
+        enum: [open, closed, all]
+      - name: per_page
+        in: query
+        type: integer
+        default: 30
+
+  - id: get_pr
+    description: Fetch a single pull request.
+    expected_use: Read PR title, body, mergeable state before commenting or merging.
+    auto_execute: true
+    required_scopes:
+      - repo
+    risk:
+      category: read
+      sensitivity: low
+    http:
+      method: GET
+      path: "/repos/{owner}/{repo}/pulls/{pull_number}"
+    params:
+      - name: owner
+        in: path
+        required: true
+        type: string
+      - name: repo
+        in: path
+        required: true
+        type: string
+      - name: pull_number
+        in: path
+        required: true
+        type: integer
+
+  - id: create_pr
+    description: Open a new pull request from `head` into `base`.
+    expected_use: Submit a code change for review; never auto-execute without policy approval.
+    auto_execute: false
+    required_scopes:
+      - repo
+    risk:
+      category: write
+      sensitivity: medium
+    http:
+      method: POST
+      path: "/repos/{owner}/{repo}/pulls"
+    params:
+      - name: owner
+        in: path
+        required: true
+        type: string
+      - name: repo
+        in: path
+        required: true
+        type: string
+      - name: title
+        in: body
+        required: true
+        type: string
+      - name: head
+        in: body
+        required: true
+        type: string
+        description: Source branch (or `owner:branch` for cross-fork).
+      - name: base
+        in: body
+        required: true
+        type: string
+        description: Target branch.
+      - name: body
+        in: body
+        type: string
+      - name: draft
+        in: body
+        type: boolean
+        default: false
+
+  - id: merge_pr
+    description: Merge a pull request.
+    expected_use: Land an approved PR. Always require explicit user step-up for production repos.
+    auto_execute: false
+    required_scopes:
+      - repo
+    risk:
+      category: write
+      sensitivity: high
+    http:
+      method: PUT
+      path: "/repos/{owner}/{repo}/pulls/{pull_number}/merge"
+    params:
+      - name: owner
+        in: path
+        required: true
+        type: string
+      - name: repo
+        in: path
+        required: true
+        type: string
+      - name: pull_number
+        in: path
+        required: true
+        type: integer
+      - name: merge_method
+        in: body
+        type: string
+        default: merge
+        enum: [merge, squash, rebase]
+      - name: commit_title
+        in: body
+        type: string
+      - name: commit_message
+        in: body
+        type: string
+
 notes: |
   - Issue numbering: GitHub uses sequential per-repo integers, not the global node_id.
   - Rate limit: 5000 req/hr authenticated; surface 403 + X-RateLimit-Remaining header.

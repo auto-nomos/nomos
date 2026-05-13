@@ -1,7 +1,16 @@
 import { readFileSync } from 'node:fs';
 import { z } from 'zod';
 
-export const SUPPORTED_INTEGRATIONS = ['github', 'slack', 'google', 'notion'] as const;
+export const SUPPORTED_INTEGRATIONS = [
+  'github',
+  'slack',
+  'google',
+  'notion',
+  'linear',
+  'stripe',
+  'google_calendar',
+  'google_gmail',
+] as const;
 export type IntegrationId = (typeof SUPPORTED_INTEGRATIONS)[number];
 
 export const ConfigSchema = z.object({

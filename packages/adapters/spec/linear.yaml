@@ -70,6 +70,96 @@ actions:
           mutation Comment($input: CommentCreateInput!) { commentCreate(input: $input) { comment { id } } }
       - { name: variables, in: body, required: true, type: object }
 
+  - id: get_issue
+    description: Fetch a single issue by id or identifier.
+    expected_use: Read full issue body, state, and metadata.
+    auto_execute: true
+    required_scopes: [read]
+    risk: { category: read, sensitivity: low }
+    http:
+      method: POST
+      path: "/"
+    params:
+      - name: query
+        in: body
+        required: true
+        type: string
+        default: |
+          query GetIssue($id: String!) { issue(id: $id) { id identifier title description state { name } priority assignee { name } team { name } createdAt updatedAt url } }
+      - { name: variables, in: body, required: true, type: object }
+
+  - id: update_issue
+    description: Update fields on an existing issue (title, state, assignee, priority).
+    expected_use: Move an issue between states, reassign, or rename.
+    auto_execute: false
+    required_scopes: [write]
+    risk: { category: write, sensitivity: medium }
+    http:
+      method: POST
+      path: "/"
+    params:
+      - name: query
+        in: body
+        required: true
+        type: string
+        default: |
+          mutation UpdateIssue($id: String!, $input: IssueUpdateInput!) { issueUpdate(id: $id, input: $input) { issue { id identifier title state { name } } } }
+      - { name: variables, in: body, required: true, type: object }
+
+  - id: list_projects
+    description: List projects across teams.
+    expected_use: Discover active projects for grouping or filtering.
+    auto_execute: true
+    required_scopes: [read]
+    risk: { category: read, sensitivity: low }
+    http:
+      method: POST
+      path: "/"
+    params:
+      - name: query
+        in: body
+        required: true
+        type: string
+        default: |
+          query Projects($first: Int!) { projects(first: $first) { nodes { id name state startDate targetDate teams { nodes { name } } } } }
+      - { name: variables, in: body, type: object, default: { first: 25 } }
+
+  - id: list_teams
+    description: List teams in the workspace.
+    expected_use: Resolve a team name for issue creation or filtering.
+    auto_execute: true
+    required_scopes: [read]
+    risk: { category: read, sensitivity: low }
+    http:
+      method: POST
+      path: "/"
+    params:
+      - name: query
+        in: body
+        required: true
+        type: string
+        default: |
+          query Teams { teams { nodes { id name key description } } }
+      - { name: variables, in: body, type: object, default: {} }
+
+  - id: get_viewer
+    description: Get the authenticated user's profile.
+    expected_use: Identify the current user (whoami) for self-assignment or audit.
+    auto_execute: true
+    required_scopes: [read]
+    risk: { category: read, sensitivity: low }
+    http:
+      method: POST
+      path: "/"
+    params:
+      - name: query
+        in: body
+        required: true
+        type: string
+        default: |
+          query Viewer { viewer { id name email displayName } }
+      - { name: variables, in: body, type: object, default: {} }
+
 notes: |
   Linear's API is GraphQL-only; every action POSTs to /graphql with
   `query` + `variables`. The YAML wraps that with default queries so an

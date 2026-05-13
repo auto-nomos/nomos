@@ -80,3 +80,78 @@ actions:
       path: "/files/{fileId}"
     params:
       - { name: fileId, in: path, required: true, type: string }
+
+  - id: update_file
+    description: Update a file's metadata (rename, move, change description).
+    expected_use: Rename a generated doc or move it into a different folder.
+    auto_execute: false
+    required_scopes: [https://www.googleapis.com/auth/drive.file]
+    risk: { category: write, sensitivity: medium }
+    http:
+      method: PATCH
+      path: "/files/{fileId}"
+    params:
+      - { name: fileId, in: path, required: true, type: string }
+      - { name: name, in: body, type: string }
+      - { name: description, in: body, type: string }
+      - { name: addParents, in: query, type: string }
+      - { name: removeParents, in: query, type: string }
+
+  - id: copy_file
+    description: Make a copy of a file.
+    expected_use: Duplicate a template before edits.
+    auto_execute: false
+    required_scopes: [https://www.googleapis.com/auth/drive.file]
+    risk: { category: write, sensitivity: medium }
+    http:
+      method: POST
+      path: "/files/{fileId}/copy"
+    params:
+      - { name: fileId, in: path, required: true, type: string }
+      - { name: name, in: body, type: string }
+      - { name: parents, in: body, type: array }
+
+  - id: create_folder
+    description: Create a new folder.
+    expected_use: Organize generated artifacts under a project folder.
+    auto_execute: false
+    required_scopes: [https://www.googleapis.com/auth/drive.file]
+    risk: { category: write, sensitivity: medium }
+    http:
+      method: POST
+      path: "/files"
+    params:
+      - { name: name, in: body, required: true, type: string }
+      - { name: mimeType, in: body, type: string, default: "application/vnd.google-apps.folder" }
+      - { name: parents, in: body, type: array }
+
+  - id: search_files
+    description: Search files by full-text and metadata.
+    expected_use: Find docs containing specific text or owned by a user.
+    auto_execute: true
+    required_scopes: [https://www.googleapis.com/auth/drive.readonly]
+    risk: { category: search, sensitivity: medium }
+    http:
+      method: GET
+      path: "/files"
+    params:
+      - { name: q, in: query, required: true, type: string }
+      - { name: pageSize, in: query, type: integer, default: 25 }
+      - { name: orderBy, in: query, type: string }
+      - { name: fields, in: query, type: string, default: "files(id,name,mimeType,modifiedTime,owners)" }
+
+  - id: share_file
+    description: Grant a permission (reader, commenter, writer) to a user or domain.
+    expected_use: Share a generated artifact with a teammate or external reviewer.
+    auto_execute: false
+    required_scopes: [https://www.googleapis.com/auth/drive.file]
+    risk: { category: write, sensitivity: high }
+    http:
+      method: POST
+      path: "/files/{fileId}/permissions"
+    params:
+      - { name: fileId, in: path, required: true, type: string }
+      - { name: type, in: body, required: true, type: string, enum: [user, group, domain, anyone] }
+      - { name: role, in: body, required: true, type: string, enum: [reader, commenter, writer, owner] }
+      - { name: emailAddress, in: body, type: string }
+      - { name: domain, in: body, type: string }

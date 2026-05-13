@@ -6,6 +6,7 @@ export const READS = [
   '/linear/project/read',
   '/linear/project/list',
   '/linear/team/list',
+  '/linear/user/me',
 ] as const;
 export const WRITES = [
   '/linear/issue/create',

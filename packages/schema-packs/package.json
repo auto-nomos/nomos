@@ -1,6 +1,6 @@
 {
   "name": "@auto-nomos/schema-packs",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "license": "MIT",
   "private": false,
   "type": "module",
@@ -26,6 +26,22 @@
     "./notion": {
       "types": "./dist/notion/index.d.ts",
       "import": "./dist/notion/index.js"
+    },
+    "./linear": {
+      "types": "./dist/linear/index.d.ts",
+      "import": "./dist/linear/index.js"
+    },
+    "./stripe": {
+      "types": "./dist/stripe/index.d.ts",
+      "import": "./dist/stripe/index.js"
+    },
+    "./google_calendar": {
+      "types": "./dist/google_calendar/index.d.ts",
+      "import": "./dist/google_calendar/index.js"
+    },
+    "./google_gmail": {
+      "types": "./dist/google_gmail/index.d.ts",
+      "import": "./dist/google_gmail/index.js"
     }
   },
   "files": [

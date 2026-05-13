@@ -79,6 +79,67 @@ actions:
     params:
       - { name: id, in: path, required: true, type: string }
 
+  - id: get_thread
+    description: Fetch a single thread with all messages.
+    expected_use: Read full conversation context before replying.
+    auto_execute: true
+    required_scopes: [https://www.googleapis.com/auth/gmail.readonly]
+    risk: { category: read, sensitivity: high }
+    http:
+      method: GET
+      path: "/users/me/threads/{id}"
+    params:
+      - { name: id, in: path, required: true, type: string }
+      - { name: format, in: query, type: string, default: full, enum: [minimal, full, metadata] }
+
+  - id: modify_message
+    description: Add or remove labels on a message.
+    expected_use: Mark a message as read, star, archive, or move between labels.
+    auto_execute: false
+    required_scopes: [https://www.googleapis.com/auth/gmail.modify]
+    risk: { category: write, sensitivity: medium }
+    http:
+      method: POST
+      path: "/users/me/messages/{id}/modify"
+    params:
+      - { name: id, in: path, required: true, type: string }
+      - { name: addLabelIds, in: body, type: array }
+      - { name: removeLabelIds, in: body, type: array }
+
+  - id: list_labels
+    description: List labels in the mailbox.
+    expected_use: Discover system + user labels before modifying messages.
+    auto_execute: true
+    required_scopes: [https://www.googleapis.com/auth/gmail.readonly]
+    risk: { category: read, sensitivity: low }
+    http:
+      method: GET
+      path: "/users/me/labels"
+    params: []
+
+  - id: create_draft
+    description: Create a draft message (does not send).
+    expected_use: Prepare an email for human review before send.
+    auto_execute: false
+    required_scopes: [https://www.googleapis.com/auth/gmail.compose]
+    risk: { category: write, sensitivity: medium }
+    http:
+      method: POST
+      path: "/users/me/drafts"
+    params:
+      - { name: message, in: body, required: true, type: object, description: "{ raw: base64url RFC 2822 }" }
+
+  - id: get_profile
+    description: Get the authenticated mailbox's profile.
+    expected_use: Whoami — confirm which mailbox the agent is acting on.
+    auto_execute: true
+    required_scopes: [https://www.googleapis.com/auth/gmail.readonly]
+    risk: { category: read, sensitivity: low }
+    http:
+      method: GET
+      path: "/users/me/profile"
+    params: []
+
 notes: |
   Gmail rate limits: 250 quota units/user/sec; messages.send costs 100 units.
   Burst calls trigger 429 — surface to caller for retry / backoff.

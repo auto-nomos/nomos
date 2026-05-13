@@ -89,3 +89,106 @@ actions:
       path: "/subscriptions/{subscription_id}"
     params:
       - { name: subscription_id, in: path, required: true, type: string }
+
+  - id: get_subscription
+    description: Retrieve a single subscription by id.
+    expected_use: Read full subscription record before cancel or update.
+    auto_execute: true
+    required_scopes: [read_write]
+    risk: { category: read, sensitivity: medium }
+    http:
+      method: GET
+      path: "/subscriptions/{subscription_id}"
+    params:
+      - { name: subscription_id, in: path, required: true, type: string }
+
+  - id: create_customer
+    description: Create a new customer record.
+    expected_use: Provision a new buyer as part of onboarding.
+    auto_execute: false
+    required_scopes: [read_write]
+    risk: { category: write, sensitivity: medium }
+    http:
+      method: POST
+      path: "/customers"
+    params:
+      - { name: email, in: form, type: string }
+      - { name: name, in: form, type: string }
+      - { name: description, in: form, type: string }
+      - { name: phone, in: form, type: string }
+
+  - id: list_charges
+    description: List recent charges.
+    expected_use: Audit recent payment activity.
+    auto_execute: true
+    required_scopes: [read_write]
+    risk: { category: read, sensitivity: medium }
+    http:
+      method: GET
+      path: "/charges"
+    params:
+      - { name: customer, in: query, type: string }
+      - { name: limit, in: query, type: integer, default: 25 }
+
+  - id: get_charge
+    description: Retrieve a single charge by id.
+    expected_use: Fetch full charge record before refunding.
+    auto_execute: true
+    required_scopes: [read_write]
+    risk: { category: read, sensitivity: medium }
+    http:
+      method: GET
+      path: "/charges/{charge_id}"
+    params:
+      - { name: charge_id, in: path, required: true, type: string }
+
+  - id: list_invoices
+    description: List invoices for a customer.
+    expected_use: Audit billing history.
+    auto_execute: true
+    required_scopes: [read_write]
+    risk: { category: read, sensitivity: medium }
+    http:
+      method: GET
+      path: "/invoices"
+    params:
+      - { name: customer, in: query, type: string }
+      - { name: status, in: query, type: string, enum: [draft, open, paid, uncollectible, void] }
+      - { name: limit, in: query, type: integer, default: 25 }
+
+  - id: get_invoice
+    description: Retrieve a single invoice by id.
+    expected_use: Fetch full invoice record for reconciliation.
+    auto_execute: true
+    required_scopes: [read_write]
+    risk: { category: read, sensitivity: medium }
+    http:
+      method: GET
+      path: "/invoices/{invoice_id}"
+    params:
+      - { name: invoice_id, in: path, required: true, type: string }
+
+  - id: list_payment_intents
+    description: List payment intents.
+    expected_use: Audit pending and recent payment intents.
+    auto_execute: true
+    required_scopes: [read_write]
+    risk: { category: read, sensitivity: medium }
+    http:
+      method: GET
+      path: "/payment_intents"
+    params:
+      - { name: customer, in: query, type: string }
+      - { name: limit, in: query, type: integer, default: 25 }
+
+  - id: get_payment_intent
+    description: Retrieve a single payment intent by id.
+    expected_use: Inspect status and details of a payment intent.
+    auto_execute: true
+    required_scopes: [read_write]
+    risk: { category: read, sensitivity: medium }
+    http:
+      method: GET
+      path: "/payment_intents/{payment_intent_id}"
+    params:
+      - { name: payment_intent_id, in: path, required: true, type: string }

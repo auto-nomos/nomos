@@ -92,3 +92,41 @@ actions:
     params:
       - { name: calendarId, in: path, required: true, type: string, default: primary }
       - { name: eventId, in: path, required: true, type: string }
+
+  - id: list_calendars
+    description: List calendars the user has access to.
+    expected_use: Discover available calendars before scheduling.
+    auto_execute: true
+    required_scopes: [https://www.googleapis.com/auth/calendar.readonly]
+    risk: { category: read, sensitivity: low }
+    http:
+      method: GET
+      path: "/users/me/calendarList"
+    params:
+      - { name: maxResults, in: query, type: integer, default: 50 }
+
+  - id: get_calendar
+    description: Fetch metadata for a single calendar.
+    expected_use: Inspect timezone and access role before booking.
+    auto_execute: true
+    required_scopes: [https://www.googleapis.com/auth/calendar.readonly]
+    risk: { category: read, sensitivity: low }
+    http:
+      method: GET
+      path: "/calendars/{calendarId}"
+    params:
+      - { name: calendarId, in: path, required: true, type: string, default: primary }
+
+  - id: list_attendees_freebusy
+    description: Query free/busy intervals for one or more calendars.
+    expected_use: Find an open slot for scheduling.
+    auto_execute: true
+    required_scopes: [https://www.googleapis.com/auth/calendar.readonly]
+    risk: { category: read, sensitivity: medium }
+    http:
+      method: POST
+      path: "/freeBusy"
+    params:
+      - { name: timeMin, in: body, required: true, type: string }
+      - { name: timeMax, in: body, required: true, type: string }
+      - { name: items, in: body, required: true, type: array, description: "[{ id: <calendarId> }, ...]" }

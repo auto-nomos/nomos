@@ -88,3 +88,87 @@ actions:
       - { name: channel, in: body, required: true, type: string }
       - { name: name, in: body, required: true, type: string }
       - { name: timestamp, in: body, required: true, type: string }
+
+  - id: list_users
+    description: List members of the workspace.
+    expected_use: Resolve usernames or build a directory.
+    auto_execute: true
+    required_scopes: [users:read]
+    risk: { category: read, sensitivity: medium }
+    http:
+      method: GET
+      path: "/users.list"
+    params:
+      - { name: limit, in: query, type: integer, default: 200 }
+      - { name: cursor, in: query, type: string }
+
+  - id: get_user_by_email
+    description: Look up a Slack user by email address.
+    expected_use: Resolve an email to a workspace member.
+    auto_execute: true
+    required_scopes: [users:read.email]
+    risk: { category: read, sensitivity: medium }
+    http:
+      method: GET
+      path: "/users.lookupByEmail"
+    params:
+      - { name: email, in: query, required: true, type: string }
+
+  - id: update_message
+    description: Edit a previously posted message.
+    expected_use: Correct or amend a prior message; never auto-execute on user-facing channels.
+    auto_execute: false
+    required_scopes: [chat:write]
+    risk: { category: write, sensitivity: medium }
+    http:
+      method: POST
+      path: "/chat.update"
+    params:
+      - { name: channel, in: body, required: true, type: string }
+      - { name: ts, in: body, required: true, type: string }
+      - { name: text, in: body, required: true, type: string }
+      - { name: blocks, in: body, type: array }
+
+  - id: delete_message
+    description: Permanently delete a message.
+    expected_use: Remove a message posted in error. Requires explicit user approval.
+    auto_execute: false
+    required_scopes: [chat:write]
+    risk: { category: delete, sensitivity: high }
+    http:
+      method: POST
+      path: "/chat.delete"
+    params:
+      - { name: channel, in: body, required: true, type: string }
+      - { name: ts, in: body, required: true, type: string }
+
+  - id: reply_in_thread
+    description: Reply in an existing thread.
+    expected_use: Continue a conversation without polluting the main channel.
+    auto_execute: false
+    required_scopes: [chat:write]
+    risk: { category: write, sensitivity: medium }
+    http:
+      method: POST
+      path: "/chat.postMessage"
+    params:
+      - { name: channel, in: body, required: true, type: string }
+      - { name: thread_ts, in: body, required: true, type: string }
+      - { name: text, in: body, required: true, type: string }
+      - { name: blocks, in: body, type: array }
+
+  - id: upload_file
+    description: Upload a file to one or more channels.
+    expected_use: Share a generated artifact (report, image) into a channel.
+    auto_execute: false
+    required_scopes: [files:write]
+    risk: { category: write, sensitivity: medium }
+    http:
+      method: POST
+      path: "/files.upload"
+    params:
+      - { name: channels, in: body, required: true, type: string }
+      - { name: content, in: body, type: string }
+      - { name: filename, in: body, type: string }
+      - { name: title, in: body, type: string }
+      - { name: initial_comment, in: body, type: string }

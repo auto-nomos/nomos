@@ -2,9 +2,9 @@ import type { IntegrationPack } from '../types.js';
 import { actionToCommand, resourceFor } from './actions.js';
 import { actions, templates } from './templates.js';
 
-export const linearPack: IntegrationPack = {
-  id: 'linear',
-  name: 'Linear',
+export const googleGmailPack: IntegrationPack = {
+  id: 'google_gmail',
+  name: 'Gmail',
   templates,
   actions: [...actions],
 };

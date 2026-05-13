@@ -16,7 +16,8 @@ export type IntegrationId =
   | 'filesystem'
   | 'linear'
   | 'stripe'
-  | 'google_calendar';
+  | 'google_calendar'
+  | 'google_gmail';
 
 export interface PolicyTemplate {
   /** Stable id, namespaced on integration: `github:read-only`. */

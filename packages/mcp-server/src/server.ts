@@ -23,11 +23,19 @@ function integrationLabel(id: IntegrationId): string {
     case 'github':
       return 'GitHub';
     case 'google':
-      return 'Google (Drive, Mail, Calendar)';
+      return 'Google Drive';
     case 'notion':
       return 'Notion';
     case 'slack':
       return 'Slack';
+    case 'linear':
+      return 'Linear';
+    case 'stripe':
+      return 'Stripe';
+    case 'google_calendar':
+      return 'Google Calendar';
+    case 'google_gmail':
+      return 'Gmail';
   }
 }
 

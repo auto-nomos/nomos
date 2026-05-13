@@ -3,15 +3,19 @@ import type { PolicyTemplate } from '../types.js';
 export const READS = [
   '/notion/page/read',
   '/notion/database/query',
+  '/notion/database/read',
   '/notion/block/read',
   '/notion/search',
+  '/notion/user/list',
+  '/notion/user/read',
 ] as const;
 export const WRITES = [
   '/notion/page/create',
   '/notion/page/update',
   '/notion/block/append',
 ] as const;
-export const actions = [...READS, ...WRITES] as const;
+export const DELETES = ['/notion/block/delete'] as const;
+export const actions = [...READS, ...WRITES, ...DELETES] as const;
 
 const READ_LIST = READS.map((a) => `Action::"${a}"`).join(', ');
 const WRITE_LIST = WRITES.map((a) => `Action::"${a}"`).join(', ');

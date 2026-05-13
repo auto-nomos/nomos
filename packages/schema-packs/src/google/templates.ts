@@ -4,10 +4,15 @@ export const READS = [
   '/google/drive/read',
   '/google/drive/list',
   '/google/drive/download',
+  '/google/drive/search',
   '/google/calendar/read',
 ] as const;
 export const WRITES = [
   '/google/drive/write',
+  '/google/drive/update',
+  '/google/drive/copy',
+  '/google/drive/share',
+  '/google/drive/folder/create',
   '/google/calendar/event/create',
   '/google/calendar/event/update',
 ] as const;
