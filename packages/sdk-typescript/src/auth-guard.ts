@@ -402,6 +402,23 @@ function parseProxyResponse(body: unknown): ProxyResult {
     };
   }
   const r = body as Record<string, unknown>;
+  // Legacy PDP error envelope (no `decision` field): promote to synthetic
+  // deny so the caller sees a real reason. Drop once every deployed PDP
+  // returns the `{ allow, decision }` shape.
+  if (
+    r.decision === undefined &&
+    (typeof r.error === 'string' || typeof r.error_code === 'string')
+  ) {
+    const errorCode = typeof r.error_code === 'string' ? r.error_code : 'pdp_error';
+    return {
+      allow: false,
+      decision: {
+        allow: false,
+        reason: errorCode as AuthorizeDecision['reason'],
+        receiptId: `pdp-synth-${errorCode}`,
+      },
+    };
+  }
   if (!isAuthorizeDecision(r.decision)) {
     return {
       allow: false,
@@ -426,7 +443,20 @@ function parseProxyResponse(body: unknown): ProxyResult {
 function isAuthorizeDecision(v: unknown): v is AuthorizeDecision {
   if (typeof v !== 'object' || v === null) return false;
   const r = v as Record<string, unknown>;
-  if (typeof r.allow !== 'boolean') return false;
+  if (typeof r.allow !== 'boolean') {
+    // Legacy PDP error envelope `{error, error_code}` (e.g. cache-miss 404,
+    // bundle-not-loaded). Promote to a synthetic deny with a real reason so
+    // callers see the actual cause instead of `pdp_invalid_response`. Drop
+    // this branch once every deployed PDP returns a decision shape.
+    if (typeof r.error === 'string' || typeof r.error_code === 'string') {
+      const errorCode = typeof r.error_code === 'string' ? r.error_code : 'pdp_error';
+      r.allow = false;
+      r.reason = errorCode;
+      r.receiptId = `pdp-synth-${errorCode}`;
+      return true;
+    }
+    return false;
+  }
   // PDP must always send receiptId, but older deny paths (unknown_command,
   // resource_out_of_scope) historically omitted it. Backfill a synthetic id
   // so the decision still surfaces with its true reason instead of being

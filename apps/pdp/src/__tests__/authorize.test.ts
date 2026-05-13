@@ -261,8 +261,8 @@ describe('POST /v1/authorize', () => {
     expect(res.status).toBe(400);
   });
 
-  it('returns 404 when customer has no policy bundle cached', async () => {
-    const { app } = buildApp();
+  it('returns 200 deny (unknown_customer) when no policy bundle cached', async () => {
+    const { app, audits } = buildApp();
     const issuer = generateKeypair();
     const agent = generateKeypair();
     const ucan = issueUcan({
@@ -279,7 +279,12 @@ describe('POST /v1/authorize', () => {
         context: {},
       }),
     });
-    expect(res.status).toBe(404);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { allow: boolean; reason: string; receiptId: string };
+    expect(body.allow).toBe(false);
+    expect(body.reason).toBe('unknown_customer');
+    expect(body.receiptId).toMatch(/^[0-9a-f]{64}$/);
+    expect(audits).toContainEqual({ command: '/github/issue/create', allow: false });
   });
 
   it('emits an audit event on successful allow', async () => {

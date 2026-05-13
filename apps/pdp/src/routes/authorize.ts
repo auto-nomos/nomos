@@ -149,10 +149,36 @@ export function createAuthorizeRoutes(deps: AuthorizeRouteDeps): Hono {
       return c.json(denyDecision, 200);
     }
 
-    const policies = deps.policyCache.getPolicies(customerId);
+    let policies = deps.policyCache.getPolicies(customerId);
+    if (policies === undefined) {
+      // Lazy-fetch: PDP boot may have missed this customer (newly added in
+      // control-plane after start, or discovery hadn't fired yet). Try once
+      // before denying so first calls don't 404 forever.
+      try {
+        await deps.policyCache.refresh(customerId);
+      } catch (err) {
+        log.warn({ err, customerId }, 'on-demand bundle fetch failed');
+      }
+      policies = deps.policyCache.getPolicies(customerId);
+    }
     if (policies === undefined) {
       log.warn({ customerId }, 'no policies cached for customer');
-      return c.json({ error: 'unknown customer or policy bundle not yet loaded' }, 404);
+      const denyDecision: AuthorizeDecision = {
+        allow: false,
+        reason: 'unknown_customer',
+        receiptId: sha256Hex(`unknown-customer|${customerId}|${request.command}`),
+      };
+      recordAuthorize(decisionToAudit(denyDecision), denyDecision.reason);
+      if (deps.emitAudit) {
+        await deps.emitAudit({
+          customerId,
+          request,
+          decision: { ...denyDecision },
+          ts: Date.now(),
+          agentDid: extractAgentDid(request.ucan),
+        });
+      }
+      return c.json(denyDecision, 200);
     }
 
     const agentDid = extractAgentDid(request.ucan);
@@ -177,7 +203,12 @@ export function createAuthorizeRoutes(deps: AuthorizeRouteDeps): Hono {
         });
       }
       log.info(
-        { customerId, command: request.command, agentId: agentMeta.agentId, reason: denyDecision.reason },
+        {
+          customerId,
+          command: request.command,
+          agentId: agentMeta.agentId,
+          reason: denyDecision.reason,
+        },
         'authorize deny agent_not_connected',
       );
       return c.json(denyDecision, 200);

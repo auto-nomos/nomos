@@ -169,16 +169,36 @@ export function createProxyRoutes(deps: ProxyRouteDeps): Hono {
       );
     }
 
-    const policies = deps.policyCache.getPolicies(customerId);
+    let policies = deps.policyCache.getPolicies(customerId);
+    if (policies === undefined) {
+      // Lazy-fetch: PDP boot may have missed this customer (newly added in
+      // control-plane after start, or discovery hadn't fired yet). Try once
+      // before denying so first proxy call doesn't 404 forever.
+      try {
+        await deps.policyCache.refresh(customerId);
+      } catch (err) {
+        log.warn({ err, customerId }, 'on-demand bundle fetch failed');
+      }
+      policies = deps.policyCache.getPolicies(customerId);
+    }
     if (policies === undefined) {
       log.warn({ customerId }, 'no policies cached for customer');
-      return c.json(
-        {
-          error: 'unknown customer or policy bundle not yet loaded',
-          error_code: 'no_policies',
-        },
-        404,
-      );
+      const denyDecision: AuthorizeDecision = {
+        allow: false,
+        reason: 'unknown_customer',
+        receiptId: sha256Hex(`unknown-customer|${customerId}|${request.command}`),
+      };
+      recordAuthorize(decisionToAudit(denyDecision), denyDecision.reason);
+      if (deps.emitAudit) {
+        await deps.emitAudit({
+          customerId,
+          request,
+          decision: { ...denyDecision },
+          ts: Date.now(),
+          agentDid: extractAgentDid(request.ucan),
+        });
+      }
+      return c.json({ allow: false, decision: denyDecision, error_code: 'unknown_customer' }, 200);
     }
 
     // D3: schema-pack enforcement. Runs after policy cache so a tenant the

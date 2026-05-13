@@ -35,6 +35,7 @@
     "dev:setup:host": "tsx scripts/setup-wizard.mts",
     "gen-keys": "tsx scripts/gen-keys.mts",
     "test:packs": "tsx scripts/pack-smoke.mts",
+    "test:smoke": "tsx scripts/deploy-smoke.mts",
     "tunnel": "bash scripts/dev-tunnel.sh",
     "e2e:sprint3": "tsx scripts/e2e-sprint3.mts",
     "e2e:sprint5": "tsx scripts/e2e-sprint5.mts",

@@ -466,7 +466,7 @@ permit (
     expect(fix.stepupCreate).not.toHaveBeenCalled();
   });
 
-  it('returns 404 when no policies cached for customer', async () => {
+  it('returns 200 deny (unknown_customer) when no policies cached', async () => {
     const fix = buildApp({});
     const issuer = generateKeypair();
     const agent = generateKeypair();
@@ -490,7 +490,17 @@ permit (
         apiCall: { method: 'GET', path: '/repos/acme/billing' },
       }),
     });
-    expect(res.status).toBe(404);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      allow: boolean;
+      decision: { allow: boolean; reason: string; receiptId: string };
+      error_code: string;
+    };
+    expect(body.allow).toBe(false);
+    expect(body.decision.allow).toBe(false);
+    expect(body.decision.reason).toBe('unknown_customer');
+    expect(body.decision.receiptId).toMatch(/^[0-9a-f]{64}$/);
+    expect(body.error_code).toBe('unknown_customer');
   });
 
   it('D3 — denies with schema_violation when apiCall method mismatches command', async () => {
