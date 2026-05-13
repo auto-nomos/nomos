@@ -127,6 +127,20 @@
       "when": 1779200000000,
       "tag": "0017_agent_policies",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1778669322609,
+      "tag": "0018_large_earthquake",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1779300000000,
+      "tag": "0019_passkey_unification",
+      "breakpoints": true
     }
   ]
 }

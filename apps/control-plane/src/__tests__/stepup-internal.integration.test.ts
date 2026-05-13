@@ -194,4 +194,61 @@ describe.skipIf(!RUN)('stepup internal endpoints (requires postgres)', () => {
     });
     expect(res.status).toBe(404);
   });
+
+  it('dedups: second call with same (agent, command, resource) returns existing id + skips notifier', async () => {
+    (notifier as unknown as ReturnType<typeof vi.fn>).mockClear();
+    const payload = {
+      customer_id: customerId,
+      agent_id: agentId,
+      command: '/dedup/test',
+      resource: { foo: 'same' },
+    };
+    const first = await app.request('/v1/internal/stepup/create', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${TOKEN}` },
+      body: JSON.stringify(payload),
+    });
+    expect(first.status).toBe(200);
+    const firstBody = (await first.json()) as { id: string };
+    await new Promise((r) => setTimeout(r, 20));
+    expect(notifier).toHaveBeenCalledTimes(1);
+
+    const second = await app.request('/v1/internal/stepup/create', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${TOKEN}` },
+      body: JSON.stringify(payload),
+    });
+    expect(second.status).toBe(200);
+    const secondBody = (await second.json()) as { id: string };
+    expect(secondBody.id).toBe(firstBody.id);
+    await new Promise((r) => setTimeout(r, 20));
+    expect(notifier).toHaveBeenCalledTimes(1); // still only the first
+  });
+
+  it('dedup: expired pending row is refreshed in place (same id, new expiresAt)', async () => {
+    const payload = {
+      customer_id: customerId,
+      agent_id: agentId,
+      command: '/dedup/expired',
+      resource: { foo: 'old' },
+    };
+    const first = await app.request('/v1/internal/stepup/create', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${TOKEN}` },
+      body: JSON.stringify(payload),
+    });
+    const firstBody = (await first.json()) as { id: string; expires_at: string };
+    await db.pool.query(
+      "UPDATE push_approvals SET expires_at = NOW() - INTERVAL '1 minute' WHERE id = $1",
+      [firstBody.id],
+    );
+    const second = await app.request('/v1/internal/stepup/create', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${TOKEN}` },
+      body: JSON.stringify(payload),
+    });
+    const secondBody = (await second.json()) as { id: string; expires_at: string };
+    expect(secondBody.id).toBe(firstBody.id);
+    expect(new Date(secondBody.expires_at).getTime()).toBeGreaterThan(Date.now());
+  });
 });

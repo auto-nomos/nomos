@@ -1,7 +1,6 @@
 'use client';
 
-import { type RegistrationResponseJSON, startRegistration } from '@simplewebauthn/browser';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '../../../../components/ui/button';
 import {
   Card,
@@ -12,54 +11,76 @@ import {
 } from '../../../../components/ui/card';
 import { Input } from '../../../../components/ui/input';
 import { Label } from '../../../../components/ui/label';
-import { trpc } from '../../../../lib/trpc';
+import {
+  deletePasskey,
+  listPasskeys,
+  type PasskeyRow as PasskeyClientRow,
+  registerPasskey,
+} from '../../../../lib/passkey-client';
+
+type PasskeyRow = PasskeyClientRow;
 
 export default function SecuritySettingsPage() {
-  const utils = trpc.useUtils();
-  const list = trpc.stepup.listCredentials.useQuery();
-  const registerOptions = trpc.stepup.registerOptions.useMutation();
-  const registerVerify = trpc.stepup.registerVerify.useMutation();
-  const removeCredential = trpc.stepup.removeCredential.useMutation({
-    onSuccess: () => utils.stepup.listCredentials.invalidate(),
-  });
-
+  const [creds, setCreds] = useState<PasskeyRow[]>([]);
+  const [loading, setLoading] = useState(true);
   const [name, setName] = useState('');
   const [status, setStatus] = useState<'idle' | 'registering' | 'done' | 'error'>('idle');
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
+
+  async function refresh() {
+    setLoading(true);
+    try {
+      const rows = await listPasskeys();
+      setCreds(rows);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'failed to list passkeys');
+      setCreds([]);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    void refresh();
+  }, []);
 
   async function handleRegister() {
     try {
       setStatus('registering');
       setError(null);
       setInfo(null);
-      const opts = await registerOptions.mutateAsync();
-      const response = (await startRegistration({ optionsJSON: opts })) as RegistrationResponseJSON;
-      // biome-ignore lint/suspicious/noExplicitAny: WebAuthn JSON validated server-side.
-      const body: { response: any; name?: string } = { response: response as any };
-      if (name.trim().length > 0) body.name = name.trim();
-      await registerVerify.mutateAsync(body);
+      await registerPasskey(name.trim().length > 0 ? { name: name.trim() } : undefined);
       setInfo('Passkey registered.');
       setName('');
       setStatus('done');
-      await list.refetch();
+      await refresh();
     } catch (err) {
       setStatus('error');
-      setError((err as Error).message);
+      setError(err instanceof Error ? err.message : 'enrollment failed');
     }
   }
 
-  const creds = list.data ?? [];
-  const hasNone = !list.isLoading && creds.length === 0;
+  async function handleRemove(id: string) {
+    if (!confirm('Remove this passkey? You will need to register again from this device.')) return;
+    try {
+      await deletePasskey(id);
+      await refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'remove failed');
+    }
+  }
+
+  const hasNone = !loading && creds.length === 0;
 
   return (
     <div className="space-y-6">
       <header>
         <h1 className="text-xl font-semibold">Passkeys</h1>
         <p className="text-sm text-zinc-500">
-          Register a passkey on this device to approve step-up requests from the dashboard. Without
-          a passkey you cannot approve high-risk actions from the dashboard — only via the Telegram
-          bot.
+          Your passkeys sign you in to Nomos and approve step-up requests. We recommend enrolling at
+          least two devices so you&rsquo;re never locked out.
         </p>
       </header>
 
@@ -67,8 +88,8 @@ export default function SecuritySettingsPage() {
         <Card className="border-yellow-500/40 bg-yellow-500/5">
           <CardContent className="py-4">
             <p className="text-sm text-yellow-700 dark:text-yellow-200">
-              <strong>No passkey on file.</strong> Register one before your first agent step-up so
-              the approval flow works without a Telegram fallback.
+              <strong>No passkey on file.</strong> Add one now so step-up approvals work and so you
+              can sign in without a recovery code next time.
             </p>
           </CardContent>
         </Card>
@@ -79,7 +100,7 @@ export default function SecuritySettingsPage() {
           <CardTitle className="text-base">Add a passkey</CardTitle>
           <CardDescription>
             Uses your device&apos;s biometric (Touch ID / Face ID / Windows Hello) or a security
-            key. Stored as a credential bound to your user — no shared secret.
+            key. The private key never leaves the device.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -113,7 +134,7 @@ export default function SecuritySettingsPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {list.isLoading ? (
+          {loading ? (
             <p className="text-sm text-zinc-500">Loading…</p>
           ) : creds.length === 0 ? (
             <p className="text-sm text-zinc-500">No passkeys yet.</p>
@@ -123,24 +144,16 @@ export default function SecuritySettingsPage() {
                 <li key={c.id} className="flex items-center justify-between gap-3 py-3">
                   <div className="min-w-0">
                     <p className="truncate text-sm font-medium">
-                      {c.name ?? c.credentialId.slice(0, 12) + '…'}
+                      {c.name ?? c.credentialID.slice(0, 12) + '…'}
                     </p>
                     <p className="font-mono text-[11px] text-zinc-500">
                       registered {new Date(c.createdAt).toLocaleString()}
-                      {c.lastUsedAt
-                        ? ` · last used ${new Date(c.lastUsedAt).toLocaleString()}`
-                        : ' · never used'}
                       {c.transports ? ` · ${c.transports}` : ''}
+                      {c.deviceType ? ` · ${c.deviceType}` : ''}
+                      {c.backedUp ? ' · synced' : ''}
                     </p>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={async () => {
-                      if (!confirm('Remove this passkey? You will need to register again.')) return;
-                      await removeCredential.mutateAsync({ id: c.id });
-                    }}
-                  >
+                  <Button variant="ghost" size="sm" onClick={() => void handleRemove(c.id)}>
                     Remove
                   </Button>
                 </li>

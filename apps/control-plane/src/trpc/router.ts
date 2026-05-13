@@ -2,6 +2,7 @@ import { router } from './index.js';
 import { agentsRouter } from './routers/agents.js';
 import { apiKeysRouter } from './routers/api-keys.js';
 import { auditRouter } from './routers/audit.js';
+import { authRouter } from './routers/auth.js';
 import { billingRouter } from './routers/billing.js';
 import { customersRouter } from './routers/customers.js';
 import { envelopesRouter } from './routers/envelopes.js';
@@ -14,6 +15,7 @@ import { stepupRouter } from './routers/stepup.js';
 import { ucansRouter } from './routers/ucans.js';
 
 export const appRouter = router({
+  auth: authRouter,
   customers: customersRouter,
   agents: agentsRouter,
   apiKeys: apiKeysRouter,

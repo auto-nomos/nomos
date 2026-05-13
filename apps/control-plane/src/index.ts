@@ -6,6 +6,7 @@ import { type Config, loadConfig } from './config.js';
 import { createDb, seedSchemas } from './db/index.js';
 import { createLogger, type Logger } from './logger.js';
 import { createServer } from './server.js';
+import { createRecoveryNotifier } from './services/auth/recovery-notify.js';
 import { createRiskSummarizer } from './services/grants/llm-risk-summary.js';
 import { createCoherenceVerifier } from './services/intent-coherence.js';
 import { createTelegramBot, type TelegramBot } from './services/notify/telegram-bot.js';
@@ -79,7 +80,11 @@ async function main(): Promise<void> {
 
   const db = createDb(config);
   await seedSchemas(db);
-  const auth = createAuth({ db: db.drizzle, config, logger });
+  const recoveryNotifier = createRecoveryNotifier({
+    apiKey: config.KNOCK_API_KEY,
+    logger,
+  });
+  const auth = createAuth({ db: db.drizzle, config, logger, recoveryNotifier });
   const { signKey, signerDid } = loadSigningKey(config, logger);
   const encryptionKey = loadOAuthEncryptionKey(config, logger);
 

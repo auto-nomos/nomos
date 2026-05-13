@@ -1,5 +1,6 @@
 'use client';
 
+import { emailOTPClient } from 'better-auth/client/plugins';
 import { createAuthClient } from 'better-auth/react';
 import { clientEnv } from './env';
 
@@ -33,10 +34,14 @@ export interface AuthFetchOptions {
   onError?: (ctx: { error: AuthError }) => void;
 }
 
-export interface AuthClient {
+interface AuthClientShape {
   signIn: {
     email: (
       input: { email: string; password: string; rememberMe?: boolean },
+      options?: AuthFetchOptions,
+    ) => Promise<{ data: SessionData | null; error: AuthError | null }>;
+    emailOtp: (
+      input: { email: string; otp: string },
       options?: AuthFetchOptions,
     ) => Promise<{ data: SessionData | null; error: AuthError | null }>;
   };
@@ -48,11 +53,22 @@ export interface AuthClient {
   };
   signOut: () => Promise<{ data: { success: boolean } | null; error: AuthError | null }>;
   useSession: () => UseSessionResult;
+  emailOtp: {
+    sendVerificationOtp: (input: {
+      email: string;
+      type: 'sign-in' | 'email-verification' | 'forget-password';
+    }) => Promise<{ data: unknown; error: AuthError | null }>;
+  };
 }
 
+export type AuthClient = AuthClientShape;
+
+// pnpm + TS2742 workaround per feedback_pnpm_ts2742: cast through unknown so
+// the inferred return doesn't leak workspace internals.
 export const authClient: AuthClient = createAuthClient({
   baseURL: `${clientEnv.controlPlaneUrl}/auth`,
   fetchOptions: { credentials: 'include' },
+  plugins: [emailOTPClient()],
 }) as unknown as AuthClient;
 
 export const { signIn, signUp, signOut, useSession } = authClient;

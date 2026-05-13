@@ -20,6 +20,7 @@ import type { DrizzleClient } from '../../db/index.js';
 import {
   agents as agentsTable,
   customerTelegramLinks,
+  notificationPreferences,
   pushApprovals,
   telegramLinkTokens,
 } from '../../db/schema.js';
@@ -89,6 +90,22 @@ export interface MintedToken {
   token: string;
   deepLink: string;
   expiresAt: Date;
+}
+
+function formatTtl(seconds: number): string {
+  if (seconds >= 86400) {
+    const d = Math.floor(seconds / 86400);
+    return `${d}d`;
+  }
+  if (seconds >= 3600) {
+    const h = Math.floor(seconds / 3600);
+    return `${h}h`;
+  }
+  if (seconds >= 60) {
+    const m = Math.floor(seconds / 60);
+    return `${m}m`;
+  }
+  return `${seconds}s`;
 }
 
 export interface TelegramBot {
@@ -192,6 +209,20 @@ export function createTelegramBot(opts: TelegramBotOptions): TelegramBot {
         .onConflictDoUpdate({
           target: [customerTelegramLinks.customerId, customerTelegramLinks.chatId],
           set: { username: username ?? null, lastUsedAt: now, enabled: true },
+        });
+      // Mirror into notification_preferences so createStepUpApproval's
+      // existing prefs lookup yields a non-null chatId on the first link —
+      // no extra dashboard step required.
+      await tx
+        .insert(notificationPreferences)
+        .values({
+          userId: row.userId,
+          telegramChatId: chatId,
+          telegramEnabled: true,
+        })
+        .onConflictDoUpdate({
+          target: notificationPreferences.userId,
+          set: { telegramChatId: chatId, telegramEnabled: true },
         });
       return { customerId: row.customerId, userId: row.userId };
     });
@@ -399,7 +430,7 @@ export function createTelegramBot(opts: TelegramBotOptions): TelegramBot {
         ...(summaryLine ? [summaryLine] : []),
         '',
         `*Action:* \`${args.command}\``,
-        `*Expires in:* ${args.ttlSeconds}s`,
+        `*Expires in:* ${formatTtl(args.ttlSeconds)}`,
         '',
         `Resource: \`${resourceJson}\``,
         ...(scopeHint ? ['', scopeHint] : []),

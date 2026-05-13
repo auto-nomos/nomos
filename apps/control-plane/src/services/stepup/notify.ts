@@ -53,12 +53,12 @@ export function createStepUpNotifier(opts: StepUpNotifierOptions): StepUpNotifie
     const prefs = args.prefs ?? {};
 
     // M6 — direct Telegram path: short-circuit Knock when bot configured.
-    if (
-      opts.telegramBot &&
+    const telegramEligible =
+      !!opts.telegramBot &&
       prefs.telegramEnabled !== false &&
-      prefs.telegramChatId &&
-      prefs.telegramChatId.length > 0
-    ) {
+      !!prefs.telegramChatId &&
+      prefs.telegramChatId.length > 0;
+    if (telegramEligible && opts.telegramBot && prefs.telegramChatId) {
       const sent = await opts.telegramBot.sendStepUp({
         chatId: prefs.telegramChatId,
         approvalId: args.approvalId,
@@ -74,6 +74,17 @@ export function createStepUpNotifier(opts: StepUpNotifierOptions): StepUpNotifie
       opts.logger.warn(
         { approvalId: args.approvalId },
         'telegram send failed; falling back to Knock / dev console',
+      );
+    } else if (opts.telegramBot) {
+      // Bot configured but path skipped — surface why so missing chat-id
+      // setups don't silently fall back to Knock/dev-console.
+      opts.logger.info(
+        {
+          approvalId: args.approvalId,
+          telegramEnabled: prefs.telegramEnabled !== false,
+          hasChatId: !!prefs.telegramChatId,
+        },
+        'telegram path skipped — see flags',
       );
     }
 

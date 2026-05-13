@@ -1,13 +1,15 @@
 /**
- * Sprint 9 — step-up approval surface for the dashboard /approve/:id page.
+ * Step-up approval surface for the dashboard /approve/:id page.
  *
  * Procedures:
  *   getApproval        — load the approval row (must be a member of the customer).
- *   registerOptions    — first-time passkey registration challenge.
- *   registerVerify     — verify + persist new credential.
  *   assertOptions      — biometric step-up assertion challenge.
  *   approve            — verify assertion + mint cosigner UCAN + flip state to approved.
  *   deny               — flip state to denied.
+ *
+ * Passkey enrollment is now owned by Better-Auth's passkey plugin
+ * (`/auth/passkey/*`); the dashboard settings page calls `authClient.passkey.*`
+ * directly. Step-up only consumes already-registered credentials.
  */
 import { TRPCError } from '@trpc/server';
 import { and, desc, eq, gt, inArray } from 'drizzle-orm';
@@ -19,12 +21,7 @@ import {
   denyApproval,
   mintCosignerForApproval,
 } from '../../services/stepup/cosigner.js';
-import {
-  authenticationOptions,
-  registrationOptions,
-  verifyAuthentication,
-  verifyRegistration,
-} from '../../services/stepup/webauthn.js';
+import { authenticationOptions, verifyAuthentication } from '../../services/stepup/webauthn.js';
 import { router, tenantProcedure } from '../index.js';
 
 function deriveIntegrationIdFromCommand(command: string): string | null {
@@ -54,9 +51,6 @@ async function loadApprovalForCustomer(
 // WebAuthn response payloads are validated downstream by @simplewebauthn/server;
 // we accept any object shape to avoid coupling the wire to the library's exact
 // (and evolving) optional fields.
-const RegistrationResponseSchema = z
-  .object({ id: z.string(), rawId: z.string(), type: z.literal('public-key') })
-  .passthrough();
 const AuthenticationResponseSchema = z
   .object({ id: z.string(), rawId: z.string(), type: z.literal('public-key') })
   .passthrough();
@@ -179,79 +173,6 @@ export const stepupRouter = router({
       const effectiveState =
         row.state === 'pending' && row.expiresAt.getTime() <= now ? 'expired' : row.state;
       return { ...row, state: effectiveState };
-    }),
-
-  /** List passkeys registered to the current user. */
-  listCredentials: tenantProcedure.query(async ({ ctx }) => {
-    return ctx.db.drizzle
-      .select({
-        id: schema.webauthnCredentials.id,
-        credentialId: schema.webauthnCredentials.credentialId,
-        name: schema.webauthnCredentials.name,
-        transports: schema.webauthnCredentials.transports,
-        createdAt: schema.webauthnCredentials.createdAt,
-        lastUsedAt: schema.webauthnCredentials.lastUsedAt,
-      })
-      .from(schema.webauthnCredentials)
-      .where(eq(schema.webauthnCredentials.userId, ctx.session.user.id))
-      .orderBy(desc(schema.webauthnCredentials.createdAt));
-  }),
-
-  /** Remove a passkey by uuid; only the owning user may delete. */
-  removeCredential: tenantProcedure
-    .input(z.object({ id: z.string().uuid() }))
-    .mutation(async ({ ctx, input }) => {
-      const deleted = await ctx.db.drizzle
-        .delete(schema.webauthnCredentials)
-        .where(
-          and(
-            eq(schema.webauthnCredentials.id, input.id),
-            eq(schema.webauthnCredentials.userId, ctx.session.user.id),
-          ),
-        )
-        .returning({ id: schema.webauthnCredentials.id });
-      if (deleted.length === 0) {
-        throw new TRPCError({ code: 'NOT_FOUND', message: 'credential_not_found' });
-      }
-      return { removed: true };
-    }),
-
-  registerOptions: tenantProcedure.mutation(async ({ ctx }) => {
-    if (!ctx.webauthn) {
-      throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'webauthn_disabled' });
-    }
-    const { options } = await registrationOptions({
-      userId: ctx.session.user.id,
-      userName: ctx.session.user.email,
-      config: ctx.webauthn,
-      db: ctx.db.drizzle,
-    });
-    return options;
-  }),
-
-  registerVerify: tenantProcedure
-    .input(
-      z.object({
-        response: RegistrationResponseSchema,
-        name: z.string().min(1).max(80).optional(),
-      }),
-    )
-    .mutation(async ({ ctx, input }) => {
-      if (!ctx.webauthn) {
-        throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'webauthn_disabled' });
-      }
-      const result = await verifyRegistration({
-        userId: ctx.session.user.id,
-        // biome-ignore lint/suspicious/noExplicitAny: zod-validated WebAuthn JSON shape.
-        response: input.response as any,
-        config: ctx.webauthn,
-        db: ctx.db.drizzle,
-        ...(input.name ? { name: input.name } : {}),
-      });
-      if (!result.ok) {
-        throw new TRPCError({ code: 'BAD_REQUEST', message: 'registration_verify_failed' });
-      }
-      return { credentialId: result.credentialId };
     }),
 
   assertOptions: tenantProcedure

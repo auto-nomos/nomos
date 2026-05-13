@@ -1,13 +1,9 @@
 'use client';
 
-import {
-  type AuthenticationResponseJSON,
-  type RegistrationResponseJSON,
-  startAuthentication,
-  startRegistration,
-} from '@simplewebauthn/browser';
+import { type AuthenticationResponseJSON, startAuthentication } from '@simplewebauthn/browser';
 import { useEffect, useState } from 'react';
 import { type EnvelopeSpec, formatEnvelopeAsk, formatReason } from '../../../lib/format-envelope';
+import { registerPasskey } from '../../../lib/passkey-client';
 import { trpc } from '../../../lib/trpc';
 
 function isEnvelopeSpec(x: unknown): x is EnvelopeSpec & { kind: 'envelope' } {
@@ -41,8 +37,6 @@ export function ApproveClient({ approvalId }: ApproveClientProps) {
     }
   }, [approval.data, selectedVariant]);
 
-  const registerOptions = trpc.stepup.registerOptions.useMutation();
-  const registerVerify = trpc.stepup.registerVerify.useMutation();
   const assertOptions = trpc.stepup.assertOptions.useMutation();
   const approveMutation = trpc.stepup.approve.useMutation();
   const denyMutation = trpc.stepup.deny.useMutation();
@@ -67,12 +61,7 @@ export function ApproveClient({ approvalId }: ApproveClientProps) {
     try {
       setStatus('registering');
       setErrorMsg(null);
-      const opts = await registerOptions.mutateAsync();
-      const response = (await startRegistration({
-        optionsJSON: opts,
-      })) as RegistrationResponseJSON;
-      // biome-ignore lint/suspicious/noExplicitAny: WebAuthn payload is verified server-side; tRPC wire schema uses passthrough.
-      await registerVerify.mutateAsync({ response: response as any });
+      await registerPasskey();
       setResultMsg('Passkey registered — now click Approve.');
       setStatus('idle');
     } catch (err) {

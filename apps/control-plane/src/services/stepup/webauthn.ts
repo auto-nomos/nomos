@@ -1,24 +1,25 @@
 /**
- * Sprint 9 — WebAuthn / passkey wrapper for the step-up approval flow.
+ * Step-up WebAuthn assertion against the unified `passkey` table.
  *
- * The dashboard /approve/:id page calls these procedures via tRPC:
- *   1. registerOptions / registerVerify  — first-time passkey registration.
- *   2. assertOptions  / assertVerify     — biometric approval of a step-up.
+ * Enrollment is owned by Better-Auth's passkey plugin (`/auth/passkey/*`).
+ * Step-up only needs to ASSERT against an already-enrolled credential, so
+ * `registrationOptions` / `verifyRegistration` are no longer here — they
+ * lived in the legacy hand-rolled flow before unification.
  *
- * Challenges live in an in-memory Map with a 5-minute TTL. Single-process
- * control plane in Phase 1 makes this acceptable; Phase 2 multi-instance
- * deploy needs Redis or a pg row.
+ * Challenges live in an in-memory Map with a 5-minute TTL (single-process
+ * control plane). Phase 2 multi-instance deploy needs Redis or a pg row,
+ * but Better-Auth's plugin uses the `verification` table for the *login*
+ * flow which is already multi-process safe; the step-up challenge surface
+ * is the only piece still in-memory.
  *
  * Origin / RP id come from `DASHBOARD_PUBLIC_URL`. WebAuthn requires the
  * relying-party id to be a registrable domain (or "localhost" in dev).
  */
 
-import type { AuthenticationResponseJSON, RegistrationResponseJSON } from '@simplewebauthn/server';
+import type { AuthenticationResponseJSON } from '@simplewebauthn/server';
 import {
   generateAuthenticationOptions,
-  generateRegistrationOptions,
   verifyAuthenticationResponse,
-  verifyRegistrationResponse,
 } from '@simplewebauthn/server';
 import { and, eq } from 'drizzle-orm';
 import type { DrizzleClient } from '../../db/index.js';
@@ -39,8 +40,8 @@ interface ChallengeEntry {
 
 const challengeStore = new Map<string, ChallengeEntry>();
 
-function challengeKey(userId: string, kind: 'register' | 'assert', tag: string): string {
-  return `${userId}|${kind}|${tag}`;
+function challengeKey(userId: string, tag: string): string {
+  return `${userId}|assert|${tag}`;
 }
 
 function setChallenge(key: string, challenge: string): void {
@@ -72,82 +73,11 @@ export function _resetWebAuthnChallenges(): void {
   challengeStore.clear();
 }
 
-export function deriveWebAuthnConfig(
-  dashboardPublicUrl: string,
-  rpName = 'credential-broker',
-): WebAuthnConfig {
+export function deriveWebAuthnConfig(dashboardPublicUrl: string, rpName = 'Nomos'): WebAuthnConfig {
   const url = new URL(dashboardPublicUrl);
   const origin = url.origin;
   const rpId = url.hostname;
   return { rpId, rpName, origin };
-}
-
-export async function registrationOptions(args: {
-  userId: string;
-  userName: string;
-  config: WebAuthnConfig;
-  db: DrizzleClient;
-}): Promise<{
-  options: ReturnType<typeof generateRegistrationOptions> extends Promise<infer T> ? T : never;
-  key: string;
-}> {
-  const existing = await args.db
-    .select({ credentialId: schema.webauthnCredentials.credentialId })
-    .from(schema.webauthnCredentials)
-    .where(eq(schema.webauthnCredentials.userId, args.userId));
-  const userIdBytes = Buffer.from(args.userId, 'utf8');
-  const options = await generateRegistrationOptions({
-    rpID: args.config.rpId,
-    rpName: args.config.rpName,
-    userName: args.userName,
-    userID: new Uint8Array(userIdBytes),
-    attestationType: 'none',
-    excludeCredentials: existing.map((e) => ({
-      id: e.credentialId,
-      transports: ['internal', 'hybrid'],
-    })),
-    authenticatorSelection: {
-      residentKey: 'preferred',
-      userVerification: 'preferred',
-    },
-  });
-  const key = challengeKey(args.userId, 'register', 'main');
-  setChallenge(key, options.challenge);
-  return { options, key };
-}
-
-export async function verifyRegistration(args: {
-  userId: string;
-  response: RegistrationResponseJSON;
-  config: WebAuthnConfig;
-  db: DrizzleClient;
-  name?: string;
-}): Promise<{ ok: boolean; credentialId?: string }> {
-  const expected = takeChallenge(challengeKey(args.userId, 'register', 'main'));
-  if (!expected) {
-    return { ok: false };
-  }
-  const verification = await verifyRegistrationResponse({
-    response: args.response,
-    expectedChallenge: expected,
-    expectedOrigin: args.config.origin,
-    expectedRPID: args.config.rpId,
-    requireUserVerification: false,
-  });
-  if (!verification.verified || !verification.registrationInfo) {
-    return { ok: false };
-  }
-  const info = verification.registrationInfo;
-  const credentialId = info.credential.id;
-  await args.db.insert(schema.webauthnCredentials).values({
-    userId: args.userId,
-    credentialId,
-    publicKey: Buffer.from(info.credential.publicKey).toString('base64url'),
-    counter: info.credential.counter,
-    transports: args.response.response.transports?.join(',') ?? null,
-    name: args.name ?? null,
-  });
-  return { ok: true, credentialId };
 }
 
 export async function authenticationOptions(args: {
@@ -160,18 +90,18 @@ export async function authenticationOptions(args: {
   hasCredentials: boolean;
 }> {
   const creds = await args.db
-    .select({ credentialId: schema.webauthnCredentials.credentialId })
-    .from(schema.webauthnCredentials)
-    .where(eq(schema.webauthnCredentials.userId, args.userId));
+    .select({ credentialID: schema.passkey.credentialID })
+    .from(schema.passkey)
+    .where(eq(schema.passkey.userId, args.userId));
   const options = await generateAuthenticationOptions({
     rpID: args.config.rpId,
     allowCredentials: creds.map((c) => ({
-      id: c.credentialId,
+      id: c.credentialID,
       transports: ['internal', 'hybrid'],
     })),
-    userVerification: 'preferred',
+    userVerification: 'required',
   });
-  setChallenge(challengeKey(args.userId, 'assert', args.approvalId), options.challenge);
+  setChallenge(challengeKey(args.userId, args.approvalId), options.challenge);
   return { options, hasCredentials: creds.length > 0 };
 }
 
@@ -182,17 +112,14 @@ export async function verifyAuthentication(args: {
   config: WebAuthnConfig;
   db: DrizzleClient;
 }): Promise<{ ok: boolean }> {
-  const expected = takeChallenge(challengeKey(args.userId, 'assert', args.approvalId));
+  const expected = takeChallenge(challengeKey(args.userId, args.approvalId));
   if (!expected) return { ok: false };
-  const credentialId = args.response.id;
+  const credentialID = args.response.id;
   const [stored] = await args.db
     .select()
-    .from(schema.webauthnCredentials)
+    .from(schema.passkey)
     .where(
-      and(
-        eq(schema.webauthnCredentials.userId, args.userId),
-        eq(schema.webauthnCredentials.credentialId, credentialId),
-      ),
+      and(eq(schema.passkey.userId, args.userId), eq(schema.passkey.credentialID, credentialID)),
     )
     .limit(1);
   if (!stored) return { ok: false };
@@ -202,20 +129,17 @@ export async function verifyAuthentication(args: {
     expectedChallenge: expected,
     expectedOrigin: args.config.origin,
     expectedRPID: args.config.rpId,
-    requireUserVerification: false,
+    requireUserVerification: true,
     credential: {
-      id: stored.credentialId,
+      id: stored.credentialID,
       publicKey,
       counter: stored.counter,
     },
   });
   if (!verification.verified) return { ok: false };
   await args.db
-    .update(schema.webauthnCredentials)
-    .set({
-      counter: verification.authenticationInfo.newCounter,
-      lastUsedAt: new Date(),
-    })
-    .where(eq(schema.webauthnCredentials.id, stored.id));
+    .update(schema.passkey)
+    .set({ counter: verification.authenticationInfo.newCounter })
+    .where(eq(schema.passkey.id, stored.id));
   return { ok: true };
 }

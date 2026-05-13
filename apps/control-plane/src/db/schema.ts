@@ -9,7 +9,7 @@
  * tables (memberships, revocations.revoked_by, push_approvals.decided_by)
  * reference Better-Auth's user.id (uuid).
  */
-import { relations } from 'drizzle-orm';
+import { relations, sql } from 'drizzle-orm';
 import {
   boolean,
   index,
@@ -76,6 +76,10 @@ export const user = pgTable(
     image: text('image'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+    // Set on first successful passkey enrollment. Middleware gates `/app/*`
+    // on this being non-null so a grace-period password sign-in lands on
+    // `/onboarding/enroll-passkey` until the user actually enrolls.
+    passkeyEnrolledAt: timestamp('passkey_enrolled_at', { withTimezone: true }),
   },
   (t) => ({
     emailIdx: uniqueIndex('user_email_idx').on(t.email),
@@ -372,10 +376,14 @@ export const pushApprovals = pgTable(
     cedarVariants: jsonb('cedar_variants'),
     recommendedScope: text('recommended_scope'),
     expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    resourceHash: text('resource_hash').notNull().default(''),
   },
   (t) => ({
     customerIdx: index('push_approvals_customer_idx').on(t.customerId),
     stateIdx: index('push_approvals_state_idx').on(t.state),
+    pendingDedupIdx: uniqueIndex('push_approvals_pending_dedup_idx')
+      .on(t.customerId, t.agentId, t.command, t.resourceHash)
+      .where(sql`state = 'pending'`),
   }),
 );
 
@@ -488,11 +496,10 @@ export const apiKeys = pgTable(
 );
 
 /**
- * Sprint 9 — passkey credentials registered against Better-Auth users.
- * One user may register many credentials (laptop, phone, etc).
- * `credentialId` is the WebAuthn credential identifier (base64url, returned
- * by the authenticator). `publicKey` is base64url of the COSE-encoded key.
- * `counter` rotates on each assertion to detect cloned authenticators.
+ * Sprint 9 (legacy) — step-up only WebAuthn credentials. Superseded by the
+ * `passkey` table below which is shared by Better-Auth login enrollment AND
+ * step-up assertion. Backfilled into `passkey` by migration 0019; kept here
+ * for one release cycle in case rollback is needed, then dropped.
  */
 export const webauthnCredentials = pgTable(
   'webauthn_credentials',
@@ -514,6 +521,40 @@ export const webauthnCredentials = pgTable(
     credentialIdIdx: uniqueIndex('webauthn_credentials_credential_id_idx').on(t.credentialId),
   }),
 );
+
+/**
+ * Passkey credentials managed by Better-Auth's `passkey` plugin. One source
+ * of truth for both login (sign-in / sign-up) and step-up assertion. Field
+ * names follow Better-Auth's plugin schema (camelCase in TS → snake_case
+ * columns); the Drizzle adapter binding in `auth/index.ts` exposes this
+ * table to the plugin under the key `passkey`.
+ */
+export const passkey = pgTable(
+  'passkey',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    name: text('name'),
+    publicKey: text('public_key').notNull(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    credentialID: text('credential_id').notNull(),
+    counter: integer('counter').notNull().default(0),
+    deviceType: text('device_type').notNull().default('singleDevice'),
+    backedUp: boolean('backed_up').notNull().default(false),
+    transports: text('transports'),
+    aaguid: text('aaguid'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    userIdx: index('passkey_user_idx').on(t.userId),
+    credentialIdIdx: uniqueIndex('passkey_credential_id_idx').on(t.credentialID),
+  }),
+);
+
+export const passkeyRelations = relations(passkey, ({ one }) => ({
+  user: one(user, { fields: [passkey.userId], references: [user.id] }),
+}));
 
 /**
  * Approval Envelope — passkey-cosigned grant that bounds the resource
@@ -577,6 +618,7 @@ export const userRelations = relations(user, ({ many }) => ({
   sessions: many(session),
   accounts: many(account),
   webauthnCredentials: many(webauthnCredentials),
+  passkeys: many(passkey),
 }));
 
 export const webauthnCredentialsRelations = relations(webauthnCredentials, ({ one }) => ({
