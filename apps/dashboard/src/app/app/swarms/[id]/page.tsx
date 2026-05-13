@@ -1,7 +1,10 @@
 'use client';
 
+import { Plug } from 'lucide-react';
+import Link from 'next/link';
 import { use } from 'react';
 import { Badge } from '../../../../components/ui/badge';
+import { Button } from '../../../../components/ui/button';
 import {
   Card,
   CardContent,
@@ -20,8 +23,29 @@ import {
 import { trpc } from '../../../../lib/trpc';
 import { formatDate, shortId } from '../../../../lib/utils';
 import { AgentTree } from './components/AgentTree';
+import { AttachChildCard } from './components/AttachChildCard';
 import { ChainApprovalCard } from './components/ChainApprovalCard';
 import { ScopeContainment } from './components/ScopeContainment';
+
+interface FlatAgent {
+  id: string;
+  name: string;
+  depth: number;
+}
+
+function flattenTree(
+  nodes: { id: string; name: string; depth: number; children: typeof nodes }[],
+): FlatAgent[] {
+  const out: FlatAgent[] = [];
+  const walk = (ns: typeof nodes) => {
+    for (const n of ns) {
+      out.push({ id: n.id, name: n.name, depth: n.depth });
+      walk(n.children);
+    }
+  };
+  walk(nodes);
+  return out;
+}
 
 export default function SwarmDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -34,24 +58,42 @@ export default function SwarmDetailPage({ params }: { params: Promise<{ id: stri
   const swarm = tree.data?.swarm;
   if (!swarm) return null;
 
+  const swarmAgents = flattenTree(tree.data?.roots ?? []);
+
   return (
     <div className="space-y-6">
-      <header>
-        <h1 className="text-2xl font-semibold tracking-tight">{swarm.name}</h1>
-        <p className="text-sm text-muted-foreground">
-          {tree.data?.totalAgents ?? 0} agents · max depth {swarm.maxDepth ?? 8}
-        </p>
+      <header className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">{swarm.name}</h1>
+          <p className="text-sm text-muted-foreground">
+            {tree.data?.totalAgents ?? 0} agents · max depth {swarm.maxDepth ?? 8}
+          </p>
+        </div>
+        <Button asChild variant="default">
+          <Link href={`/app/swarms/${id}/connect`} className="inline-flex items-center gap-1.5">
+            <Plug className="h-4 w-4" />
+            Connect agents
+          </Link>
+        </Button>
       </header>
 
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Agent tree</CardTitle>
-          <CardDescription>Trust propagates root → leaf via UCAN delegation chain.</CardDescription>
+          <CardDescription>
+            Trust propagates root → leaf via UCAN delegation chain. Use{' '}
+            <Link href={`/app/swarms/${id}/connect`} className="underline">
+              Connect agents
+            </Link>{' '}
+            to wire a new child process; use the card below to record the tree shape after.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <AgentTree roots={tree.data?.roots ?? []} />
         </CardContent>
       </Card>
+
+      <AttachChildCard swarmId={id} swarmAgents={swarmAgents} />
 
       <ChainApprovalCard
         swarmId={id}
