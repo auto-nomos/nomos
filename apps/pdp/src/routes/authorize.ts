@@ -33,6 +33,11 @@ export interface AuthorizeRouteDeps {
   schemaForCustomer?: (customerId: string) => Schema | undefined;
   trustedIssuerDid?: string;
   /**
+   * Sprint MAOS-A — chain depth cap (env: NOMOS_MAX_CHAIN_DEPTH, default 8).
+   * Hard guard against runaway delegation; enforced in `decide()`.
+   */
+  maxChainDepth?: number;
+  /**
    * Sprint 9 — when supplied, denies that *would* allow with cosigner=true
    * trigger a control-plane push_approvals row + Knock notification, and the
    * decision returns `{ requiresStepUp: true, stepUpUrl, stepUpId }`.
@@ -59,6 +64,10 @@ export interface AuditEmitInput {
   decision: { allow: boolean; reason?: string; receiptId: string };
   ts: number;
   agentDid: string;
+  /** Sprint MAOS-A — chain causation. Optional for legacy single-UCAN calls. */
+  parentReceiptId?: string;
+  swarmId?: string;
+  chainDepth?: number;
 }
 
 export function createAuthorizeRoutes(deps: AuthorizeRouteDeps): Hono {
@@ -77,7 +86,18 @@ export function createAuthorizeRoutes(deps: AuthorizeRouteDeps): Hono {
     if (!parsed.success) {
       return c.json({ error: 'invalid request shape', issues: parsed.error.issues }, 400);
     }
-    const request = parsed.data;
+    let request = parsed.data;
+
+    // Sprint MAOS-A — propagate W3C traceparent header into context so the
+    // chain trace correlates across PDP + egress + downstream SaaS calls.
+    const traceparent = c.req.header('traceparent');
+    const contextRecord = request.context as Record<string, unknown>;
+    if (traceparent && typeof contextRecord.trace !== 'string') {
+      request = {
+        ...request,
+        context: { ...contextRecord, trace: traceparent } as typeof request.context,
+      };
+    }
 
     const derive = deriveCustomerId(headerCustomerId, request.ucan);
     if (!derive.ok) {
@@ -286,13 +306,22 @@ export function createAuthorizeRoutes(deps: AuthorizeRouteDeps): Hono {
       };
     }
 
+    // Sprint MAOS-A — when delegated_chain is supplied, decide() validates
+    // the whole chain (signature continuity + attenuation) and uses the leaf
+    // for Cedar evaluation. Single-UCAN callers still pass through the
+    // existing path unchanged.
+    const ucanInput: string | string[] = effectiveRequest.delegated_chain?.length
+      ? effectiveRequest.delegated_chain
+      : effectiveRequest.ucan;
+
     const input: DecideInput = {
-      ucan: effectiveRequest.ucan,
+      ucan: ucanInput,
       request: effectiveRequest,
       policies,
       revokedCids,
       ...(schema !== undefined ? { schema } : {}),
       ...(deps.trustedIssuerDid !== undefined ? { trustedIssuerDid: deps.trustedIssuerDid } : {}),
+      ...(deps.maxChainDepth !== undefined ? { maxChainDepth: deps.maxChainDepth } : {}),
     };
 
     let decision: AuthorizeDecision = decide(input);
@@ -344,6 +373,11 @@ export function createAuthorizeRoutes(deps: AuthorizeRouteDeps): Hono {
         },
         ts: Date.now(),
         agentDid: extractAgentDid(request.ucan),
+        ...(request.parent_receipt_id !== undefined
+          ? { parentReceiptId: request.parent_receipt_id }
+          : {}),
+        ...(request.swarm_id !== undefined ? { swarmId: request.swarm_id } : {}),
+        ...(decision.chain_depth !== undefined ? { chainDepth: decision.chain_depth } : {}),
       });
     }
 
@@ -354,6 +388,7 @@ export function createAuthorizeRoutes(deps: AuthorizeRouteDeps): Hono {
         allow: decision.allow,
         reason: decision.reason,
         ...(decision.requiresStepUp ? { stepUpId: decision.stepUpId } : {}),
+        ...(decision.chain_depth !== undefined ? { chainDepth: decision.chain_depth } : {}),
       },
       'authorize',
     );

@@ -10,6 +10,7 @@ import { Button } from './ui/button';
 const NAV_ITEMS = [
   { href: '/app', label: 'Overview' },
   { href: '/app/agents', label: 'Apps' },
+  { href: '/app/swarms', label: 'Swarms' },
   { href: '/app/connections', label: 'Connections' },
   { href: '/app/policies', label: 'Policies' },
   { href: '/app/audit', label: 'Audit' },

@@ -12,6 +12,10 @@ A SaaS that lets any team shipping AI agents grant fine-grained authorization th
 1. **Control plane is the moat; data plane is distribution.** Customers run the PDP runtime; we run the brain. The PDP is portable and can later deploy at customer edge or on-prem without rebuild.
 2. **Capability through modules, not new products.** Phase 1 ships core PDP + 3 modules. Phase 2/3 layer on more modules. Architecture never gets ripped up.
 
+### Delegation chains (beta — Sprint MAOS)
+
+Multi-agent orchestration security: parent agents fork attenuated UCAN chains for child agents (LangGraph / CrewAI / AutoGen / Claude sub-agents). Trust propagation, permission inheritance, and scope containment work end-to-end across agent swarms. See [docs/SWARM_SECURITY.md](docs/SWARM_SECURITY.md).
+
 ## Monorepo layout
 
 ```

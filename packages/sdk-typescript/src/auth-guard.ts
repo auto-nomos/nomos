@@ -1,4 +1,5 @@
 import { parseApiKey } from './api-key.js';
+import { applyParentChain, readParentChainFromEnv } from './chain.js';
 import { type FetchFn, fetchWithRetry } from './transport.js';
 
 export type FailureMode = 'closed' | 'open';
@@ -58,6 +59,10 @@ export interface AuthorizeDecision {
   stepUpUrl?: string;
   /** Approval id the SDK polls via `waitForApproval`. */
   stepUpId?: string;
+  /** Sprint MAOS-A — chain depth (0 for direct single-UCAN calls). */
+  chain_depth?: number;
+  /** Sprint MAOS-A — what the chain attenuated relative to the root UCAN. */
+  attenuation_summary?: { capability_lost: string[]; resources_narrowed: string[] };
 }
 
 export interface AuthorizeRequestInput {
@@ -71,6 +76,17 @@ export interface AuthorizeRequestInput {
    * `context.cosigner = true`, and re-evaluates.
    */
   cosignerJwt?: string;
+  /**
+   * Sprint MAOS-A — multi-agent delegation chain (root-first JWT array).
+   * When unset, SDK auto-reads `NOMOS_PARENT_UCAN_CHAIN` env (or
+   * `NOMOS_PARENT_UCAN_CHAIN_FILE` fallback) and appends the local `ucan`
+   * as leaf so PDP sees the full chain.
+   */
+  delegated_chain?: string[];
+  /** Sprint MAOS-A — causation back-link to parent agent's receiptId. */
+  parent_receipt_id?: string;
+  /** Sprint MAOS-A — explicit swarm hint (otherwise PDP derives from chain root). */
+  swarm_id?: string;
 }
 
 export type StepUpState = 'pending' | 'approved' | 'denied' | 'expired';
@@ -190,14 +206,19 @@ export function createAuthGuard(opts: AuthGuardOptions): AuthGuard {
   // TTL is below REFRESH_BEFORE_MS.
   const ucanCache = new Map<string, MintedUcan>();
 
+  // Sprint MAOS-A — read parent-chain context once at construction. Cached
+  // for the lifetime of the guard since env vars don't mutate post-spawn.
+  const parentChainCtx = readParentChainFromEnv();
+
   return {
     customerId,
     async authorize(req) {
+      const enriched = applyParentChain(req, parentChainCtx);
       let res: Response;
       try {
         res = await fetchWithRetry(
           `${baseUrl}/v1/authorize`,
-          { method: 'POST', headers, body: JSON.stringify(req) },
+          { method: 'POST', headers, body: JSON.stringify(enriched) },
           { ...(opts.fetchFn !== undefined ? { fetchFn: opts.fetchFn } : {}), ...opts.retry },
         );
       } catch {
@@ -352,7 +373,8 @@ export function createAuthGuard(opts: AuthGuardOptions): AuthGuard {
     },
 
     async proxy(req) {
-      const { apiCall, ...authReq } = req;
+      const { apiCall, ...authReqRaw } = req;
+      const authReq = applyParentChain(authReqRaw, parentChainCtx);
       const path = `${baseUrl}/v1/proxy${authReq.command}`;
       const failClosedDecision = failureMode === 'open' ? FAIL_OPEN : FAIL_CLOSED;
       let res: Response;

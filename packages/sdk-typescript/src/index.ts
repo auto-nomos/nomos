@@ -18,6 +18,23 @@ export type {
 } from './auth-guard.js';
 export { createAuthGuard, MintUcanError } from './auth-guard.js';
 export type {
+  ChildEnvVars,
+  ForkChildInput,
+  ForkChildResult,
+  ParentChainContext,
+} from './chain.js';
+export {
+  applyParentChain,
+  DEFAULT_MAX_CHAIN_DEPTH,
+  ENV_MAX_CHAIN_DEPTH,
+  ENV_PARENT_CHAIN,
+  ENV_PARENT_CHAIN_FILE,
+  ENV_PARENT_RECEIPT,
+  ENV_SWARM_ID,
+  forkChild,
+  readParentChainFromEnv,
+} from './chain.js';
+export type {
   FilesystemConstraint,
   GithubConstraint,
   Grant,

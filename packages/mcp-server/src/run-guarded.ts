@@ -5,6 +5,27 @@ import type {
   ProxyResult,
   ResourceConstraint,
 } from '@auto-nomos/sdk';
+import { ENV_PARENT_CHAIN, readParentChainFromEnv } from '@auto-nomos/sdk';
+
+/**
+ * Sprint MAOS-A — diagnostic. Logged once per process when the chain env
+ * is unset but downstream code expected to be a child agent. Useful for
+ * orchestrators (LangGraph, CrewAI) that forgot to wire the env handoff.
+ */
+let chainEnvWarnedOnce = false;
+function maybeWarnMissingChainEnv(): void {
+  if (chainEnvWarnedOnce) return;
+  const ctx = readParentChainFromEnv();
+  if (ctx.chain.length === 0 && process.env.NOMOS_EXPECT_PARENT_CHAIN === '1') {
+    chainEnvWarnedOnce = true;
+    // biome-ignore lint/suspicious/noConsole: structural-mismatch diagnostic
+    console.warn(
+      `[nomos] NOMOS_EXPECT_PARENT_CHAIN=1 but ${ENV_PARENT_CHAIN} is unset — ` +
+        'child agent will be authorized as if it were a root agent. ' +
+        'Set NOMOS_PARENT_UCAN_CHAIN on child-process spawn.',
+    );
+  }
+}
 
 export interface ToolResultJson {
   status: 'allowed' | 'denied' | 'failed';
@@ -31,6 +52,7 @@ export async function runGuarded(
   resource: Record<string, unknown>,
   apiCall: ProxyApiCall,
 ): Promise<ToolResultJson> {
+  maybeWarnMissingChainEnv();
   const minted = await guard.mintUcan({ commands: [command] });
   const ucan = minted.get(command);
   if (!ucan) {

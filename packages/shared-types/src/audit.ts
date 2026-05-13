@@ -15,6 +15,13 @@ export const AuditEvent = z.object({
   resource: z.record(z.string(), z.unknown()),
   context: z.record(z.string(), z.unknown()),
   hash: z.string().regex(/^[0-9a-f]{64}$/, 'sha256 hex required'),
+  /**
+   * Sprint MAOS-A — chain causation. Orthogonal to prev_hash (the
+   * tamper-evidence chain). Optional for legacy single-UCAN calls.
+   */
+  parent_receipt_id: z.string().optional(),
+  swarm_id: z.string().optional(),
+  chain_depth: z.number().int().nonnegative().optional(),
 });
 
 export const AuditProof = z.object({
