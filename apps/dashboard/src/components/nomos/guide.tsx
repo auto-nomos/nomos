@@ -5,6 +5,7 @@ import {
   Boxes,
   Cpu,
   FileLock2,
+  GitBranch,
   Hash,
   KeyRound,
   Layers,
@@ -46,6 +47,7 @@ const SECTIONS: Section[] = [
   { id: 'step-up', label: 'Step-up & passkeys', group: 'Runtime', icon: ShieldAlert },
   { id: 'standing-grants', label: 'Standing grants', group: 'Runtime', icon: Layers },
   { id: 'audit', label: 'Audit chain', group: 'Runtime', icon: Hash },
+  { id: 'swarms', label: 'Swarms (delegation chains)', group: 'Runtime', icon: GitBranch },
   { id: 'sdk', label: 'SDK & MCP', group: 'Integrate', icon: Terminal },
   { id: 'telegram', label: 'Telegram notifications', group: 'Integrate', icon: MessageCircle },
   { id: 'faq', label: 'FAQ', group: 'Reference', icon: KeyRound },
@@ -91,6 +93,7 @@ export function GuideContent() {
           <StepUp />
           <StandingGrants />
           <AuditChain />
+          <Swarms />
           <Sdk />
           <TelegramSetup />
           <Faq />
@@ -111,14 +114,14 @@ function Header() {
         How to use <em>Nomos</em>.
       </h1>
       <p className="mt-6 max-w-[640px] text-base text-aegis-mute">
-        A reading guide to the platform. Thirteen short sections — read top to bottom for
+        A reading guide to the platform. Fourteen short sections — read top to bottom for
         orientation, or jump from the table of contents on the left. Code snippets are copy-paste
         ready.
       </p>
       <div className="mt-6 flex flex-wrap items-center gap-2 font-mono text-[11px] uppercase tracking-[0.16em] text-aegis-faint">
-        <span>~12 min read</span>
+        <span>~14 min read</span>
         <span aria-hidden>·</span>
-        <span>last updated 2026-05-11</span>
+        <span>last updated 2026-05-14 · MAOS beta</span>
         <span aria-hidden>·</span>
         <a href="#quickstart" className="text-aegis-signal hover:underline">
           Skip to 5-min quickstart →
@@ -580,19 +583,163 @@ function AuditChain() {
   );
 }
 
+function Swarms() {
+  return (
+    <Section id="swarms" eyebrow="11 · runtime · beta" title="Swarms (delegation chains).">
+      <P>
+        Most agents do one thing. The next era is <em className="not-italic">swarms</em> — a planner
+        agent forks a researcher, the researcher forks a writer, each step calls a different SaaS.
+        Nomos models that pipeline natively: every fork passes the parent&rsquo;s UCAN as a proof,
+        scope can only narrow downstream (UCAN attenuation), and the PDP rejects any chain that
+        violates depth caps or attenuation rules.
+      </P>
+      <P>
+        A &ldquo;swarm&rdquo; is just a tree of Apps with one root. The dashboard view at{' '}
+        <Link href="/app/swarms" className="text-aegis-signal hover:underline">
+          Swarms
+        </Link>{' '}
+        renders the tree, the recent receipts, and a <K>ScopeContainment</K> diff showing where each
+        leaf&rsquo;s effective capability sits relative to the root.
+      </P>
+
+      <h3 className="mt-8 font-display text-[22px] text-aegis-paper">Wire format</h3>
+      <P>
+        The chain is propagated through three environment variables — orchestrator-agnostic so
+        LangGraph, CrewAI, AutoGen, and Claude sub-agents all work without importing the SDK:
+      </P>
+      <Code lang="shell">{`# Set on the child process before fork
+NOMOS_PARENT_UCAN_CHAIN='["<rootJWT>","<midJWT>"]'   # JSON array, root-first
+NOMOS_PARENT_RECEIPT_ID='evt_…'                     # parent's last allow receipt
+NOMOS_SWARM_ID='swm_…'                              # optional swarm grouping
+NOMOS_MAX_CHAIN_DEPTH=8                             # default; PDP enforces`}</Code>
+      <Callout tone="info">
+        If <K>NOMOS_PARENT_UCAN_CHAIN</K> would exceed the env-var limit (~128 KB on Linux), use the
+        file fallback: <K>NOMOS_PARENT_UCAN_CHAIN_FILE=/tmp/nomos-chain.json</K>.
+      </Callout>
+
+      <h3 className="mt-8 font-display text-[22px] text-aegis-paper">
+        Forking a child (TypeScript)
+      </h3>
+      <Code lang="typescript">{`import { forkChild, createAuthorize } from '@auto-nomos/sdk';
+import { mintUcan } from '@auto-nomos/ucan';
+
+const parentChain = readParentChainFromEnv(process.env);
+const childUcan = await mintUcan({ /* attenuated audience + capability */ });
+
+const childChain = forkChild({
+  parentChain,
+  childUcanJwt: childUcan.jwt,
+  parentReceiptId: process.env.NOMOS_PARENT_RECEIPT_ID,
+  swarmId: process.env.NOMOS_SWARM_ID,
+});
+
+// Pass to the spawned subprocess as env
+spawn('node', ['./researcher.js'], {
+  env: {
+    ...process.env,
+    NOMOS_PARENT_UCAN_CHAIN: JSON.stringify(childChain.chain),
+    NOMOS_PARENT_RECEIPT_ID: childChain.parentReceiptId ?? '',
+    NOMOS_SWARM_ID: childChain.swarmId ?? '',
+  },
+});`}</Code>
+
+      <h3 className="mt-8 font-display text-[22px] text-aegis-paper">
+        Forking a child (Python / CLI)
+      </h3>
+      <P>
+        Python parity ships via the <K>nomos-ucan</K> Bun-compiled binary. The Python SDK shells out
+        for any UCAN minting; everything else is plain HTTPS.
+      </P>
+      <Code lang="python">{`from nomos import AuthGuard, fork_child, read_parent_chain_from_env
+
+guard = AuthGuard(control_plane_url=os.environ["NOMOS_CONTROL_URL"],
+                  api_key=os.environ["NOMOS_API_KEY"])
+
+parent = read_parent_chain_from_env(os.environ)
+child = fork_child(parent_chain=parent.chain,
+                   audience_did="did:key:z6Mk...researcher",
+                   capabilities=[{"with":"github://acme/app","can":"repo:read"}])
+
+env = {**os.environ,
+       "NOMOS_PARENT_UCAN_CHAIN": json.dumps(child["chain"]),
+       "NOMOS_PARENT_RECEIPT_ID": child.get("parentReceiptId",""),
+       "NOMOS_SWARM_ID": child.get("swarmId","")}
+subprocess.Popen(["python","./researcher.py"], env=env)`}</Code>
+
+      <h3 className="mt-8 font-display text-[22px] text-aegis-paper">Cedar templates</h3>
+      <P>
+        The <K>swarm-safe</K> schema-pack ships four Cedar templates that read the chain principal
+        attributes <K>delegationDepth</K>, <K>rootAgent</K>, <K>invokedBy</K>:
+      </P>
+      <ul className="ml-6 list-disc space-y-1.5 marker:text-aegis-signal">
+        <li>
+          <K>forbid-deep-delegation</K> — caps chain depth (defends against runaway sub-agent
+          spawn).
+        </li>
+        <li>
+          <K>pin-root-agent</K> — only allow if rooted at a specific App (locks a swarm to one
+          owner).
+        </li>
+        <li>
+          <K>block-tainted-ancestor</K> — deny if any ancestor App is on a quarantine list.
+        </li>
+        <li>
+          <K>require-direct-call</K> — refuse delegated calls for the most sensitive actions
+          (writes, key rotation).
+        </li>
+      </ul>
+
+      <h3 className="mt-8 font-display text-[22px] text-aegis-paper">Swarm-scoped approval</h3>
+      <P>
+        On the approve page, an operator can choose &ldquo;Approve for this agent and all current
+        children (snapshot at &lt;ts&gt;)&rdquo;. The list of approved agent ids is materialized at
+        approval time — children forked <em className="not-italic">after</em> the approval still
+        require a fresh step-up. Never auto-extends.
+      </P>
+
+      <h3 className="mt-8 font-display text-[22px] text-aegis-paper">Walking the audit tree</h3>
+      <P>
+        Each receipt carries <K>parent_receipt_id</K>, so you can recursively unwind any chain:
+      </P>
+      <Code lang="bash">{`pnpm dlx @auto-nomos/audit-verify \\
+  --chain writerReceipt.json \\
+  --pubkey $AUDIT_VERIFY_KEY
+
+# OK: 3 events, hash chain verified.
+#
+# ALLOW github://acme/app agent=planner  depth=0 id=8c1f…
+# └── ALLOW github://acme/app agent=researcher depth=1 id=92ab…
+#     └── STEPUP github://acme/app agent=writer depth=2 id=7fde…`}</Code>
+
+      <Callout tone="warn">
+        <strong className="text-aegis-paper">Beta:</strong> the wire format and Cedar templates are
+        stable for one minor version. Federation across customers (cross-customer chains) is a
+        design hook today (<K>swarms.crossCustomerEnabled</K>) but enforcement stays intra-customer
+        until the federation contract ships.
+      </Callout>
+    </Section>
+  );
+}
+
 function Sdk() {
   return (
-    <Section id="sdk" eyebrow="11 · integrate" title="SDK & MCP.">
+    <Section id="sdk" eyebrow="12 · integrate" title="SDK & MCP.">
       <P>
         The TypeScript SDK ships as <K>@auto-nomos/sdk</K>. Three primary surfaces:{' '}
         <K>createIntentClient()</K> for dynamic-mode agents, <K>createAuthorize()</K> for
-        static-mode, and <K>Disposable Grant</K> for {`{ using }`} scope.
+        static-mode, and <K>Disposable Grant</K> for {`{ using }`} scope. The chain helpers{' '}
+        <K>forkChild()</K> + <K>readParentChainFromEnv()</K> live in the same package.
+      </P>
+      <P>
+        Python parity ships as <K>nomos</K> on PyPI plus the <K>nomos-ucan</K> Bun-compiled binary (
+        <K>mint</K> / <K>fork</K> / <K>validate</K> / <K>parse</K>). LangGraph and CrewAI examples
+        are under <K>examples/langgraph-nomos/</K> and <K>examples/crewai-nomos/</K>.
       </P>
       <P>
         For Claude Desktop / Claude Code, the broker ships an MCP server wrapper at{' '}
-        <K>@auto-nomos/mcp-server</K>. Three example MCPs live in <K>examples/</K>:{' '}
-        <K>mcp-github</K> (static), <K>mcp-github-dynamic</K> (intent flow), and{' '}
-        <K>mcp-filesystem</K> (filesystem provider).
+        <K>@auto-nomos/mcp-server</K>. Reference MCPs live in <K>examples/</K>: <K>mcp-github</K>{' '}
+        (static), <K>mcp-github-dynamic</K> (intent flow), <K>mcp-filesystem</K> (filesystem
+        provider), and <K>claude-subagents-nomos</K> (sub-agent chain).
       </P>
     </Section>
   );
@@ -600,7 +747,7 @@ function Sdk() {
 
 function TelegramSetup() {
   return (
-    <Section id="telegram" eyebrow="12 · integrate" title="Telegram notifications.">
+    <Section id="telegram" eyebrow="13 · integrate" title="Telegram notifications.">
       <P>
         Nomos can push step-up approval prompts to your Telegram account. When an agent triggers a
         high-risk action you&rsquo;ll get a message with{' '}
@@ -656,7 +803,7 @@ nomos status`}</Code>
 
 function Faq() {
   return (
-    <Section id="faq" eyebrow="13 · reference" title="FAQ.">
+    <Section id="faq" eyebrow="14 · reference" title="FAQ.">
       <Faqs
         items={[
           [
@@ -676,8 +823,16 @@ function Faq() {
             'Either revoke its envelope on the agent’s detail page (revokes all children silently within 5s via the push channel) or revoke a specific cid via the UCANs router.',
           ],
           [
-            'Is there a non-TS SDK?',
-            'Not yet. Public roadmap: Python, then Go. Until then any HTTP client can call /v1/intent and /v1/proxy directly.',
+            'Is there a Python SDK?',
+            'Yes — `pip install nomos`. UCAN minting shells out to the `nomos-ucan` Bun-compiled binary so you get the same crypto path as TypeScript. LangGraph and CrewAI examples ship under `examples/`.',
+          ],
+          [
+            'How deep can a delegation chain go?',
+            'Default cap is 8 (NOMOS_MAX_CHAIN_DEPTH, env-overridable). PDP rejects with `chain_too_deep` and `forkChild()` refuses to construct a deeper chain client-side.',
+          ],
+          [
+            'Does a child agent inherit the parent’s scope automatically?',
+            'No — UCAN attenuation is monotonic. A child can only narrow the parent’s capability, never broaden it. The PDP computes an `attenuation_summary` (capability_lost, resources_narrowed) on every chain request.',
           ],
         ]}
       />
@@ -739,6 +894,7 @@ export type TopicId =
   | 'step-up'
   | 'standing-grants'
   | 'audit'
+  | 'swarms'
   | 'sdk'
   | 'telegram'
   | 'faq';
@@ -754,6 +910,7 @@ const TOPIC_COMPONENTS: Record<TopicId, React.ComponentType> = {
   'step-up': StepUp,
   'standing-grants': StandingGrants,
   audit: AuditChain,
+  swarms: Swarms,
   sdk: Sdk,
   telegram: TelegramSetup,
   faq: Faq,

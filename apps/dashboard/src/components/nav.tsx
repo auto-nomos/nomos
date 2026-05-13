@@ -7,10 +7,10 @@ import { authClient, useSession } from '../lib/auth-client';
 import { cn } from '../lib/utils';
 import { Button } from './ui/button';
 
-const NAV_ITEMS = [
+const NAV_ITEMS: { href: string; label: string; badge?: string }[] = [
   { href: '/app', label: 'Overview' },
   { href: '/app/agents', label: 'Apps' },
-  { href: '/app/swarms', label: 'Swarms' },
+  { href: '/app/swarms', label: 'Swarms', badge: 'beta' },
   { href: '/app/connections', label: 'Connections' },
   { href: '/app/policies', label: 'Policies' },
   { href: '/app/audit', label: 'Audit' },
@@ -39,13 +39,18 @@ export function AppNav() {
               key={item.href}
               href={item.href}
               className={cn(
-                'rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-muted',
+                'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-muted',
                 pathname === item.href || pathname?.startsWith(`${item.href}/`)
                   ? 'bg-muted font-medium text-foreground'
                   : 'text-muted-foreground',
               )}
             >
               {item.label}
+              {item.badge ? (
+                <span className="rounded-sm border border-aegis-iris/40 bg-aegis-iris/10 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.16em] text-aegis-iris">
+                  {item.badge}
+                </span>
+              ) : null}
             </Link>
           ))}
         </div>
