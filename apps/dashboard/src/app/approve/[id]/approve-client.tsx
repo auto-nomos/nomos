@@ -143,7 +143,7 @@ export function ApproveClient({ approvalId }: ApproveClientProps) {
             </div>
             <details className="text-xs">
               <summary className="cursor-pointer text-zinc-500">Show raw spec</summary>
-              <pre className="mt-1 rounded bg-zinc-50 p-2">
+              <pre className="mt-1 rounded bg-zinc-900 p-2 text-zinc-100">
                 {JSON.stringify(a.resource, null, 2)}
               </pre>
             </details>
@@ -156,7 +156,7 @@ export function ApproveClient({ approvalId }: ApproveClientProps) {
             </div>
             <div>
               <dt className="text-zinc-500">Resource</dt>
-              <dd className="mt-1 rounded bg-zinc-50 p-2 font-mono text-xs">
+              <dd className="mt-1 rounded bg-zinc-900 p-2 font-mono text-xs text-zinc-100">
                 {JSON.stringify(a.resource, null, 2)}
               </dd>
             </div>
@@ -212,7 +212,7 @@ export function ApproveClient({ approvalId }: ApproveClientProps) {
                   return (
                     <label
                       key={scope}
-                      className={`mt-2 block cursor-pointer rounded border p-2 ${isSelected ? 'border-zinc-700 bg-zinc-50' : 'border-zinc-200'}`}
+                      className={`mt-2 block cursor-pointer rounded border p-2 ${isSelected ? 'border-zinc-700 bg-zinc-100 dark:bg-zinc-800' : 'border-zinc-200 dark:border-zinc-700'}`}
                     >
                       <div className="flex items-center gap-2">
                         <input
@@ -224,7 +224,7 @@ export function ApproveClient({ approvalId }: ApproveClientProps) {
                         />
                         <span className="font-medium">{label}</span>
                       </div>
-                      <pre className="mt-2 whitespace-pre-wrap rounded bg-white p-2 font-mono text-xs">
+                      <pre className="mt-2 whitespace-pre-wrap rounded bg-zinc-900 p-2 font-mono text-xs text-zinc-100">
                         {text}
                       </pre>
                     </label>
@@ -239,7 +239,7 @@ export function ApproveClient({ approvalId }: ApproveClientProps) {
                 <summary className="cursor-pointer text-zinc-500">
                   Cedar preview (what would be saved)
                 </summary>
-                <pre className="mt-1 whitespace-pre-wrap rounded bg-zinc-50 p-2">
+                <pre className="mt-1 whitespace-pre-wrap rounded bg-zinc-900 p-2 text-zinc-100">
                   {a.cedarPreview}
                 </pre>
               </details>
