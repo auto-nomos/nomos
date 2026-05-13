@@ -5,6 +5,10 @@ export const READS = [
   '/google/drive/list',
   '/google/drive/download',
   '/google/drive/search',
+  '/google/drive/export',
+  '/google/drive/permission/list',
+  '/google/drive/revision/list',
+  '/google/drive/quota/read',
   '/google/calendar/read',
 ] as const;
 export const WRITES = [
@@ -16,7 +20,7 @@ export const WRITES = [
   '/google/calendar/event/create',
   '/google/calendar/event/update',
 ] as const;
-export const DELETES = ['/google/drive/delete'] as const;
+export const DELETES = ['/google/drive/delete', '/google/drive/permission/delete'] as const;
 export const actions = [...READS, ...WRITES, ...DELETES] as const;
 
 const READ_LIST = READS.map((a) => `Action::"${a}"`).join(', ');

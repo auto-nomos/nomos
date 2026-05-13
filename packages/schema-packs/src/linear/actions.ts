@@ -13,6 +13,15 @@ export const actionToCommand: Record<string, string> = {
   list_projects: '/linear/project/list',
   list_teams: '/linear/team/list',
   get_viewer: '/linear/user/me',
+  delete_issue: '/linear/issue/delete',
+  search_issues: '/linear/issue/search',
+  list_workflow_states: '/linear/workflow_state/list',
+  list_labels: '/linear/label/list',
+  list_members: '/linear/user/list',
+  get_project: '/linear/project/read',
+  create_project: '/linear/project/create',
+  update_project: '/linear/project/update',
+  list_comments: '/linear/comment/list',
 };
 
 export function resourceFor(

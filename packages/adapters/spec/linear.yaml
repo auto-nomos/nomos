@@ -160,6 +160,168 @@ actions:
           query Viewer { viewer { id name email displayName } }
       - { name: variables, in: body, type: object, default: {} }
 
+  - id: delete_issue
+    description: Delete an issue permanently.
+    expected_use: Remove an issue created in error; almost never invoked by an agent.
+    auto_execute: false
+    required_scopes: [write]
+    risk: { category: delete, sensitivity: high }
+    http:
+      method: POST
+      path: "/"
+    params:
+      - name: query
+        in: body
+        required: true
+        type: string
+        default: |
+          mutation Delete($id: String!) { issueDelete(id: $id) { success } }
+      - { name: variables, in: body, required: true, type: object }
+
+  - id: search_issues
+    description: Search issues by free-text filter.
+    expected_use: Find issues matching a complex filter expression.
+    auto_execute: true
+    required_scopes: [read]
+    risk: { category: search, sensitivity: low }
+    http:
+      method: POST
+      path: "/"
+    params:
+      - name: query
+        in: body
+        required: true
+        type: string
+        default: |
+          query Search($filter: IssueFilter!, $first: Int!) { issues(filter: $filter, first: $first) { nodes { id identifier title state { name } } } }
+      - { name: variables, in: body, required: true, type: object }
+
+  - id: list_workflow_states
+    description: List workflow states for a team.
+    expected_use: Discover available state ids before updating issues.
+    auto_execute: true
+    required_scopes: [read]
+    risk: { category: read, sensitivity: low }
+    http:
+      method: POST
+      path: "/"
+    params:
+      - name: query
+        in: body
+        required: true
+        type: string
+        default: |
+          query States($teamId: String!) { workflowStates(filter: { team: { id: { eq: $teamId } } }) { nodes { id name type team { name } } } }
+      - { name: variables, in: body, required: true, type: object }
+
+  - id: list_labels
+    description: List issue labels across teams.
+    expected_use: Discover available labels for issue tagging.
+    auto_execute: true
+    required_scopes: [read]
+    risk: { category: read, sensitivity: low }
+    http:
+      method: POST
+      path: "/"
+    params:
+      - name: query
+        in: body
+        required: true
+        type: string
+        default: |
+          query Labels($first: Int!) { issueLabels(first: $first) { nodes { id name color team { name } } } }
+      - { name: variables, in: body, type: object, default: { first: 50 } }
+
+  - id: list_members
+    description: List active workspace members.
+    expected_use: Resolve assignee ids before creating or updating issues.
+    auto_execute: true
+    required_scopes: [read]
+    risk: { category: read, sensitivity: medium }
+    http:
+      method: POST
+      path: "/"
+    params:
+      - name: query
+        in: body
+        required: true
+        type: string
+        default: |
+          query Members { users { nodes { id name email active } } }
+      - { name: variables, in: body, type: object, default: {} }
+
+  - id: get_project
+    description: Fetch a project by id.
+    expected_use: Read full project metadata.
+    auto_execute: true
+    required_scopes: [read]
+    risk: { category: read, sensitivity: low }
+    http:
+      method: POST
+      path: "/"
+    params:
+      - name: query
+        in: body
+        required: true
+        type: string
+        default: |
+          query Project($id: String!) { project(id: $id) { id name state startDate targetDate description } }
+      - { name: variables, in: body, required: true, type: object }
+
+  - id: create_project
+    description: Create a new project.
+    expected_use: Spin up a project for a new initiative.
+    auto_execute: false
+    required_scopes: [write]
+    risk: { category: write, sensitivity: medium }
+    http:
+      method: POST
+      path: "/"
+    params:
+      - name: query
+        in: body
+        required: true
+        type: string
+        default: |
+          mutation Create($input: ProjectCreateInput!) { projectCreate(input: $input) { project { id name } } }
+      - { name: variables, in: body, required: true, type: object }
+
+  - id: update_project
+    description: Update an existing project (rename, change state, adjust dates).
+    expected_use: Move a project between states or update its scope.
+    auto_execute: false
+    required_scopes: [write]
+    risk: { category: write, sensitivity: medium }
+    http:
+      method: POST
+      path: "/"
+    params:
+      - name: query
+        in: body
+        required: true
+        type: string
+        default: |
+          mutation Update($id: String!, $input: ProjectUpdateInput!) { projectUpdate(id: $id, input: $input) { project { id name state } } }
+      - { name: variables, in: body, required: true, type: object }
+
+  - id: list_comments
+    description: List comments on an issue.
+    expected_use: Read discussion history before replying.
+    auto_execute: true
+    required_scopes: [read]
+    risk: { category: read, sensitivity: low }
+    http:
+      method: POST
+      path: "/"
+    params:
+      - name: query
+        in: body
+        required: true
+        type: string
+        default: |
+          query Comments($issueId: String!) { comments(filter: { issue: { id: { eq: $issueId } } }) { nodes { id body createdAt user { name } } } }
+      - { name: variables, in: body, required: true, type: object }
+
 notes: |
   Linear's API is GraphQL-only; every action POSTs to /graphql with
   `query` + `variables`. The YAML wraps that with default queries so an

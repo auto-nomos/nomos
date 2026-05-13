@@ -3,7 +3,9 @@ import type { PolicyTemplate } from '../types.js';
 export const READS = [
   '/slack/channel/list',
   '/slack/channel/history',
+  '/slack/channel/read',
   '/slack/message/read',
+  '/slack/message/search',
   '/slack/user/read',
   '/slack/user/list',
   '/slack/user/lookup',
@@ -12,8 +14,14 @@ export const WRITES = [
   '/slack/message/post',
   '/slack/message/update',
   '/slack/message/react',
+  '/slack/message/unreact',
   '/slack/message/reply',
+  '/slack/message/pin',
+  '/slack/message/schedule',
   '/slack/channel/create',
+  '/slack/channel/invite',
+  '/slack/channel/topic',
+  '/slack/dm/open',
   '/slack/file/upload',
 ] as const;
 export const DELETES = ['/slack/message/delete'] as const;

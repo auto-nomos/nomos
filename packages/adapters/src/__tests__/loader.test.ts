@@ -71,7 +71,7 @@ actions:
     expect(all.has('github')).toBe(true);
   });
 
-  it('ships all 19 P1 adapters', () => {
+  it('ships all P1 adapters', () => {
     const all = loadAllAdapters(SPEC_DIR);
     const expected = [
       'github',
@@ -83,6 +83,9 @@ actions:
       'google_calendar',
       'google_drive',
       'google_contacts',
+      'google_docs',
+      'google_sheets',
+      'google_tasks',
       'discord',
       'telegram',
       'dropbox',

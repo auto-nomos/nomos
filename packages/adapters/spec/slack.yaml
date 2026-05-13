@@ -172,3 +172,121 @@ actions:
       - { name: filename, in: body, type: string }
       - { name: title, in: body, type: string }
       - { name: initial_comment, in: body, type: string }
+
+  - id: open_dm
+    description: Open a direct-message conversation with one or more users.
+    expected_use: Start a 1:1 or group DM before posting.
+    auto_execute: false
+    required_scopes: [im:write]
+    risk: { category: write, sensitivity: low }
+    http:
+      method: POST
+      path: "/conversations.open"
+    params:
+      - { name: users, in: body, required: true, type: string, description: "Comma-separated user ids." }
+
+  - id: get_channel_info
+    description: Fetch metadata for a single channel.
+    expected_use: Inspect channel topic, membership, or purpose before posting.
+    auto_execute: true
+    required_scopes: [channels:read]
+    risk: { category: read, sensitivity: low }
+    http:
+      method: GET
+      path: "/conversations.info"
+    params:
+      - { name: channel, in: query, required: true, type: string }
+
+  - id: search_messages
+    description: Search messages across the workspace.
+    expected_use: Find prior discussion before posting.
+    auto_execute: true
+    required_scopes: [search:read]
+    risk: { category: search, sensitivity: medium }
+    http:
+      method: GET
+      path: "/search.messages"
+    params:
+      - { name: query, in: query, required: true, type: string }
+      - { name: sort, in: query, type: string }
+      - { name: count, in: query, type: integer, default: 20 }
+
+  - id: create_channel
+    description: Create a new channel.
+    expected_use: Provision a project or incident channel.
+    auto_execute: false
+    required_scopes: [channels:manage]
+    risk: { category: write, sensitivity: medium }
+    http:
+      method: POST
+      path: "/conversations.create"
+    params:
+      - { name: name, in: body, required: true, type: string }
+      - { name: is_private, in: body, type: boolean, default: false }
+
+  - id: invite_to_channel
+    description: Invite one or more users to a channel.
+    expected_use: Add teammates to a project or incident channel.
+    auto_execute: false
+    required_scopes: [channels:manage]
+    risk: { category: write, sensitivity: medium }
+    http:
+      method: POST
+      path: "/conversations.invite"
+    params:
+      - { name: channel, in: body, required: true, type: string }
+      - { name: users, in: body, required: true, type: string, description: "Comma-separated user ids." }
+
+  - id: pin_message
+    description: Pin a message in a channel.
+    expected_use: Highlight an important message for the channel.
+    auto_execute: false
+    required_scopes: [pins:write]
+    risk: { category: write, sensitivity: low }
+    http:
+      method: POST
+      path: "/pins.add"
+    params:
+      - { name: channel, in: body, required: true, type: string }
+      - { name: timestamp, in: body, required: true, type: string }
+
+  - id: schedule_message
+    description: Schedule a message to post at a future time.
+    expected_use: Queue a status update or reminder for later delivery.
+    auto_execute: false
+    required_scopes: [chat:write]
+    risk: { category: write, sensitivity: medium }
+    http:
+      method: POST
+      path: "/chat.scheduleMessage"
+    params:
+      - { name: channel, in: body, required: true, type: string }
+      - { name: text, in: body, required: true, type: string }
+      - { name: post_at, in: body, required: true, type: integer, description: "Unix epoch seconds." }
+
+  - id: set_topic
+    description: Set the topic for a channel.
+    expected_use: Update channel topic with status or context.
+    auto_execute: false
+    required_scopes: [channels:manage]
+    risk: { category: write, sensitivity: low }
+    http:
+      method: POST
+      path: "/conversations.setTopic"
+    params:
+      - { name: channel, in: body, required: true, type: string }
+      - { name: topic, in: body, required: true, type: string }
+
+  - id: remove_reaction
+    description: Remove an emoji reaction from a message.
+    expected_use: Undo a reaction added in error.
+    auto_execute: false
+    required_scopes: [reactions:write]
+    risk: { category: write, sensitivity: low }
+    http:
+      method: POST
+      path: "/reactions.remove"
+    params:
+      - { name: channel, in: body, required: true, type: string }
+      - { name: timestamp, in: body, required: true, type: string }
+      - { name: name, in: body, required: true, type: string }

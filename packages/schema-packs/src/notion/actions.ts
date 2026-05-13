@@ -15,6 +15,13 @@ export const actionToCommand: Record<string, string> = {
   list_users: '/notion/user/list',
   get_user: '/notion/user/read',
   delete_block: '/notion/block/delete',
+  create_database: '/notion/database/create',
+  update_database: '/notion/database/update',
+  retrieve_block: '/notion/block/retrieve',
+  update_block: '/notion/block/update',
+  list_comments: '/notion/comment/list',
+  create_comment: '/notion/comment/create',
+  get_bot_user: '/notion/user/me',
 };
 
 export function resourceFor(

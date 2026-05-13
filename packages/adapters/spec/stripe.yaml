@@ -192,3 +192,143 @@ actions:
       path: "/payment_intents/{payment_intent_id}"
     params:
       - { name: payment_intent_id, in: path, required: true, type: string }
+
+  - id: create_payment_intent
+    description: Create a new payment intent.
+    expected_use: Start a charge flow for a customer.
+    auto_execute: false
+    required_scopes: [read_write]
+    risk: { category: write, sensitivity: high }
+    http:
+      method: POST
+      path: "/payment_intents"
+    params:
+      - { name: amount, in: form, required: true, type: integer }
+      - { name: currency, in: form, required: true, type: string }
+      - { name: customer, in: form, type: string }
+      - { name: description, in: form, type: string }
+      - { name: automatic_payment_methods, in: form, type: object }
+
+  - id: capture_payment_intent
+    description: Capture funds on a previously authorized payment intent.
+    expected_use: Capture an authorized payment after fulfillment.
+    auto_execute: false
+    required_scopes: [read_write]
+    risk: { category: write, sensitivity: high }
+    http:
+      method: POST
+      path: "/payment_intents/{payment_intent_id}/capture"
+    params:
+      - { name: payment_intent_id, in: path, required: true, type: string }
+      - { name: amount_to_capture, in: form, type: integer }
+
+  - id: cancel_payment_intent
+    description: Cancel a payment intent before it is captured.
+    expected_use: Abandon a payment that should not proceed.
+    auto_execute: false
+    required_scopes: [read_write]
+    risk: { category: write, sensitivity: high }
+    http:
+      method: POST
+      path: "/payment_intents/{payment_intent_id}/cancel"
+    params:
+      - { name: payment_intent_id, in: path, required: true, type: string }
+      - { name: cancellation_reason, in: form, type: string, enum: [duplicate, fraudulent, requested_by_customer, abandoned] }
+
+  - id: update_customer
+    description: Update an existing customer's profile fields.
+    expected_use: Correct a name, email, or description on a customer record.
+    auto_execute: false
+    required_scopes: [read_write]
+    risk: { category: write, sensitivity: high }
+    http:
+      method: POST
+      path: "/customers/{customer_id}"
+    params:
+      - { name: customer_id, in: path, required: true, type: string }
+      - { name: email, in: form, type: string }
+      - { name: name, in: form, type: string }
+      - { name: description, in: form, type: string }
+      - { name: phone, in: form, type: string }
+
+  - id: create_subscription
+    description: Create a subscription for a customer.
+    expected_use: Start recurring billing for a customer on one or more prices.
+    auto_execute: false
+    required_scopes: [read_write]
+    risk: { category: write, sensitivity: high }
+    http:
+      method: POST
+      path: "/subscriptions"
+    params:
+      - { name: customer, in: form, required: true, type: string }
+      - { name: items, in: form, required: true, type: array, description: "Array of {price: <price_id>}." }
+      - { name: trial_period_days, in: form, type: integer }
+
+  - id: update_subscription
+    description: Update an existing subscription.
+    expected_use: Change plan, item set, or cancel-at-period-end.
+    auto_execute: false
+    required_scopes: [read_write]
+    risk: { category: write, sensitivity: high }
+    http:
+      method: POST
+      path: "/subscriptions/{subscription_id}"
+    params:
+      - { name: subscription_id, in: path, required: true, type: string }
+      - { name: items, in: form, type: array }
+      - { name: cancel_at_period_end, in: form, type: boolean }
+
+  - id: list_products
+    description: List active products in the catalog.
+    expected_use: Browse the catalog before creating a price or subscription.
+    auto_execute: true
+    required_scopes: [read_write]
+    risk: { category: read, sensitivity: medium }
+    http:
+      method: GET
+      path: "/products"
+    params:
+      - { name: active, in: query, type: boolean }
+      - { name: limit, in: query, type: integer, default: 25 }
+
+  - id: list_prices
+    description: List prices, optionally filtered by product.
+    expected_use: Pick a price id for subscription or payment intent creation.
+    auto_execute: true
+    required_scopes: [read_write]
+    risk: { category: read, sensitivity: medium }
+    http:
+      method: GET
+      path: "/prices"
+    params:
+      - { name: product, in: query, type: string }
+      - { name: active, in: query, type: boolean }
+      - { name: limit, in: query, type: integer, default: 25 }
+
+  - id: list_disputes
+    description: List recent disputes.
+    expected_use: Audit chargebacks and outstanding disputes.
+    auto_execute: true
+    required_scopes: [read_write]
+    risk: { category: read, sensitivity: medium }
+    http:
+      method: GET
+      path: "/disputes"
+    params:
+      - { name: charge, in: query, type: string }
+      - { name: payment_intent, in: query, type: string }
+      - { name: limit, in: query, type: integer, default: 25 }
+
+  - id: list_balance_transactions
+    description: List balance transactions on the connected account.
+    expected_use: Reconcile payouts, fees, and refunds.
+    auto_execute: true
+    required_scopes: [read_write]
+    risk: { category: read, sensitivity: medium }
+    http:
+      method: GET
+      path: "/balance_transactions"
+    params:
+      - { name: type, in: query, type: string }
+      - { name: limit, in: query, type: integer, default: 25 }

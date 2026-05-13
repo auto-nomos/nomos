@@ -156,6 +156,103 @@ actions:
     params:
       - { name: block_id, in: path, required: true, type: string }
 
+  - id: create_database
+    description: Create a new Notion database under a parent page.
+    expected_use: Provision a tracker database programmatically.
+    auto_execute: false
+    required_scopes: []
+    risk: { category: write, sensitivity: medium }
+    http:
+      method: POST
+      path: "/databases"
+    params:
+      - { name: parent, in: body, required: true, type: object }
+      - { name: title, in: body, required: true, type: array }
+      - { name: properties, in: body, required: true, type: object }
+
+  - id: update_database
+    description: Update a database's title or property schema.
+    expected_use: Rename a tracker or add a new column.
+    auto_execute: false
+    required_scopes: []
+    risk: { category: write, sensitivity: medium }
+    http:
+      method: PATCH
+      path: "/databases/{database_id}"
+    params:
+      - { name: database_id, in: path, required: true, type: string }
+      - { name: title, in: body, type: array }
+      - { name: properties, in: body, type: object }
+
+  - id: retrieve_block
+    description: Fetch a single block by id.
+    expected_use: Inspect a block's content before updating.
+    auto_execute: true
+    required_scopes: []
+    risk: { category: read, sensitivity: low }
+    http:
+      method: GET
+      path: "/blocks/{block_id}"
+    params:
+      - { name: block_id, in: path, required: true, type: string }
+
+  - id: update_block
+    description: Update a block's content (block-type-specific payload).
+    expected_use: Edit a paragraph, heading, or list item in place.
+    auto_execute: false
+    required_scopes: []
+    risk: { category: write, sensitivity: medium }
+    http:
+      method: PATCH
+      path: "/blocks/{block_id}"
+    params:
+      - { name: block_id, in: path, required: true, type: string }
+      - { name: paragraph, in: body, type: object }
+      - { name: heading_1, in: body, type: object }
+      - { name: heading_2, in: body, type: object }
+      - { name: heading_3, in: body, type: object }
+      - { name: to_do, in: body, type: object }
+      - { name: bulleted_list_item, in: body, type: object }
+      - { name: numbered_list_item, in: body, type: object }
+      - { name: archived, in: body, type: boolean }
+
+  - id: list_comments
+    description: List comments on a block or page.
+    expected_use: Read discussion before replying.
+    auto_execute: true
+    required_scopes: []
+    risk: { category: read, sensitivity: low }
+    http:
+      method: GET
+      path: "/comments"
+    params:
+      - { name: block_id, in: query, required: true, type: string }
+      - { name: page_size, in: query, type: integer, default: 25 }
+
+  - id: create_comment
+    description: Post a comment on a page or existing discussion thread.
+    expected_use: Reply to a discussion or post a status comment.
+    auto_execute: false
+    required_scopes: []
+    risk: { category: write, sensitivity: low }
+    http:
+      method: POST
+      path: "/comments"
+    params:
+      - { name: parent, in: body, required: true, type: object }
+      - { name: rich_text, in: body, required: true, type: array }
+
+  - id: get_bot_user
+    description: Get the authenticated bot user.
+    expected_use: Identify which Notion integration the agent is acting as.
+    auto_execute: true
+    required_scopes: []
+    risk: { category: read, sensitivity: low }
+    http:
+      method: GET
+      path: "/users/me"
+    params: []
+
 notes: |
   Notion does not issue refresh tokens; access tokens are long-lived but the
   user can revoke them via Settings → Connected apps. Treat 401 as

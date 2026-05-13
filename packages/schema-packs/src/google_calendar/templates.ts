@@ -16,8 +16,13 @@ export const WRITES = [
   '/google/calendar/event/create',
   '/google/calendar/event/update',
   '/google/calendar/event/delete',
+  '/google/calendar/event/quick_add',
+  '/google/calendar/event/move',
+  '/google/calendar/event/import',
+  '/google/calendar/list/create',
 ] as const;
-export const actions = [...READS, ...WRITES] as const;
+export const DELETES = ['/google/calendar/list/delete'] as const;
+export const actions = [...READS, ...WRITES, ...DELETES] as const;
 
 const READ_LIST = READS.map((a) => `Action::"${a}"`).join(', ');
 const WRITE_LIST = WRITES.map((a) => `Action::"${a}"`).join(', ');

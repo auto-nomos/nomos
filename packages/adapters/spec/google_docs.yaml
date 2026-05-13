@@ -1,0 +1,75 @@
+id: google_docs
+name: Google Docs
+version: 1.0.0
+description: Google Docs API — documents, batch updates, text replacement.
+homepage: https://developers.google.com/docs/api
+
+api_base: https://docs.googleapis.com/v1
+
+auth:
+  kind: oauth2
+  authorize_url: https://accounts.google.com/o/oauth2/v2/auth
+  token_url: https://oauth2.googleapis.com/token
+  default_scopes:
+    - https://www.googleapis.com/auth/documents
+    - https://www.googleapis.com/auth/drive.readonly
+  pkce: true
+
+actions:
+  - id: create_document
+    description: Create a new empty Google Doc.
+    expected_use: Provision a new document to be populated later.
+    auto_execute: false
+    required_scopes: [https://www.googleapis.com/auth/documents]
+    risk: { category: write, sensitivity: medium }
+    http:
+      method: POST
+      path: "/documents"
+    params:
+      - { name: title, in: body, required: true, type: string }
+
+  - id: get_document
+    description: Fetch a Google Doc's structure and content.
+    expected_use: Read document body for summarization or analysis.
+    auto_execute: true
+    required_scopes: [https://www.googleapis.com/auth/drive.readonly]
+    risk: { category: read, sensitivity: medium }
+    http:
+      method: GET
+      path: "/documents/{documentId}"
+    params:
+      - { name: documentId, in: path, required: true, type: string }
+
+  - id: batch_update
+    description: Apply a batch of structural updates (insertText, deleteRange, etc.) to a document.
+    expected_use: Edit document content programmatically.
+    auto_execute: false
+    required_scopes: [https://www.googleapis.com/auth/documents]
+    risk: { category: write, sensitivity: medium }
+    http:
+      method: POST
+      path: "/documents/{documentId}:batchUpdate"
+    params:
+      - { name: documentId, in: path, required: true, type: string }
+      - { name: requests, in: body, required: true, type: array }
+
+  - id: replace_text
+    description: Replace all occurrences of a text string in a document.
+    expected_use: Templated find-and-replace for document generation.
+    auto_execute: false
+    required_scopes: [https://www.googleapis.com/auth/documents]
+    risk: { category: write, sensitivity: medium }
+    http:
+      method: POST
+      path: "/documents/{documentId}:batchUpdate"
+    params:
+      - { name: documentId, in: path, required: true, type: string }
+      - { name: text, in: body, required: true, type: string }
+      - { name: replaceText, in: body, required: true, type: string }
+      - { name: matchCase, in: body, type: boolean, default: false }
+
+notes: |
+  - Google Docs uses the shared google OAuth connector. Scope must include
+    `https://www.googleapis.com/auth/documents` to permit writes.
+  - `replace_text` is a thin alias over `batchUpdate` with the
+    `replaceAllText` request shape pre-applied by the executor.

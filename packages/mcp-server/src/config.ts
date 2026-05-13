@@ -10,6 +10,9 @@ export const SUPPORTED_INTEGRATIONS = [
   'stripe',
   'google_calendar',
   'google_gmail',
+  'google_docs',
+  'google_sheets',
+  'google_tasks',
 ] as const;
 export type IntegrationId = (typeof SUPPORTED_INTEGRATIONS)[number];
 

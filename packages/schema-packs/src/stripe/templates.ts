@@ -16,13 +16,23 @@ export const READS = [
   '/stripe/subscription/list',
   '/stripe/payment_intent/read',
   '/stripe/payment_intent/list',
+  '/stripe/product/list',
+  '/stripe/price/list',
+  '/stripe/dispute/list',
+  '/stripe/balance_transaction/list',
 ] as const;
 export const WRITES = [
   '/stripe/customer/create',
+  '/stripe/customer/update',
   '/stripe/invoice/create',
   '/stripe/invoice/send',
   '/stripe/refund/create',
   '/stripe/subscription/cancel',
+  '/stripe/subscription/create',
+  '/stripe/subscription/update',
+  '/stripe/payment_intent/create',
+  '/stripe/payment_intent/capture',
+  '/stripe/payment_intent/cancel',
 ] as const;
 export const actions = [...READS, ...WRITES] as const;
 

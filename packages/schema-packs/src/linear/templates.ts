@@ -3,18 +3,26 @@ import type { PolicyTemplate } from '../types.js';
 export const READS = [
   '/linear/issue/read',
   '/linear/issue/list',
+  '/linear/issue/search',
   '/linear/project/read',
   '/linear/project/list',
   '/linear/team/list',
   '/linear/user/me',
+  '/linear/user/list',
+  '/linear/workflow_state/list',
+  '/linear/label/list',
+  '/linear/comment/list',
 ] as const;
 export const WRITES = [
   '/linear/issue/create',
   '/linear/issue/comment',
   '/linear/issue/update',
   '/linear/issue/close',
+  '/linear/project/create',
+  '/linear/project/update',
 ] as const;
-export const actions = [...READS, ...WRITES] as const;
+export const DELETES = ['/linear/issue/delete'] as const;
+export const actions = [...READS, ...WRITES, ...DELETES] as const;
 
 const READ_LIST = READS.map((a) => `Action::"${a}"`).join(', ');
 const WRITE_LIST = WRITES.map((a) => `Action::"${a}"`).join(', ');

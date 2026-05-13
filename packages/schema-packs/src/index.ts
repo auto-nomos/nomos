@@ -2,7 +2,10 @@ export { filesystemPack } from './filesystem/index.js';
 export { githubPack } from './github/index.js';
 export { googlePack } from './google/index.js';
 export { googleCalendarPack } from './google_calendar/index.js';
+export { googleDocsPack } from './google_docs/index.js';
 export { googleGmailPack } from './google_gmail/index.js';
+export { googleSheetsPack } from './google_sheets/index.js';
+export { googleTasksPack } from './google_tasks/index.js';
 export { linearPack } from './linear/index.js';
 export { notionPack } from './notion/index.js';
 export { slackPack } from './slack/index.js';
@@ -13,7 +16,10 @@ import { filesystemPack } from './filesystem/index.js';
 import { githubPack } from './github/index.js';
 import { googlePack } from './google/index.js';
 import { googleCalendarPack } from './google_calendar/index.js';
+import { googleDocsPack } from './google_docs/index.js';
 import { googleGmailPack } from './google_gmail/index.js';
+import { googleSheetsPack } from './google_sheets/index.js';
+import { googleTasksPack } from './google_tasks/index.js';
 import { linearPack } from './linear/index.js';
 import { notionPack } from './notion/index.js';
 import { slackPack } from './slack/index.js';
@@ -26,6 +32,9 @@ export const PACKS: IntegrationPack[] = [
   googlePack,
   googleCalendarPack,
   googleGmailPack,
+  googleDocsPack,
+  googleSheetsPack,
+  googleTasksPack,
   notionPack,
   linearPack,
   stripePack,

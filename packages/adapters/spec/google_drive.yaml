@@ -155,3 +155,65 @@ actions:
       - { name: role, in: body, required: true, type: string, enum: [reader, commenter, writer, owner] }
       - { name: emailAddress, in: body, type: string }
       - { name: domain, in: body, type: string }
+
+  - id: export_file
+    description: Export a Google-native doc to another format (PDF, DOCX, etc.).
+    expected_use: Convert a Google Doc/Sheet/Slide into a portable file format.
+    auto_execute: true
+    required_scopes: [https://www.googleapis.com/auth/drive.readonly]
+    risk: { category: read, sensitivity: high }
+    http:
+      method: GET
+      path: "/files/{fileId}/export"
+    params:
+      - { name: fileId, in: path, required: true, type: string }
+      - { name: mimeType, in: query, required: true, type: string, description: "e.g. application/pdf, application/vnd.openxmlformats-officedocument.wordprocessingml.document" }
+
+  - id: list_permissions
+    description: List sharing permissions on a file.
+    expected_use: Audit who has access before sharing more broadly.
+    auto_execute: true
+    required_scopes: [https://www.googleapis.com/auth/drive.readonly]
+    risk: { category: read, sensitivity: medium }
+    http:
+      method: GET
+      path: "/files/{fileId}/permissions"
+    params:
+      - { name: fileId, in: path, required: true, type: string }
+
+  - id: delete_permission
+    description: Revoke a sharing permission from a file.
+    expected_use: Remove a collaborator's access.
+    auto_execute: false
+    required_scopes: [https://www.googleapis.com/auth/drive.file]
+    risk: { category: delete, sensitivity: high }
+    http:
+      method: DELETE
+      path: "/files/{fileId}/permissions/{permissionId}"
+    params:
+      - { name: fileId, in: path, required: true, type: string }
+      - { name: permissionId, in: path, required: true, type: string }
+
+  - id: list_revisions
+    description: List revision history for a file.
+    expected_use: Audit recent edits or roll back to a prior version.
+    auto_execute: true
+    required_scopes: [https://www.googleapis.com/auth/drive.readonly]
+    risk: { category: read, sensitivity: medium }
+    http:
+      method: GET
+      path: "/files/{fileId}/revisions"
+    params:
+      - { name: fileId, in: path, required: true, type: string }
+
+  - id: get_storage_quota
+    description: Get the user's Drive storage quota and usage.
+    expected_use: Check available space before uploading large files.
+    auto_execute: true
+    required_scopes: [https://www.googleapis.com/auth/drive.readonly]
+    risk: { category: read, sensitivity: low }
+    http:
+      method: GET
+      path: "/about"
+    params:
+      - { name: fields, in: query, type: string, default: "storageQuota" }

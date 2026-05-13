@@ -15,6 +15,15 @@ export const actionToCommand: Record<string, string> = {
   delete_message: '/slack/message/delete',
   reply_in_thread: '/slack/message/reply',
   upload_file: '/slack/file/upload',
+  open_dm: '/slack/dm/open',
+  get_channel_info: '/slack/channel/read',
+  search_messages: '/slack/message/search',
+  create_channel: '/slack/channel/create',
+  invite_to_channel: '/slack/channel/invite',
+  pin_message: '/slack/message/pin',
+  schedule_message: '/slack/message/schedule',
+  set_topic: '/slack/channel/topic',
+  remove_reaction: '/slack/message/unreact',
 };
 
 export function resourceFor(

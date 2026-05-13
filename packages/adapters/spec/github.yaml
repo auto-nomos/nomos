@@ -496,6 +496,195 @@ actions:
         in: body
         type: string
 
+  - id: update_file
+    description: Create or update a file at a path; commits to the named branch.
+    expected_use: Commit a generated or edited file as part of an automation.
+    auto_execute: false
+    required_scopes: [repo]
+    risk: { category: write, sensitivity: medium }
+    http:
+      method: PUT
+      path: "/repos/{owner}/{repo}/contents/{path}"
+    params:
+      - { name: owner, in: path, required: true, type: string }
+      - { name: repo, in: path, required: true, type: string }
+      - { name: path, in: path, required: true, type: string }
+      - { name: message, in: body, required: true, type: string }
+      - { name: content, in: body, required: true, type: string, description: "Base64-encoded file contents." }
+      - { name: branch, in: body, type: string }
+      - { name: sha, in: body, type: string, description: "Required when updating an existing file." }
+
+  - id: list_commits
+    description: List commits on a branch or path.
+    expected_use: Audit recent history or build a change summary.
+    auto_execute: true
+    required_scopes: [repo]
+    risk: { category: read, sensitivity: low }
+    http:
+      method: GET
+      path: "/repos/{owner}/{repo}/commits"
+    params:
+      - { name: owner, in: path, required: true, type: string }
+      - { name: repo, in: path, required: true, type: string }
+      - { name: sha, in: query, type: string }
+      - { name: path, in: query, type: string }
+      - { name: author, in: query, type: string }
+      - { name: per_page, in: query, type: integer, default: 30 }
+
+  - id: search_issues
+    description: Search issues and pull requests across GitHub.
+    expected_use: Find issues matching a free-text query for triage.
+    auto_execute: true
+    required_scopes: [repo]
+    risk: { category: search, sensitivity: low }
+    http:
+      method: GET
+      path: "/search/issues"
+    params:
+      - { name: q, in: query, required: true, type: string }
+      - { name: sort, in: query, type: string }
+      - { name: order, in: query, type: string, enum: [asc, desc] }
+      - { name: per_page, in: query, type: integer, default: 30 }
+
+  - id: search_repos
+    description: Search public and accessible repositories.
+    expected_use: Discover repos matching a query.
+    auto_execute: true
+    required_scopes: [repo]
+    risk: { category: search, sensitivity: low }
+    http:
+      method: GET
+      path: "/search/repositories"
+    params:
+      - { name: q, in: query, required: true, type: string }
+      - { name: sort, in: query, type: string }
+      - { name: order, in: query, type: string, enum: [asc, desc] }
+      - { name: per_page, in: query, type: integer, default: 30 }
+
+  - id: list_labels
+    description: List labels in a repository.
+    expected_use: Discover available labels before applying.
+    auto_execute: true
+    required_scopes: [repo]
+    risk: { category: read, sensitivity: low }
+    http:
+      method: GET
+      path: "/repos/{owner}/{repo}/labels"
+    params:
+      - { name: owner, in: path, required: true, type: string }
+      - { name: repo, in: path, required: true, type: string }
+      - { name: per_page, in: query, type: integer, default: 30 }
+
+  - id: add_labels_to_issue
+    description: Add labels to an issue.
+    expected_use: Tag an issue for triage or routing.
+    auto_execute: false
+    required_scopes: [repo]
+    risk: { category: write, sensitivity: low }
+    http:
+      method: POST
+      path: "/repos/{owner}/{repo}/issues/{issue_number}/labels"
+    params:
+      - { name: owner, in: path, required: true, type: string }
+      - { name: repo, in: path, required: true, type: string }
+      - { name: issue_number, in: path, required: true, type: integer }
+      - { name: labels, in: body, required: true, type: array }
+
+  - id: list_issue_comments
+    description: List comments on an issue.
+    expected_use: Read discussion history before replying.
+    auto_execute: true
+    required_scopes: [repo]
+    risk: { category: read, sensitivity: low }
+    http:
+      method: GET
+      path: "/repos/{owner}/{repo}/issues/{issue_number}/comments"
+    params:
+      - { name: owner, in: path, required: true, type: string }
+      - { name: repo, in: path, required: true, type: string }
+      - { name: issue_number, in: path, required: true, type: integer }
+
+  - id: create_release
+    description: Create a release for a tag.
+    expected_use: Publish a release as part of a deploy workflow.
+    auto_execute: false
+    required_scopes: [repo]
+    risk: { category: write, sensitivity: high }
+    http:
+      method: POST
+      path: "/repos/{owner}/{repo}/releases"
+    params:
+      - { name: owner, in: path, required: true, type: string }
+      - { name: repo, in: path, required: true, type: string }
+      - { name: tag_name, in: body, required: true, type: string }
+      - { name: name, in: body, type: string }
+      - { name: body, in: body, type: string }
+      - { name: draft, in: body, type: boolean, default: false }
+      - { name: prerelease, in: body, type: boolean, default: false }
+
+  - id: list_workflow_runs
+    description: List Actions workflow runs for a repository.
+    expected_use: Audit recent CI activity or check deploy status.
+    auto_execute: true
+    required_scopes: [repo]
+    risk: { category: read, sensitivity: low }
+    http:
+      method: GET
+      path: "/repos/{owner}/{repo}/actions/runs"
+    params:
+      - { name: owner, in: path, required: true, type: string }
+      - { name: repo, in: path, required: true, type: string }
+      - { name: branch, in: query, type: string }
+      - { name: status, in: query, type: string }
+      - { name: per_page, in: query, type: integer, default: 30 }
+
+  - id: trigger_workflow
+    description: Trigger a workflow_dispatch event for an Actions workflow.
+    expected_use: Kick off a deploy, release, or other workflow that supports manual dispatch.
+    auto_execute: false
+    required_scopes: [repo]
+    risk: { category: write, sensitivity: high }
+    http:
+      method: POST
+      path: "/repos/{owner}/{repo}/actions/workflows/{workflow_id}/dispatches"
+    params:
+      - { name: owner, in: path, required: true, type: string }
+      - { name: repo, in: path, required: true, type: string }
+      - { name: workflow_id, in: path, required: true, type: string }
+      - { name: ref, in: body, required: true, type: string }
+      - { name: inputs, in: body, type: object }
+
+  - id: list_pr_reviews
+    description: List reviews on a pull request.
+    expected_use: Read prior reviewer feedback before submitting your own.
+    auto_execute: true
+    required_scopes: [repo]
+    risk: { category: read, sensitivity: low }
+    http:
+      method: GET
+      path: "/repos/{owner}/{repo}/pulls/{pull_number}/reviews"
+    params:
+      - { name: owner, in: path, required: true, type: string }
+      - { name: repo, in: path, required: true, type: string }
+      - { name: pull_number, in: path, required: true, type: integer }
+
+  - id: submit_review
+    description: Submit a review on a pull request (approve, request changes, or comment).
+    expected_use: Record an automated or assisted code review decision.
+    auto_execute: false
+    required_scopes: [repo]
+    risk: { category: write, sensitivity: high }
+    http:
+      method: POST
+      path: "/repos/{owner}/{repo}/pulls/{pull_number}/reviews"
+    params:
+      - { name: owner, in: path, required: true, type: string }
+      - { name: repo, in: path, required: true, type: string }
+      - { name: pull_number, in: path, required: true, type: integer }
+      - { name: body, in: body, type: string }
+      - { name: event, in: body, required: true, type: string, enum: [APPROVE, REQUEST_CHANGES, COMMENT] }
+      - { name: comments, in: body, type: array }
+
 notes: |
   - Issue numbering: GitHub uses sequential per-repo integers, not the global node_id.
   - Rate limit: 5000 req/hr authenticated; surface 403 + X-RateLimit-Remaining header.

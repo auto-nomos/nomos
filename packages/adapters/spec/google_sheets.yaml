@@ -1,0 +1,99 @@
+id: google_sheets
+name: Google Sheets
+version: 1.0.0
+description: Google Sheets API — spreadsheets, values, batch updates.
+homepage: https://developers.google.com/sheets/api
+
+api_base: https://sheets.googleapis.com/v4
+
+auth:
+  kind: oauth2
+  authorize_url: https://accounts.google.com/o/oauth2/v2/auth
+  token_url: https://oauth2.googleapis.com/token
+  default_scopes:
+    - https://www.googleapis.com/auth/spreadsheets
+    - https://www.googleapis.com/auth/drive.readonly
+  pkce: true
+
+actions:
+  - id: create_spreadsheet
+    description: Create a new spreadsheet.
+    expected_use: Provision a new tracker or report sheet.
+    auto_execute: false
+    required_scopes: [https://www.googleapis.com/auth/spreadsheets]
+    risk: { category: write, sensitivity: medium }
+    http:
+      method: POST
+      path: "/spreadsheets"
+    params:
+      - { name: properties, in: body, required: true, type: object, description: "{ title: string }" }
+
+  - id: get_spreadsheet
+    description: Fetch a spreadsheet's metadata and (optionally) data.
+    expected_use: Read sheet titles, ranges, or grid data.
+    auto_execute: true
+    required_scopes: [https://www.googleapis.com/auth/spreadsheets]
+    risk: { category: read, sensitivity: medium }
+    http:
+      method: GET
+      path: "/spreadsheets/{spreadsheetId}"
+    params:
+      - { name: spreadsheetId, in: path, required: true, type: string }
+      - { name: ranges, in: query, type: string }
+      - { name: includeGridData, in: query, type: boolean, default: false }
+
+  - id: get_values
+    description: Read cell values from a range.
+    expected_use: Pull rows from a sheet for analysis.
+    auto_execute: true
+    required_scopes: [https://www.googleapis.com/auth/spreadsheets]
+    risk: { category: read, sensitivity: medium }
+    http:
+      method: GET
+      path: "/spreadsheets/{spreadsheetId}/values/{range}"
+    params:
+      - { name: spreadsheetId, in: path, required: true, type: string }
+      - { name: range, in: path, required: true, type: string }
+
+  - id: update_values
+    description: Write cell values to a range.
+    expected_use: Update an existing cell or row.
+    auto_execute: false
+    required_scopes: [https://www.googleapis.com/auth/spreadsheets]
+    risk: { category: write, sensitivity: medium }
+    http:
+      method: PUT
+      path: "/spreadsheets/{spreadsheetId}/values/{range}"
+    params:
+      - { name: spreadsheetId, in: path, required: true, type: string }
+      - { name: range, in: path, required: true, type: string }
+      - { name: valueInputOption, in: query, type: string, default: USER_ENTERED, enum: [RAW, USER_ENTERED] }
+      - { name: values, in: body, required: true, type: array, description: "Array of arrays — rows of cell values." }
+
+  - id: append_values
+    description: Append rows to a sheet.
+    expected_use: Add new rows without overwriting existing data.
+    auto_execute: false
+    required_scopes: [https://www.googleapis.com/auth/spreadsheets]
+    risk: { category: write, sensitivity: medium }
+    http:
+      method: POST
+      path: "/spreadsheets/{spreadsheetId}/values/{range}:append"
+    params:
+      - { name: spreadsheetId, in: path, required: true, type: string }
+      - { name: range, in: path, required: true, type: string }
+      - { name: valueInputOption, in: query, type: string, default: USER_ENTERED, enum: [RAW, USER_ENTERED] }
+      - { name: values, in: body, required: true, type: array }
+
+  - id: batch_update
+    description: Apply a batch of structural updates (add sheet, format cells, etc.).
+    expected_use: Restructure a sheet programmatically.
+    auto_execute: false
+    required_scopes: [https://www.googleapis.com/auth/spreadsheets]
+    risk: { category: write, sensitivity: medium }
+    http:
+      method: POST
+      path: "/spreadsheets/{spreadsheetId}:batchUpdate"
+    params:
+      - { name: spreadsheetId, in: path, required: true, type: string }
+      - { name: requests, in: body, required: true, type: array }

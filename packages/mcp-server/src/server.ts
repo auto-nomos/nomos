@@ -36,6 +36,12 @@ function integrationLabel(id: IntegrationId): string {
       return 'Google Calendar';
     case 'google_gmail':
       return 'Gmail';
+    case 'google_docs':
+      return 'Google Docs';
+    case 'google_sheets':
+      return 'Google Sheets';
+    case 'google_tasks':
+      return 'Google Tasks';
   }
 }
 

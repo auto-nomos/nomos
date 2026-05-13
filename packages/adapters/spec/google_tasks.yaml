@@ -1,0 +1,99 @@
+id: google_tasks
+name: Google Tasks
+version: 1.0.0
+description: Google Tasks API — task lists and tasks.
+homepage: https://developers.google.com/tasks
+
+api_base: https://tasks.googleapis.com/tasks/v1
+
+auth:
+  kind: oauth2
+  authorize_url: https://accounts.google.com/o/oauth2/v2/auth
+  token_url: https://oauth2.googleapis.com/token
+  default_scopes:
+    - https://www.googleapis.com/auth/tasks
+  pkce: true
+
+actions:
+  - id: list_tasklists
+    description: List the user's task lists.
+    expected_use: Discover which lists exist before reading or creating tasks.
+    auto_execute: true
+    required_scopes: [https://www.googleapis.com/auth/tasks]
+    risk: { category: read, sensitivity: low }
+    http:
+      method: GET
+      path: "/users/@me/lists"
+    params:
+      - { name: maxResults, in: query, type: integer, default: 50 }
+
+  - id: list_tasks
+    description: List tasks in a task list.
+    expected_use: Read open tasks for status or triage.
+    auto_execute: true
+    required_scopes: [https://www.googleapis.com/auth/tasks]
+    risk: { category: read, sensitivity: low }
+    http:
+      method: GET
+      path: "/lists/{tasklist}/tasks"
+    params:
+      - { name: tasklist, in: path, required: true, type: string }
+      - { name: showCompleted, in: query, type: boolean, default: false }
+      - { name: maxResults, in: query, type: integer, default: 50 }
+
+  - id: get_task
+    description: Fetch a single task.
+    expected_use: Read full task details before updating.
+    auto_execute: true
+    required_scopes: [https://www.googleapis.com/auth/tasks]
+    risk: { category: read, sensitivity: low }
+    http:
+      method: GET
+      path: "/lists/{tasklist}/tasks/{task}"
+    params:
+      - { name: tasklist, in: path, required: true, type: string }
+      - { name: task, in: path, required: true, type: string }
+
+  - id: create_task
+    description: Create a new task in a task list.
+    expected_use: File a new todo as part of automation.
+    auto_execute: false
+    required_scopes: [https://www.googleapis.com/auth/tasks]
+    risk: { category: write, sensitivity: low }
+    http:
+      method: POST
+      path: "/lists/{tasklist}/tasks"
+    params:
+      - { name: tasklist, in: path, required: true, type: string }
+      - { name: title, in: body, required: true, type: string }
+      - { name: notes, in: body, type: string }
+      - { name: due, in: body, type: string, description: "RFC3339 timestamp." }
+
+  - id: update_task
+    description: Update fields on a task (title, status, notes).
+    expected_use: Mark a task complete or update its details.
+    auto_execute: false
+    required_scopes: [https://www.googleapis.com/auth/tasks]
+    risk: { category: write, sensitivity: low }
+    http:
+      method: PATCH
+      path: "/lists/{tasklist}/tasks/{task}"
+    params:
+      - { name: tasklist, in: path, required: true, type: string }
+      - { name: task, in: path, required: true, type: string }
+      - { name: title, in: body, type: string }
+      - { name: status, in: body, type: string, enum: [needsAction, completed] }
+      - { name: notes, in: body, type: string }
+
+  - id: delete_task
+    description: Permanently delete a task.
+    expected_use: Remove a task that is no longer needed.
+    auto_execute: false
+    required_scopes: [https://www.googleapis.com/auth/tasks]
+    risk: { category: delete, sensitivity: medium }
+    http:
+      method: DELETE
+      path: "/lists/{tasklist}/tasks/{task}"
+    params:
+      - { name: tasklist, in: path, required: true, type: string }
+      - { name: task, in: path, required: true, type: string }

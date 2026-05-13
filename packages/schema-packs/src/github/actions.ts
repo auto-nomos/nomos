@@ -27,6 +27,18 @@ export const actionToCommand: Record<string, string> = {
   get_pr: '/github/pr/read',
   create_pr: '/github/pr/create',
   merge_pr: '/github/pr/merge',
+  update_file: '/github/content/update',
+  list_commits: '/github/commit/list',
+  search_issues: '/github/issue/search',
+  search_repos: '/github/repo/search',
+  list_labels: '/github/label/list',
+  add_labels_to_issue: '/github/issue/label',
+  list_issue_comments: '/github/issue/comment/list',
+  create_release: '/github/release/create',
+  list_workflow_runs: '/github/workflow/run/list',
+  trigger_workflow: '/github/workflow/trigger',
+  list_pr_reviews: '/github/pr/review/list',
+  submit_review: '/github/pr/review/submit',
 };
 
 /**

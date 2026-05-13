@@ -10,6 +10,13 @@ export const READS = [
   '/github/pr/list',
   '/github/branch/list',
   '/github/content/read',
+  '/github/commit/list',
+  '/github/issue/search',
+  '/github/repo/search',
+  '/github/label/list',
+  '/github/issue/comment/list',
+  '/github/workflow/run/list',
+  '/github/pr/review/list',
 ] as const;
 export const WRITES = [
   '/github/repo/create',
@@ -18,6 +25,11 @@ export const WRITES = [
   '/github/issue/close',
   '/github/pr/create',
   '/github/pr/merge',
+  '/github/content/update',
+  '/github/issue/label',
+  '/github/release/create',
+  '/github/workflow/trigger',
+  '/github/pr/review/submit',
 ] as const;
 export const DELETES = ['/github/repo/delete'] as const;
 

@@ -130,3 +130,74 @@ actions:
       - { name: timeMin, in: body, required: true, type: string }
       - { name: timeMax, in: body, required: true, type: string }
       - { name: items, in: body, required: true, type: array, description: "[{ id: <calendarId> }, ...]" }
+
+  - id: quick_add
+    description: Create an event from a natural-language description.
+    expected_use: Quickly file an event without filling in structured fields.
+    auto_execute: false
+    required_scopes: [https://www.googleapis.com/auth/calendar.events]
+    risk: { category: write, sensitivity: medium }
+    http:
+      method: POST
+      path: "/calendars/{calendarId}/events/quickAdd"
+    params:
+      - { name: calendarId, in: path, required: true, type: string, default: primary }
+      - { name: text, in: query, required: true, type: string }
+
+  - id: create_calendar
+    description: Create a new secondary calendar.
+    expected_use: Provision a project or team calendar.
+    auto_execute: false
+    required_scopes: [https://www.googleapis.com/auth/calendar]
+    risk: { category: write, sensitivity: medium }
+    http:
+      method: POST
+      path: "/calendars"
+    params:
+      - { name: summary, in: body, required: true, type: string }
+      - { name: timeZone, in: body, type: string }
+
+  - id: delete_calendar
+    description: Permanently delete a secondary calendar.
+    expected_use: Remove a calendar that is no longer needed.
+    auto_execute: false
+    required_scopes: [https://www.googleapis.com/auth/calendar]
+    risk: { category: delete, sensitivity: high }
+    http:
+      method: DELETE
+      path: "/calendars/{calendarId}"
+    params:
+      - { name: calendarId, in: path, required: true, type: string }
+
+  - id: move_event
+    description: Move an event to a different calendar.
+    expected_use: Reassign an event between calendars.
+    auto_execute: false
+    required_scopes: [https://www.googleapis.com/auth/calendar.events]
+    risk: { category: write, sensitivity: medium }
+    http:
+      method: POST
+      path: "/calendars/{calendarId}/events/{eventId}/move"
+    params:
+      - { name: calendarId, in: path, required: true, type: string, default: primary }
+      - { name: eventId, in: path, required: true, type: string }
+      - { name: destination, in: query, required: true, type: string }
+
+  - id: import_event
+    description: Import an externally-created event into a calendar.
+    expected_use: Mirror an event from another system into Google Calendar.
+    auto_execute: false
+    required_scopes: [https://www.googleapis.com/auth/calendar.events]
+    risk: { category: write, sensitivity: medium }
+    http:
+      method: POST
+      path: "/calendars/{calendarId}/events/import"
+    params:
+      - { name: calendarId, in: path, required: true, type: string, default: primary }
+      - { name: summary, in: body, required: true, type: string }
+      - { name: start, in: body, required: true, type: object }
+      - { name: end, in: body, required: true, type: object }
+      - { name: iCalUID, in: body, required: true, type: string }
+      - { name: description, in: body, type: string }
+      - { name: attendees, in: body, type: array }
+      - { name: location, in: body, type: string }

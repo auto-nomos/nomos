@@ -5,14 +5,21 @@ export const READS = [
   '/notion/database/query',
   '/notion/database/read',
   '/notion/block/read',
+  '/notion/block/retrieve',
   '/notion/search',
   '/notion/user/list',
   '/notion/user/read',
+  '/notion/user/me',
+  '/notion/comment/list',
 ] as const;
 export const WRITES = [
   '/notion/page/create',
   '/notion/page/update',
   '/notion/block/append',
+  '/notion/block/update',
+  '/notion/database/create',
+  '/notion/database/update',
+  '/notion/comment/create',
 ] as const;
 export const DELETES = ['/notion/block/delete'] as const;
 export const actions = [...READS, ...WRITES, ...DELETES] as const;

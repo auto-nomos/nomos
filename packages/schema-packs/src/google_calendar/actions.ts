@@ -14,6 +14,11 @@ export const actionToCommand: Record<string, string> = {
   list_calendars: '/google/calendar/list/list',
   get_calendar: '/google/calendar/list/read',
   list_attendees_freebusy: '/google/calendar/freebusy/read',
+  quick_add: '/google/calendar/event/quick_add',
+  create_calendar: '/google/calendar/list/create',
+  delete_calendar: '/google/calendar/list/delete',
+  move_event: '/google/calendar/event/move',
+  import_event: '/google/calendar/event/import',
 };
 
 export function resourceFor(
@@ -27,14 +32,19 @@ export function resourceFor(
   switch (actionId) {
     case 'list_calendars':
     case 'list_attendees_freebusy':
+    case 'create_calendar':
       return {};
     case 'list_events':
     case 'get_calendar':
+    case 'delete_calendar':
+    case 'quick_add':
+    case 'import_event':
       return calendarId ? { calendar: calendarId } : {};
     case 'get_event':
     case 'create_event':
     case 'update_event':
     case 'delete_event':
+    case 'move_event':
       return {
         ...(calendarId ? { calendar: calendarId } : {}),
         ...(eventId ? { event: eventId } : {}),

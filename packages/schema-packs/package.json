@@ -1,6 +1,6 @@
 {
   "name": "@auto-nomos/schema-packs",
-  "version": "0.0.6",
+  "version": "0.0.7",
   "license": "MIT",
   "private": false,
   "type": "module",
@@ -42,6 +42,18 @@
     "./google_gmail": {
       "types": "./dist/google_gmail/index.d.ts",
       "import": "./dist/google_gmail/index.js"
+    },
+    "./google_docs": {
+      "types": "./dist/google_docs/index.d.ts",
+      "import": "./dist/google_docs/index.js"
+    },
+    "./google_sheets": {
+      "types": "./dist/google_sheets/index.d.ts",
+      "import": "./dist/google_sheets/index.js"
+    },
+    "./google_tasks": {
+      "types": "./dist/google_tasks/index.d.ts",
+      "import": "./dist/google_tasks/index.js"
     }
   },
   "files": [

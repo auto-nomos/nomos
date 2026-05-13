@@ -17,7 +17,10 @@ export type IntegrationId =
   | 'linear'
   | 'stripe'
   | 'google_calendar'
-  | 'google_gmail';
+  | 'google_gmail'
+  | 'google_docs'
+  | 'google_sheets'
+  | 'google_tasks';
 
 export interface PolicyTemplate {
   /** Stable id, namespaced on integration: `github:read-only`. */
