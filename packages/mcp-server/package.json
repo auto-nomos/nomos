@@ -1,6 +1,6 @@
 {
   "name": "@auto-nomos/mcp-server",
-  "version": "0.0.8",
+  "version": "0.0.9",
   "private": false,
   "description": "Distributable MCP server backed by Credential Broker. Wire into Claude Desktop / Cursor; the OAuth tokens stay on the PDP.",
   "license": "MIT",
