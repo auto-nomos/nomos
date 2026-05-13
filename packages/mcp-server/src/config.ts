@@ -8,7 +8,10 @@ export const ConfigSchema = z.object({
   apiKey: z.string().regex(/^cb_[0-9a-f-]+_/, 'expected api key format cb_<uuid>_<secret>'),
   pdpUrl: z.string().url(),
   controlPlaneUrl: z.string().url(),
-  integrations: z.array(z.enum(SUPPORTED_INTEGRATIONS)).min(1),
+  // Empty array = "fetch from control plane at startup". The platform is
+  // the single source of truth for which integrations an agent can use —
+  // the env var is an offline / power-user override only.
+  integrations: z.array(z.enum(SUPPORTED_INTEGRATIONS)).default([]),
 });
 export type Config = z.infer<typeof ConfigSchema>;
 
