@@ -25,6 +25,11 @@ const Config = z.object({
   OTEL_SERVICE_NAME: z.string().default('cb-pdp'),
   SENTRY_DSN: z.string().url().optional(),
   SENTRY_TRACES_SAMPLE_RATE: z.coerce.number().min(0).max(1).default(0.1),
+  /**
+   * Sprint MAOS-A — chain depth cap. Hard guard against runaway delegation
+   * in agent swarms. Effective length includes the leaf.
+   */
+  NOMOS_MAX_CHAIN_DEPTH: z.coerce.number().int().positive().default(8),
 });
 
 export type Config = z.infer<typeof Config>;

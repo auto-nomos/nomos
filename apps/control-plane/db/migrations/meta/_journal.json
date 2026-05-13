@@ -141,6 +141,20 @@
       "when": 1779300000000,
       "tag": "0019_passkey_unification",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1779400000000,
+      "tag": "0020_swarm_identity",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1779500000000,
+      "tag": "0021_chain_approvals",
+      "breakpoints": true
     }
   ]
 }

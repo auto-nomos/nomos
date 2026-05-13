@@ -22,6 +22,11 @@ export interface ServerDeps {
   /** Expected root UCAN issuer DID, derived from the control-plane verify key. */
   trustedIssuerDid?: string;
   /**
+   * Sprint MAOS-A — chain depth cap (env: NOMOS_MAX_CHAIN_DEPTH, default 8).
+   * Hard guard against runaway delegation in agent swarms.
+   */
+  maxChainDepth?: number;
+  /**
    * Sprint 8 push-revocation. When supplied, mounts
    * POST /v1/internal/refresh-revocations so the control plane can flush a
    * customer's revocation set within ~1s of a revoke.
@@ -71,6 +76,7 @@ export function createServer(deps: ServerDeps): Hono {
       revocationCache: deps.revocationCache,
       ...(deps.emitAudit !== undefined ? { emitAudit: deps.emitAudit } : {}),
       ...(deps.trustedIssuerDid !== undefined ? { trustedIssuerDid: deps.trustedIssuerDid } : {}),
+      ...(deps.maxChainDepth !== undefined ? { maxChainDepth: deps.maxChainDepth } : {}),
       ...(deps.stepup
         ? {
             stepup: {

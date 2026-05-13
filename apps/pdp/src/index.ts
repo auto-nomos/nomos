@@ -144,6 +144,7 @@ async function main(): Promise<void> {
     policyCache,
     revocationCache,
     ...(trustedIssuerDid !== undefined ? { trustedIssuerDid } : {}),
+    maxChainDepth: config.NOMOS_MAX_CHAIN_DEPTH,
     emitAudit: async (ev) => {
       await auditEmitter.emit({
         customer_id: ev.customerId,
@@ -153,6 +154,9 @@ async function main(): Promise<void> {
         command: ev.request.command,
         resource: ev.request.resource,
         context: ev.request.context as Record<string, unknown>,
+        ...(ev.parentReceiptId !== undefined ? { parent_receipt_id: ev.parentReceiptId } : {}),
+        ...(ev.swarmId !== undefined ? { swarm_id: ev.swarmId } : {}),
+        ...(ev.chainDepth !== undefined ? { chain_depth: ev.chainDepth } : {}),
       });
     },
     emitReceipt: async (ev) => {

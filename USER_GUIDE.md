@@ -207,7 +207,146 @@ minted UCAN bafyrei...
 ## What's done vs not (Phase 1)
 
 - Done (Sprints 1–9): foundations, PDP, control plane, SDK, OAuth bridge for 4 connectors, dashboard MVP, visual builder package, push revocation, signed audit chain, Cloudflare R2 archive, step-up + passkey PWA.
+- Done (Sprint MAOS A+B+C, beta): multi-agent delegation chains — see chapter below.
 - Next (Sprint 10): six more schema packs (Salesforce, Linear, Stripe, Postgres, Jira, Calendar) + 50 more templates.
 - Sprint 11: production cloud deploy, Stripe billing, npm publish, Mintlify docs site.
 
-The plan lives at `~/.claude/plans/wobbly-discovering-pascal.md`.
+The plan lives at `~/.claude/plans/wobbly-discovering-pascal.md`. The MAOS plan lives at `~/.claude/plans/now-whatever-we-have-elegant-tarjan.md`.
+
+---
+
+## Delegation chains — multi-agent orchestration security (beta)
+
+> Sprint MAOS — beta. Single-agent flows keep working unchanged.
+
+### Why
+
+LangGraph, CrewAI, AutoGen, OpenAI Swarm, Claude sub-agents — the world is moving from one agent doing one thing to **swarms of agents calling each other and tools**. Nobody owns the security layer for that yet. Nomos models the chain natively: each child UCAN attenuates its parent, the PDP sees the whole chain on every authorize, and audit log links each receipt to the parent that triggered it.
+
+### Vocabulary additions
+
+| Term | What it means |
+|---|---|
+| **Swarm** | A tree of Apps that delegate to each other. Rooted at one App. Bounded by `NOMOS_MAX_CHAIN_DEPTH` (default 8). |
+| **Chain** | The root-first JWT array of UCANs from the root App down to the leaf that's making the current call. Validated end-to-end on every authorize. |
+| **Attenuation** | Each child's capability is a strict subset of its parent's — narrower command, narrower resource, shorter TTL, or all three. PDP rejects any "broadening" link as `chain_attenuation_violation`. |
+| **Causation** | `auditEvents.parent_receipt_id` back-links each receipt to the parent authorize that triggered it. Orthogonal to `prev_hash` (tamper chain). |
+| **Snapshot approval** | A step-up that covers "this App and its current children" — the child set is materialized at approval time. New children forked after approval need a fresh approval. Never auto-extends. |
+
+### Wire format (orchestrator-agnostic)
+
+Every SDK reads these env vars; any orchestrator wires them on child-process spawn without importing our SDK:
+
+| Var | Shape | Purpose |
+|---|---|---|
+| `NOMOS_PARENT_UCAN_CHAIN` | JSON `string[]` (root-first) | Full chain to authorize against. |
+| `NOMOS_PARENT_UCAN_CHAIN_FILE` | path | Fallback when env exceeds OS limits (~128KB). |
+| `NOMOS_PARENT_RECEIPT_ID` | string | Causation back-link. |
+| `NOMOS_SWARM_ID` | uuid | Explicit swarm hint. |
+| `NOMOS_MAX_CHAIN_DEPTH` | int (default 8) | Override depth cap. |
+
+W3C `traceparent` header is propagated end-to-end so spans link orchestrator → PDP authorize → egress to upstream SaaS.
+
+### TypeScript
+
+```ts
+import { createAuthGuard, forkChild } from '@auto-nomos/sdk';
+
+const guard = createAuthGuard({ apiKey, pdpUrl });
+
+// authorize() auto-detects NOMOS_PARENT_UCAN_CHAIN and prepends it.
+const decision = await guard.authorize({ ucan, command, resource, context: {} });
+
+// Fork an attenuated child for a sub-agent.
+const { env } = forkChild({
+  parentChain: [rootUcan],
+  childUcanJwt: childUcan,
+  parentReceiptId: decision.receiptId,
+});
+spawn('node', ['./child.js'], { env: { ...process.env, ...env } });
+```
+
+### Python
+
+```python
+from nomos import AuthGuard, fork_child
+
+guard = AuthGuard(api_key=..., pdp_url=...)
+decision = guard.authorize(ucan=root_ucan, command='/github/issue/list',
+                           resource={'repo': 'org/test-repo'})
+
+chain, env = fork_child(
+    parent_chain=[root_ucan],
+    child_ucan_jwt=child_ucan,
+    parent_receipt_id=decision.receipt_id,
+)
+subprocess.Popen([sys.executable, 'child.py'], env={**os.environ, **env})
+```
+
+### Any other runtime
+
+Use the `nomos-ucan` CLI (Bun-compiled, install via `npm i -g @auto-nomos/ucan-cli`):
+
+```bash
+nomos-ucan fork --parent-chain ./chain.json --child-jwt $CHILD \
+  --parent-receipt-id $RECEIPT --swarm-id $SWARM
+# prints {chain, env} JSON; merge env into child process spawn.
+```
+
+### Cedar swarm-safe templates
+
+Every Cedar policy can now reason about chain attributes:
+
+- `principal.delegationDepth` — `Long`, 0 for root, +1 per hop.
+- `principal.rootAgent` — `String`, the root agent's DID.
+- `principal.invokedBy` — `Set<String>`, every ancestor agent's DID.
+
+Four templates ship in `packages/schema-packs/swarm-safe/`:
+
+```cedar
+// Cap delegation depth.
+forbid (principal, action, resource) when { principal.delegationDepth > 3 };
+
+// Pin root agent.
+permit (principal, action, resource)
+when { principal.rootAgent == "<root-did>" };
+
+// Block tainted-ancestor chains.
+forbid (principal, action, resource)
+when { principal.invokedBy.contains("<tainted-did>") };
+
+// Sensitive ops only at root.
+forbid (principal, action, resource) when { principal.delegationDepth > 0 };
+```
+
+### Dashboard
+
+`/app/swarms` lists every swarm in your workspace. Open one to see:
+
+- **Agent tree** — root → children, collapsed past depth 3 (click to expand).
+- **Approve for chain** — pick a root agent + TTL; preview shows the snapshot of current children that the approval covers; click Approve to mint a swarm-scoped step-up. Children forked later need a fresh approval.
+- **Scope containment** — each agent's last decision and chain depth at a glance.
+- **Recent receipts** — last 100 authorize calls in this swarm, colored allow / deny / step-up.
+
+### Audit walking
+
+Pull a bundle and walk the causation tree (hash chain still verified per node):
+
+```bash
+nomos audit-verify --chain ./bundle.json
+# prints colored ALLOW/DENY/STEPUP tree; exits 1 on any link tampered with.
+```
+
+### Reference integrations
+
+- [`examples/langgraph-nomos`](examples/langgraph-nomos/) — 3-node Python chain (planner → researcher → writer) hitting GitHub through Nomos with mid-chain step-up.
+- [`examples/crewai-nomos`](examples/crewai-nomos/) — CrewAI Task wrapper that authorizes every tool call.
+- [`examples/claude-subagents-nomos`](examples/claude-subagents-nomos/) — Claude Code sub-agent invocation through the `Task` tool.
+
+### Limits
+
+- **Chain depth**: capped at `NOMOS_MAX_CHAIN_DEPTH` (default 8). Larger swarms federate at the application layer.
+- **Cross-customer chains**: `swarms.cross_customer_enabled` column is a reserved design hook (Phase 2 federation). Enforcement stays intra-customer at launch.
+- **Env size**: chain JSON in env var bounded by OS limits (~128KB). Use `NOMOS_PARENT_UCAN_CHAIN_FILE` fallback for deep chains with bulky UCANs.
+
+Full technical details in [docs/SWARM_SECURITY.md](docs/SWARM_SECURITY.md).

@@ -235,7 +235,9 @@ describe('decide', () => {
       now: NOW,
     });
     expect(decision.allow).toBe(false);
-    expect(decision.reason).toBe('malformed_ucan');
+    // Sprint MAOS-A — over-attenuated chain now maps to the precise
+    // chain_attenuation_violation reason (was malformed_ucan pre-MAOS).
+    expect(decision.reason).toBe('chain_attenuation_violation');
   });
 
   it('denies when leaf CID is in the revocation list', () => {

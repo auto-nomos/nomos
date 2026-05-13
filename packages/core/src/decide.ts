@@ -1,15 +1,28 @@
 import type { Context } from '@auto-nomos/cedar';
 import { evaluate, type Schema } from '@auto-nomos/cedar';
 import { sha256Hex } from '@auto-nomos/crypto';
-import type { AuthorizeDecision, AuthorizeRequest, DenyReason } from '@auto-nomos/shared-types';
+import type {
+  AttenuationSummary,
+  AuthorizeDecision,
+  AuthorizeRequest,
+  DenyReason,
+} from '@auto-nomos/shared-types';
 import {
   type ChainError,
   canonicalize,
   computeCid,
   constraintMatchesResource,
   extractResourceConstraint,
+  parseUcanJwt,
   validateChain,
 } from '@auto-nomos/ucan';
+
+/**
+ * Sprint MAOS-A — chain depth cap. Hard guard against runaway delegation
+ * (e.g. agent loops re-issuing to itself). Effective length includes the
+ * leaf — so MAX_CHAIN_DEPTH=8 means up to 8 UCANs in a chain.
+ */
+export const DEFAULT_MAX_CHAIN_DEPTH = 8;
 
 export interface DecideInput {
   ucan: string | string[];
@@ -24,6 +37,11 @@ export interface DecideInput {
    */
   trustedIssuerDid?: string;
   now?: number;
+  /**
+   * Sprint MAOS-A — override chain depth cap. Defaults to
+   * `DEFAULT_MAX_CHAIN_DEPTH`. PDP wires this from `NOMOS_MAX_CHAIN_DEPTH`.
+   */
+  maxChainDepth?: number;
 }
 
 const CHAIN_ERROR_TO_REASON: Record<ChainError, DenyReason> = {
@@ -34,10 +52,28 @@ const CHAIN_ERROR_TO_REASON: Record<ChainError, DenyReason> = {
   audience_mismatch: 'audience_mismatch',
   command_mismatch: 'command_mismatch',
   issuer_unsupported: 'malformed_ucan',
-  broken_delegation: 'malformed_ucan',
-  over_attenuated: 'malformed_ucan',
+  broken_delegation: 'chain_invalid',
+  over_attenuated: 'chain_attenuation_violation',
   empty_chain: 'malformed_ucan',
 };
+
+function summarizeAttenuation(jwts: string[]): AttenuationSummary | undefined {
+  if (jwts.length < 2) return undefined;
+  const root = parseUcanJwt(jwts[0] as string);
+  const leaf = parseUcanJwt(jwts[jwts.length - 1] as string);
+  if ('error' in root || 'error' in leaf) return undefined;
+  const lost: string[] = [];
+  const narrowed: string[] = [];
+  if (root.payload.cmd !== leaf.payload.cmd && !leaf.payload.cmd.startsWith(root.payload.cmd)) {
+    lost.push(root.payload.cmd);
+  }
+  const rootCons = extractResourceConstraint(root.payload.meta);
+  const leafCons = extractResourceConstraint(leaf.payload.meta);
+  if (rootCons && leafCons && JSON.stringify(rootCons) !== JSON.stringify(leafCons)) {
+    narrowed.push('resource_constraint');
+  }
+  return { capability_lost: lost, resources_narrowed: narrowed };
+}
 
 function buildReceiptId(jwts: string[], request: AuthorizeRequest): string {
   const leafCid = computeCid(jwts[jwts.length - 1] as string);
@@ -55,6 +91,7 @@ function deny(reason: DenyReason, jwts: string[], request: AuthorizeRequest): Au
 export function decide(input: DecideInput): AuthorizeDecision {
   const jwts = Array.isArray(input.ucan) ? input.ucan : [input.ucan];
   const now = input.now ?? Math.floor(Date.now() / 1000);
+  const maxDepth = input.maxChainDepth ?? DEFAULT_MAX_CHAIN_DEPTH;
 
   if (jwts.length === 0) {
     return {
@@ -64,6 +101,10 @@ export function decide(input: DecideInput): AuthorizeDecision {
         `empty|${canonicalize(input.request as unknown as Record<string, unknown>)}`,
       ),
     };
+  }
+
+  if (jwts.length > maxDepth) {
+    return deny('chain_too_deep', jwts, input.request);
   }
 
   const chainResult = validateChain(jwts, {
@@ -89,11 +130,24 @@ export function decide(input: DecideInput): AuthorizeDecision {
   }
 
   const leaf = chainResult.leaf;
+  const root = chainResult.root;
+  const chainDepth = jwts.length - 1;
 
   const constraint = extractResourceConstraint(leaf.meta);
   if (constraint && !constraintMatchesResource(constraint, input.request.resource)) {
     return deny('resource_out_of_scope', jwts, input.request);
   }
+
+  // Sprint MAOS-A — chain-derived principal attributes available to Cedar.
+  const ancestors = jwts.slice(0, -1).map((jwt) => {
+    const p = parseUcanJwt(jwt);
+    return 'error' in p ? 'unknown' : p.payload.aud;
+  });
+  const principalAttrs: Record<string, unknown> = {
+    delegationDepth: chainDepth,
+    rootAgent: root.aud,
+    invokedBy: ancestors,
+  };
 
   const mergedContext = mergeContext(
     input.request.context as unknown as Record<string, unknown>,
@@ -110,7 +164,11 @@ export function decide(input: DecideInput): AuthorizeDecision {
     resource: { type: 'Resource', id: '__request__' },
     context: mergedContext as unknown as Context,
     entities: [
-      { uid: { type: 'Agent', id: leaf.aud }, attrs: {}, parents: [] },
+      {
+        uid: { type: 'Agent', id: leaf.aud },
+        attrs: principalAttrs as unknown as Context,
+        parents: [],
+      },
       {
         uid: { type: 'Resource', id: '__request__' },
         attrs: input.request.resource as unknown as Context,
@@ -120,13 +178,23 @@ export function decide(input: DecideInput): AuthorizeDecision {
     ...(input.schema !== undefined ? { schema: input.schema } : {}),
   });
 
+  const attenuation = summarizeAttenuation(jwts);
+  const chainFields =
+    chainDepth > 0
+      ? {
+          chain_depth: chainDepth,
+          ...(attenuation ? { attenuation_summary: attenuation } : {}),
+        }
+      : {};
+
   if (cedarResult.decision === 'deny') {
-    return deny('policy_denied', jwts, input.request);
+    return { ...deny('policy_denied', jwts, input.request), ...chainFields };
   }
 
   return {
     allow: true,
     receiptId: buildReceiptId(jwts, input.request),
+    ...chainFields,
   };
 }
 

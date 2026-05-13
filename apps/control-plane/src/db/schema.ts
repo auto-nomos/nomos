@@ -169,6 +169,31 @@ export const memberships = pgTable(
   }),
 );
 
+/**
+ * Sprint MAOS-A — `swarms` groups agents that participate in delegation chains.
+ * One swarm is rooted at a single agent (`rootAgentId`); children are linked
+ * via `agents.parentAgentId`. `crossCustomerEnabled` is a reserved design
+ * hook for Phase 2 federation; enforcement stays intra-customer at launch.
+ */
+export const swarms = pgTable(
+  'swarms',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    customerId: uuid('customer_id')
+      .notNull()
+      .references(() => customers.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    rootAgentId: uuid('root_agent_id'),
+    maxDepth: integer('max_depth'),
+    crossCustomerEnabled: boolean('cross_customer_enabled').notNull().default(false),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    customerIdx: index('swarms_customer_idx').on(t.customerId),
+    rootAgentIdx: index('swarms_root_agent_idx').on(t.rootAgentId),
+  }),
+);
+
 export const agents = pgTable(
   'agents',
   {
@@ -186,10 +211,22 @@ export const agents = pgTable(
     lastActiveAt: timestamp('last_active_at', { withTimezone: true }),
     connectionApprovedAt: timestamp('connection_approved_at', { withTimezone: true }),
     connectionApprovedBy: uuid('connection_approved_by'),
+    /**
+     * Sprint MAOS-A — chain identity. Nullable for legacy single-agent rows.
+     * `rootAgentId` self-references when this agent is the swarm root.
+     * `depth` is 0 for root; children increment by 1.
+     */
+    parentAgentId: uuid('parent_agent_id'),
+    rootAgentId: uuid('root_agent_id'),
+    depth: integer('depth').notNull().default(0),
+    swarmId: uuid('swarm_id').references(() => swarms.id, { onDelete: 'set null' }),
   },
   (t) => ({
     customerIdx: index('agents_customer_idx').on(t.customerId),
     didIdx: uniqueIndex('agents_did_idx').on(t.did),
+    parentIdx: index('agents_parent_idx').on(t.parentAgentId),
+    rootIdx: index('agents_root_idx').on(t.rootAgentId),
+    swarmIdx: index('agents_swarm_idx').on(t.swarmId),
   }),
 );
 
@@ -303,11 +340,21 @@ export const auditEvents = pgTable(
     prevHash: text('prev_hash').notNull(),
     hash: text('hash').notNull(),
     payload: jsonb('payload').notNull(),
+    /**
+     * Sprint MAOS-A — chain causation. `parentReceiptId` back-links the
+     * authorize-receipt that triggered this call (orthogonal to prevHash,
+     * which links the tamper-evidence chain). Nullable for root receipts.
+     */
+    parentReceiptId: uuid('parent_receipt_id'),
+    swarmId: uuid('swarm_id'),
+    chainDepth: integer('chain_depth'),
   },
   (t) => ({
     customerTsIdx: index('audit_events_customer_ts_idx').on(t.customerId, t.ts),
     prevHashIdx: index('audit_events_prev_hash_idx').on(t.prevHash),
     hashIdx: uniqueIndex('audit_events_hash_idx').on(t.hash),
+    parentReceiptIdx: index('audit_events_parent_receipt_idx').on(t.parentReceiptId),
+    swarmIdx: index('audit_events_swarm_idx').on(t.swarmId),
   }),
 );
 
@@ -653,6 +700,12 @@ export const agentsRelations = relations(agents, ({ one, many }) => ({
   apiKeys: many(apiKeys),
   pushApprovals: many(pushApprovals),
   agentPolicies: many(agentPolicies),
+  swarm: one(swarms, { fields: [agents.swarmId], references: [swarms.id] }),
+}));
+
+export const swarmsRelations = relations(swarms, ({ one, many }) => ({
+  customer: one(customers, { fields: [swarms.customerId], references: [customers.id] }),
+  agents: many(agents),
 }));
 
 export const policiesRelations = relations(policies, ({ one, many }) => ({
@@ -867,3 +920,34 @@ export const usageCountersRelations = relations(usageCounters, ({ one }) => ({
     references: [customers.id],
   }),
 }));
+
+/**
+ * Sprint MAOS-B — swarm-scoped step-up approvals.
+ * `approvedAgentIds` is a *snapshot* of children at approval time. New
+ * agents forked after approval need a fresh approval — never auto-extend.
+ */
+export const agentChainApprovals = pgTable(
+  'agent_chain_approvals',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    customerId: uuid('customer_id')
+      .notNull()
+      .references(() => customers.id, { onDelete: 'cascade' }),
+    rootAgentId: uuid('root_agent_id').notNull(),
+    swarmId: uuid('swarm_id'),
+    scope: jsonb('scope').notNull(),
+    approvedAgentIds: jsonb('approved_agent_ids').$type<string[]>().notNull(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    approverEmail: text('approver_email').notNull(),
+    appliesToCurrentChildrenOnly: boolean('applies_to_current_children_only')
+      .notNull()
+      .default(true),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    customerIdx: index('agent_chain_approvals_customer_idx').on(t.customerId),
+    rootAgentIdx: index('agent_chain_approvals_root_agent_idx').on(t.rootAgentId),
+    swarmIdx: index('agent_chain_approvals_swarm_idx').on(t.swarmId),
+    expiresAtIdx: index('agent_chain_approvals_expires_at_idx').on(t.expiresAt),
+  }),
+);

@@ -26,6 +26,13 @@ export interface EgressObservation {
   headers: Record<string, string>;
   /** Wall-clock timestamp. */
   ts: number;
+  /**
+   * Sprint MAOS-A — W3C `traceparent` value when the agent emitted one.
+   * Lets downstream correlation see "this egress was triggered by trace X
+   * which was authorized by PDP receipt Y". Header itself is never
+   * redacted (no secret), so passes through outbound unchanged.
+   */
+  traceparent?: string;
 }
 
 export type AuditFn = (obs: EgressObservation) => void;
@@ -66,12 +73,14 @@ export function createEgressProxy(opts: EgressProxyOptions): {
 
   const server = createServer((req: IncomingMessage, res: ServerResponse) => {
     const target = req.url ?? '';
+    const traceparent = req.headers.traceparent;
     const obs: EgressObservation = {
       kind: 'http_request',
       target,
       method: req.method,
       headers: sanitize(req.headers),
       ts: Date.now(),
+      ...(typeof traceparent === 'string' ? { traceparent } : {}),
     };
     try {
       opts.audit(obs);
@@ -117,11 +126,13 @@ export function createEgressProxy(opts: EgressProxyOptions): {
 
   server.on('connect', (req: IncomingMessage, clientSocket: Socket, head: Buffer) => {
     const target = req.url ?? '';
+    const traceparent = req.headers.traceparent;
     const obs: EgressObservation = {
       kind: 'connect',
       target,
       headers: sanitize(req.headers),
       ts: Date.now(),
+      ...(typeof traceparent === 'string' ? { traceparent } : {}),
     };
     try {
       opts.audit(obs);
