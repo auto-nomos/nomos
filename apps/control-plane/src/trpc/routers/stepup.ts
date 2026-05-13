@@ -128,17 +128,50 @@ export const stepupRouter = router({
           requestedAt: schema.pushApprovals.requestedAt,
           decidedAt: schema.pushApprovals.decidedAt,
           decidedBy: schema.pushApprovals.decidedBy,
+          decidedByName: schema.user.name,
+          decidedByEmail: schema.user.email,
         })
         .from(schema.pushApprovals)
         .leftJoin(schema.agents, eq(schema.pushApprovals.agentId, schema.agents.id))
+        .leftJoin(schema.user, eq(schema.pushApprovals.decidedBy, schema.user.id))
         .where(and(...filters))
         .orderBy(desc(schema.pushApprovals.requestedAt))
         .limit(limit);
+
+      const approvalIds = rows.map((r) => r.id);
+      const grantRows = approvalIds.length
+        ? await ctx.db.drizzle
+            .select({
+              sourceApprovalId: schema.agentGrants.sourceApprovalId,
+              scope: schema.agentGrants.scope,
+              revokedAt: schema.agentGrants.revokedAt,
+            })
+            .from(schema.agentGrants)
+            .where(
+              and(
+                eq(schema.agentGrants.customerId, ctx.customerId),
+                inArray(schema.agentGrants.sourceApprovalId, approvalIds),
+              ),
+            )
+        : [];
+      const grantByApprovalId = new Map<string, { scope: 'exact' | 'any'; revoked: boolean }>();
+      for (const g of grantRows) {
+        if (!g.sourceApprovalId) continue;
+        grantByApprovalId.set(g.sourceApprovalId, {
+          scope: g.scope as 'exact' | 'any',
+          revoked: g.revokedAt !== null,
+        });
+      }
+
       const out = rows
         .map((r) => {
           const folded =
             r.state === 'pending' && r.expiresAt.getTime() <= now.getTime() ? 'expired' : r.state;
-          return { ...r, state: folded };
+          const grant = grantByApprovalId.get(r.id);
+          const remembered = !!grant;
+          const grantScope = grant?.scope ?? null;
+          const grantRevoked = grant?.revoked ?? false;
+          return { ...r, state: folded, remembered, grantScope, grantRevoked };
         })
         .filter((r) => wants.has(r.state as 'approved' | 'denied' | 'expired'));
       return out;

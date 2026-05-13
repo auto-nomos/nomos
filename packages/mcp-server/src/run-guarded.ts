@@ -18,6 +18,12 @@ export interface ToolResultJson {
  * Mint (or reuse) a UCAN for the command, then call PDP /v1/proxy. The
  * upstream OAuth token never leaves the PDP — agents only ever see the
  * upstream response body the PDP forwards back.
+ *
+ * Step-up wait: when the first proxy call denies with requiresStepUp +
+ * stepUpId, the function blocks on `guard.waitForApproval` (60s by
+ * default). If the user approves in time the proxy is retried with the
+ * cosigner JWT attached so the agent's in-flight call succeeds without
+ * the agent having to retry manually.
  */
 export async function runGuarded(
   guard: AuthGuard,
@@ -30,13 +36,34 @@ export async function runGuarded(
   if (!ucan) {
     return { status: 'failed', error: `no UCAN minted for ${command}` };
   }
-  const result: ProxyResult = await guard.proxy({
+  let result: ProxyResult = await guard.proxy({
     ucan: ucan.jwt,
     command,
     resource,
     context: {},
     apiCall,
   });
+  // Step-up wait: if PDP denied for step-up and surfaced a stepUpId,
+  // block until the user approves (or 60s timeout) then retry with
+  // cosigner JWT so the agent doesn't have to.
+  if (
+    !result.allow &&
+    result.decision.requiresStepUp &&
+    result.decision.stepUpId &&
+    typeof guard.waitForApproval === 'function'
+  ) {
+    const status = await guard.waitForApproval({ stepUpId: result.decision.stepUpId });
+    if (status.state === 'approved' && status.cosignerJwt) {
+      result = await guard.proxy({
+        ucan: ucan.jwt,
+        command,
+        resource,
+        context: {},
+        apiCall,
+        cosignerJwt: status.cosignerJwt,
+      });
+    }
+  }
   if (!result.allow) {
     return {
       status: 'denied',

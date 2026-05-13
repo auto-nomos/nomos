@@ -44,6 +44,44 @@ function decisionBadge(state: string): ReactElement {
   return <Badge variant="outline">{state}</Badge>;
 }
 
+function scopeBadge(r: {
+  state: string;
+  remembered?: boolean;
+  grantScope?: 'exact' | 'any' | null;
+  grantRevoked?: boolean;
+}): ReactElement {
+  if (r.state === 'expired') {
+    return <span className="text-xs text-zinc-500">—</span>;
+  }
+  if (!r.remembered) {
+    return (
+      <Badge variant="outline" title="One-time decision; no standing grant written.">
+        once
+      </Badge>
+    );
+  }
+  const scopeText = r.grantScope === 'any' ? 'forever · any resource' : 'forever · this resource';
+  if (r.grantRevoked) {
+    return (
+      <Badge
+        variant="outline"
+        className="text-zinc-500"
+        title="Standing grant was written but has since been revoked."
+      >
+        {scopeText} (revoked)
+      </Badge>
+    );
+  }
+  return (
+    <Badge
+      className="bg-blue-500/15 text-blue-700 dark:text-blue-300"
+      title="Standing grant active; identical future requests auto-resolve."
+    >
+      {scopeText}
+    </Badge>
+  );
+}
+
 export default function ApprovalsPage() {
   const [tab, setTab] = useState<Tab>('pending');
   const [agentId, setAgentId] = useState<string>('all');
@@ -148,6 +186,8 @@ export default function ApprovalsPage() {
                   <TableHead>Command</TableHead>
                   <TableHead>Resource</TableHead>
                   {tab !== 'pending' ? <TableHead>State</TableHead> : null}
+                  {tab !== 'pending' ? <TableHead>Scope</TableHead> : null}
+                  {tab !== 'pending' ? <TableHead>Decided by</TableHead> : null}
                   <TableHead>{tab === 'pending' ? 'Requested' : 'Decided'}</TableHead>
                   <TableHead>{tab === 'pending' ? 'Expires' : 'Requested'}</TableHead>
                   <TableHead className="text-right">Action</TableHead>
@@ -162,26 +202,40 @@ export default function ApprovalsPage() {
                     isHistory && 'decidedAt' in r && r.decidedAt
                       ? new Date(r.decidedAt as string | Date).toLocaleString()
                       : '—';
+                  const hist = r as unknown as {
+                    state: string;
+                    remembered?: boolean;
+                    grantScope?: 'exact' | 'any' | null;
+                    grantRevoked?: boolean;
+                    decidedByName?: string | null;
+                    decidedByEmail?: string | null;
+                  };
                   return (
                     <TableRow key={r.id}>
                       <TableCell className="font-medium">{r.agentName ?? r.agentId}</TableCell>
                       <TableCell className="font-mono text-xs">{r.command}</TableCell>
                       <TableCell className="font-mono text-xs">{resourceStr}</TableCell>
+                      {isHistory ? <TableCell>{decisionBadge(hist.state)}</TableCell> : null}
+                      {isHistory ? <TableCell>{scopeBadge(hist)}</TableCell> : null}
                       {isHistory ? (
-                        <TableCell>
-                          {decisionBadge((r as unknown as { state: string }).state)}
+                        <TableCell className="text-xs">
+                          {hist.decidedByName || hist.decidedByEmail ? (
+                            <span title={hist.decidedByEmail ?? ''}>
+                              {hist.decidedByName ?? hist.decidedByEmail}
+                            </span>
+                          ) : (
+                            <span className="text-zinc-500">—</span>
+                          )}
                         </TableCell>
                       ) : null}
                       <TableCell className="text-xs text-zinc-500">
-                        {isHistory ? decidedAt : new Date(r.requestedAt).toLocaleTimeString()}
+                        {isHistory ? decidedAt : new Date(r.requestedAt).toLocaleString()}
                       </TableCell>
                       <TableCell className="text-xs text-zinc-500">
                         {isHistory ? (
                           requestedAt
                         ) : (
-                          <Badge variant="outline">
-                            {new Date(r.expiresAt).toLocaleTimeString()}
-                          </Badge>
+                          <Badge variant="outline">{new Date(r.expiresAt).toLocaleString()}</Badge>
                         )}
                       </TableCell>
                       <TableCell className="text-right">

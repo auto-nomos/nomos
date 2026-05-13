@@ -167,8 +167,12 @@ export function ApproveClient({ approvalId }: ApproveClientProps) {
           <dd className="font-medium">{a.state}</dd>
         </div>
         <div className="flex justify-between">
+          <dt className="text-zinc-500">Requested</dt>
+          <dd>{new Date(a.requestedAt).toLocaleString()}</dd>
+        </div>
+        <div className="flex justify-between">
           <dt className="text-zinc-500">Expires</dt>
-          <dd>{new Date(a.expiresAt).toLocaleTimeString()}</dd>
+          <dd>{new Date(a.expiresAt).toLocaleString()}</dd>
         </div>
         {a.riskScore && (
           <div className="flex justify-between">
