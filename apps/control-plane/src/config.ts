@@ -51,7 +51,14 @@ const Config = z.object({
   // /approve/:id page lives.
   KNOCK_API_KEY: z.string().optional(),
   KNOCK_WORKFLOW_ID: z.string().default('step-up-request'),
-  STEPUP_DEFAULT_TTL_MS: z.coerce.number().int().positive().default(60_000),
+  // 7-day default so users can revisit Telegram / dashboard within a week
+  // even if the agent's in-flight call already timed out. The SDK still
+  // polls 60s and gives up — but the approval row stays actionable.
+  STEPUP_DEFAULT_TTL_MS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(7 * 24 * 60 * 60 * 1_000),
   DASHBOARD_PUBLIC_URL: z.string().url().default('http://localhost:3000'),
 
   // P1 — M6 Telegram approval bot. Empty token = bot disabled (Knock /
