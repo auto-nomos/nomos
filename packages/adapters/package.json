@@ -1,6 +1,6 @@
 {
   "name": "@auto-nomos/adapters",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "private": false,
   "description": "YAML-driven adapter framework for SaaS integrations. Spec defines actions/scopes/risk/transforms/sanitize; TS executor calls existing Connector.callApi.",
   "license": "MIT",
