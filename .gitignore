@@ -43,3 +43,8 @@ tmp/
 temp/
 audit.log
 .cb-setup-done
+
+# Local tooling artifacts
+.claude/
+graphify-out/
+dep-temp.md
