@@ -36,7 +36,7 @@ describe.skipIf(!RUN)('db migration smoke (requires postgres)', () => {
     await db.pool.end();
   });
 
-  it('all 24 tables exist (20 application + 4 Better-Auth)', async () => {
+  it('all 25 tables exist (21 application + 4 Better-Auth)', async () => {
     const result = await db.pool.query<{ table_name: string }>(
       `SELECT table_name FROM information_schema.tables
        WHERE table_schema = 'public' AND table_type = 'BASE TABLE'
@@ -46,6 +46,7 @@ describe.skipIf(!RUN)('db migration smoke (requires postgres)', () => {
     expect(tables).toEqual([
       'account',
       'agent_grants',
+      'agent_policies',
       'agents',
       'api_keys',
       'audit_events',
@@ -65,6 +66,7 @@ describe.skipIf(!RUN)('db migration smoke (requires postgres)', () => {
       'session',
       'telegram_link_tokens',
       'ucan_issues',
+      'usage_counters',
       'user',
       'verification',
       'webauthn_credentials',

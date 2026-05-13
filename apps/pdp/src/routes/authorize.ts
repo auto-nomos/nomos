@@ -155,6 +155,56 @@ export function createAuthorizeRoutes(deps: AuthorizeRouteDeps): Hono {
       return c.json({ error: 'unknown customer or policy bundle not yet loaded' }, 404);
     }
 
+    const agentDid = extractAgentDid(request.ucan);
+    const agentMeta = deps.policyCache.getAgentByDid(customerId, agentDid);
+    // Static apps must be approved by the operator at the dashboard before the
+    // PDP authorises any call. Dynamic apps bypass this gate — their unmapped
+    // commands still deny via empty policy coverage and route through step-up.
+    if (agentMeta && agentMeta.mode === 'static' && agentMeta.connectionApprovedAt === null) {
+      const denyDecision: AuthorizeDecision = {
+        allow: false,
+        reason: 'agent_not_connected',
+        receiptId: sha256Hex(`agent-not-connected|${agentMeta.agentId}|${request.command}`),
+      };
+      recordAuthorize(decisionToAudit(denyDecision), denyDecision.reason);
+      if (deps.emitAudit) {
+        await deps.emitAudit({
+          customerId,
+          request,
+          decision: { ...denyDecision },
+          ts: Date.now(),
+          agentDid,
+        });
+      }
+      log.info(
+        { customerId, command: request.command, agentId: agentMeta.agentId, reason: denyDecision.reason },
+        'authorize deny agent_not_connected',
+      );
+      return c.json(denyDecision, 200);
+    }
+    if (agentMeta && agentMeta.status !== 'active') {
+      const denyDecision: AuthorizeDecision = {
+        allow: false,
+        reason: 'agent_disabled',
+        receiptId: sha256Hex(`agent-disabled|${agentMeta.agentId}|${request.command}`),
+      };
+      recordAuthorize(decisionToAudit(denyDecision), denyDecision.reason);
+      if (deps.emitAudit) {
+        await deps.emitAudit({
+          customerId,
+          request,
+          decision: { ...denyDecision },
+          ts: Date.now(),
+          agentDid,
+        });
+      }
+      log.info(
+        { customerId, command: request.command, agentId: agentMeta.agentId },
+        'authorize deny agent_disabled',
+      );
+      return c.json(denyDecision, 200);
+    }
+
     const revokedCids = deps.revocationCache.getRevoked(customerId);
     const schema = deps.schemaForCustomer?.(customerId);
 

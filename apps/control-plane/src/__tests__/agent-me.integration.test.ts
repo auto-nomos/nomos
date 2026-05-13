@@ -98,13 +98,24 @@ describe.skipIf(!RUN)('GET /v1/agent/me/tools (requires postgres)', () => {
   });
 
   it('returns distinct integrations from policies', async () => {
-    const { apiKey, customerId } = await bootstrap();
+    const { apiKey, customerId, agentId } = await bootstrap();
     // Two policies on the same integration → still one integration in output.
-    await db.drizzle.insert(schema.policies).values([
-      { customerId, integrationId: 'github', name: 'p1', cedarText: 'permit(...)' },
-      { customerId, integrationId: 'github', name: 'p2', cedarText: 'permit(...)' },
-      { customerId, integrationId: 'slack', name: 'p3', cedarText: 'permit(...)' },
-    ]);
+    const inserted = await db.drizzle
+      .insert(schema.policies)
+      .values([
+        { customerId, integrationId: 'github', name: 'p1', cedarText: 'permit(...)' },
+        { customerId, integrationId: 'github', name: 'p2', cedarText: 'permit(...)' },
+        { customerId, integrationId: 'slack', name: 'p3', cedarText: 'permit(...)' },
+      ])
+      .returning({ id: schema.policies.id });
+    await db.drizzle.insert(schema.agentPolicies).values(
+      inserted.map((p) => ({
+        customerId,
+        agentId,
+        policyId: p.id,
+        source: 'manual' as const,
+      })),
+    );
     const res = await app.request('/v1/agent/me/tools', {
       headers: { authorization: `Bearer ${apiKey}` },
     });
@@ -120,17 +131,26 @@ describe.skipIf(!RUN)('GET /v1/agent/me/tools (requires postgres)', () => {
   });
 
   it('strips integrations not present in schema-packs', async () => {
-    const { apiKey, customerId } = await bootstrap();
+    const { apiKey, customerId, agentId } = await bootstrap();
     // schemas table has a row for an integration that's no longer in PACKS
     // (e.g. a removed pack); the route should drop it even if FK lets it in.
     await db.pool.query(
       "INSERT INTO schemas (id, version, definition, schema_hash) VALUES ('removed-pack-xyz', 'v1', '{}', '') ON CONFLICT DO NOTHING",
     );
-    await db.drizzle.insert(schema.policies).values({
+    const [rogue] = await db.drizzle
+      .insert(schema.policies)
+      .values({
+        customerId,
+        integrationId: 'removed-pack-xyz',
+        name: 'rogue',
+        cedarText: 'permit(...)',
+      })
+      .returning({ id: schema.policies.id });
+    await db.drizzle.insert(schema.agentPolicies).values({
       customerId,
-      integrationId: 'removed-pack-xyz',
-      name: 'rogue',
-      cedarText: 'permit(...)',
+      agentId,
+      policyId: rogue!.id,
+      source: 'manual',
     });
     const res = await app.request('/v1/agent/me/tools', {
       headers: { authorization: `Bearer ${apiKey}` },

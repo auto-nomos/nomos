@@ -27,6 +27,14 @@ import {
 } from '../../services/stepup/webauthn.js';
 import { router, tenantProcedure } from '../index.js';
 
+function deriveIntegrationIdFromCommand(command: string): string | null {
+  // Commands look like `/github/issues/comment` — first segment is the
+  // integration. Returns null when shape doesn't match (e.g. legacy or
+  // multi-integration commands) so policies fall back to general scope.
+  const match = command.match(/^\/([a-z0-9_-]+)\//);
+  return match?.[1] ?? null;
+}
+
 async function loadApprovalForCustomer(
   ctx: { db: { drizzle: typeof schema extends never ? never : ReturnType<() => unknown> } },
   customerId: string,
@@ -285,6 +293,12 @@ export const stepupRouter = router({
          *  When set, that variant's Cedar text persists verbatim into
          *  the grant. Defaults to the approval row's recommended_scope. */
         selectedVariant: z.enum(['narrow', 'medium', 'broad']).optional(),
+        /** When true, promote the selected Cedar variant to a real policy
+         *  in the org-level `policies` table and auto-map it to the
+         *  requesting App via `agent_policies`. The operator can later
+         *  map the same policy to other Apps from the dashboard.
+         *  Stronger than `remember`; both may be set. */
+        persistAsPolicy: z.boolean().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -317,7 +331,8 @@ export const stepupRouter = router({
             signerDid: ctx.signing.signerDid,
           },
         );
-        if (input.remember) {
+        let persistedPolicyId: string | undefined;
+        if (input.remember || input.persistAsPolicy) {
           const [approval] = await ctx.db.drizzle
             .select({
               agentId: schema.pushApprovals.agentId,
@@ -342,19 +357,53 @@ export const stepupRouter = router({
               variantPick && variants && typeof variants[variantPick] === 'string'
                 ? variants[variantPick]
                 : undefined;
-            await upsertGrant(ctx.db.drizzle, {
-              customerId: ctx.customerId,
-              agentId: approval.agentId,
-              agentName: approval.agentName,
-              command: approval.command,
-              resource: approval.resource as Record<string, unknown>,
-              scope: input.scope ?? 'exact',
-              decision: 'allow',
-              grantedBy: ctx.session.user.id,
-              sourceApprovalId: input.approvalId,
-              riskSummary: approval.riskSummary,
-              ...(chosenSnippet ? { cedarSnippet: chosenSnippet } : {}),
-            });
+            if (input.persistAsPolicy && chosenSnippet) {
+              persistedPolicyId = await ctx.db.drizzle.transaction(async (tx) => {
+                const policyName = `Step-up: ${approval.command} (${variantPick ?? 'custom'})`;
+                const integrationId = deriveIntegrationIdFromCommand(approval.command);
+                const [policyRow] = await tx
+                  .insert(schema.policies)
+                  .values({
+                    customerId: ctx.customerId,
+                    name: policyName,
+                    cedarText: chosenSnippet,
+                    ...(integrationId ? { integrationId } : {}),
+                  })
+                  .returning({ id: schema.policies.id });
+                if (!policyRow) {
+                  throw new TRPCError({
+                    code: 'INTERNAL_SERVER_ERROR',
+                    message: 'policy insert failed',
+                  });
+                }
+                await tx
+                  .insert(schema.agentPolicies)
+                  .values({
+                    customerId: ctx.customerId,
+                    agentId: approval.agentId,
+                    policyId: policyRow.id,
+                    source: 'step_up',
+                    createdBy: ctx.session.user.id,
+                  })
+                  .onConflictDoNothing();
+                return policyRow.id;
+              });
+            }
+            if (input.remember) {
+              await upsertGrant(ctx.db.drizzle, {
+                customerId: ctx.customerId,
+                agentId: approval.agentId,
+                agentName: approval.agentName,
+                command: approval.command,
+                resource: approval.resource as Record<string, unknown>,
+                scope: input.scope ?? 'exact',
+                decision: 'allow',
+                grantedBy: ctx.session.user.id,
+                sourceApprovalId: input.approvalId,
+                riskSummary: approval.riskSummary,
+                ...(chosenSnippet ? { cedarSnippet: chosenSnippet } : {}),
+              });
+            }
             ctx.policyInvalidator.invalidate(ctx.customerId);
           }
         }
@@ -363,6 +412,7 @@ export const stepupRouter = router({
           cosignerJwt: cosigner.cosignerJwt,
           expiresAt: cosigner.expiresAt.toISOString(),
           ...(input.remember ? { remembered: true } : {}),
+          ...(persistedPolicyId ? { persistedPolicyId } : {}),
         };
       } catch (err) {
         if (err instanceof CosignerError) {

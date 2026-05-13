@@ -8,6 +8,7 @@
 import { verifyDetached } from '@auto-nomos/crypto';
 import { base64urlToBytes, canonicalize } from '@auto-nomos/ucan';
 import { hexToBytes } from '@noble/hashes/utils';
+import type { AgentMeta, BundleEntry } from '../cache/policies.js';
 import type { Logger } from '../logger.js';
 
 interface BundlePolicy {
@@ -18,12 +19,21 @@ interface BundlePolicy {
   version: number;
 }
 
+interface BundleAgentDto {
+  agentId: string;
+  did: string;
+  mode: 'static' | 'dynamic';
+  status: 'active' | 'disabled' | 'deleted';
+  connectionApprovedAt: string | null;
+}
+
 interface SignedBundleResponse {
   bundle: {
     customer_id: string;
     version: number;
     generated_at: string;
     policies: BundlePolicy[];
+    agents?: BundleAgentDto[];
     schema_hash: string;
   };
   signature: string;
@@ -78,7 +88,7 @@ export interface ControlPlaneClient {
   /** Discover all customers the control plane knows about. PDP polls this
    *  on a slow interval so a new tenant doesn't need a PDP restart. */
   fetchCustomerIds(): Promise<string[]>;
-  fetchBundle(customerId: string): Promise<string | undefined>;
+  fetchBundle(customerId: string): Promise<BundleEntry | undefined>;
   fetchRevocations(customerId: string): Promise<string[] | undefined>;
   fetchOAuthToken(customerId: string, connectionId: string): Promise<OAuthTokenResponse>;
   /**
@@ -124,7 +134,7 @@ export function createControlPlaneClient(opts: ControlPlaneClientOptions): Contr
     );
   }
 
-  async function fetchBundle(customerId: string): Promise<string | undefined> {
+  async function fetchBundle(customerId: string): Promise<BundleEntry | undefined> {
     const res = await fetchImpl(`${opts.baseUrl}/v1/internal/bundles/${customerId}`, {
       headers: { authorization: `Bearer ${opts.serviceToken}` },
     });
@@ -154,7 +164,15 @@ export function createControlPlaneClient(opts: ControlPlaneClientOptions): Contr
     }
 
     // Cedar parses multiple policies separated by `;` newlines. Concatenate.
-    return body.bundle.policies.map((p) => p.cedarText).join('\n\n');
+    const cedar = body.bundle.policies.map((p) => p.cedarText).join('\n\n');
+    const agents: AgentMeta[] = (body.bundle.agents ?? []).map((a) => ({
+      agentId: a.agentId,
+      did: a.did,
+      mode: a.mode,
+      status: a.status,
+      connectionApprovedAt: a.connectionApprovedAt,
+    }));
+    return { cedar, agents };
   }
 
   async function fetchRevocations(customerId: string): Promise<string[] | undefined> {

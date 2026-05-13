@@ -41,6 +41,8 @@ export const DenyReason = z.enum([
   'cosigner_expired',
   'resource_out_of_scope',
   'schema_violation',
+  'agent_not_connected',
+  'agent_disabled',
 ]);
 
 export const AuthorizeDecision = z.object({

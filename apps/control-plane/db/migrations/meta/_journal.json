@@ -120,6 +120,13 @@
       "when": 1779100000000,
       "tag": "0016_usage_counters",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1779200000000,
+      "tag": "0017_agent_policies",
+      "breakpoints": true
     }
   ]
 }

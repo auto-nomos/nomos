@@ -12,7 +12,7 @@
  */
 import type { IntegrationId } from '@auto-nomos/schema-packs';
 import { actionsFor, KNOWN_INTEGRATIONS } from '@auto-nomos/schema-packs';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { Hono } from 'hono';
 import type { Db } from '../db/index.js';
 import * as schema from '../db/schema.js';
@@ -35,8 +35,14 @@ export function createAgentMeRoutes(
 
     const rows = await deps.db.drizzle
       .select({ integrationId: schema.policies.integrationId })
-      .from(schema.policies)
-      .where(eq(schema.policies.customerId, customerId));
+      .from(schema.agentPolicies)
+      .innerJoin(schema.policies, eq(schema.agentPolicies.policyId, schema.policies.id))
+      .where(
+        and(
+          eq(schema.agentPolicies.agentId, agentId),
+          eq(schema.agentPolicies.customerId, customerId),
+        ),
+      );
 
     const integrations = Array.from(
       new Set(

@@ -1,6 +1,6 @@
 import { generateKeypair } from '@auto-nomos/crypto';
 import { TRPCError } from '@trpc/server';
-import { and, desc, eq, isNull } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull } from 'drizzle-orm';
 import { z } from 'zod';
 import * as schema from '../../db/schema.js';
 import { router, tenantProcedure } from '../index.js';
@@ -192,4 +192,104 @@ export const agentsRouter = router({
 
       return { id: updated.id, deleted: true, revokedUcans: cids.length };
     }),
+
+  listPolicies: tenantProcedure
+    .input(z.object({ agentId: z.string().uuid() }))
+    .query(async ({ ctx, input }) => {
+      await assertAgentInCustomer(ctx, input.agentId);
+      const rows = await ctx.db.drizzle
+        .select({
+          mappingId: schema.agentPolicies.id,
+          policyId: schema.policies.id,
+          name: schema.policies.name,
+          integrationId: schema.policies.integrationId,
+          source: schema.agentPolicies.source,
+          createdAt: schema.agentPolicies.createdAt,
+        })
+        .from(schema.agentPolicies)
+        .innerJoin(schema.policies, eq(schema.agentPolicies.policyId, schema.policies.id))
+        .where(
+          and(
+            eq(schema.agentPolicies.agentId, input.agentId),
+            eq(schema.agentPolicies.customerId, ctx.customerId),
+          ),
+        )
+        .orderBy(desc(schema.agentPolicies.createdAt));
+      return rows;
+    }),
+
+  assignPolicies: tenantProcedure
+    .input(
+      z.object({
+        agentId: z.string().uuid(),
+        policyIds: z.array(z.string().uuid()).min(1),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      await assertAgentInCustomer(ctx, input.agentId);
+      await assertPoliciesInCustomer(ctx, input.policyIds);
+      await ctx.db.drizzle
+        .insert(schema.agentPolicies)
+        .values(
+          input.policyIds.map((policyId) => ({
+            customerId: ctx.customerId,
+            agentId: input.agentId,
+            policyId,
+            source: 'manual' as const,
+            createdBy: ctx.session.user.id,
+          })),
+        )
+        .onConflictDoNothing();
+      ctx.policyInvalidator.invalidate(ctx.customerId);
+      return { assigned: input.policyIds.length };
+    }),
+
+  unassignPolicy: tenantProcedure
+    .input(z.object({ agentId: z.string().uuid(), policyId: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAgentInCustomer(ctx, input.agentId);
+      const [removed] = await ctx.db.drizzle
+        .delete(schema.agentPolicies)
+        .where(
+          and(
+            eq(schema.agentPolicies.agentId, input.agentId),
+            eq(schema.agentPolicies.policyId, input.policyId),
+            eq(schema.agentPolicies.customerId, ctx.customerId),
+          ),
+        )
+        .returning({ id: schema.agentPolicies.id });
+      if (!removed) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'mapping not found' });
+      }
+      ctx.policyInvalidator.invalidate(ctx.customerId);
+      return { removed: true };
+    }),
 });
+
+async function assertAgentInCustomer(
+  ctx: { db: { drizzle: import('../../db/index.js').DrizzleClient }; customerId: string },
+  agentId: string,
+): Promise<void> {
+  const agent = await ctx.db.drizzle.query.agents.findFirst({
+    where: and(eq(schema.agents.id, agentId), eq(schema.agents.customerId, ctx.customerId)),
+    columns: { id: true },
+  });
+  if (!agent) {
+    throw new TRPCError({ code: 'NOT_FOUND', message: 'agent not found' });
+  }
+}
+
+async function assertPoliciesInCustomer(
+  ctx: { db: { drizzle: import('../../db/index.js').DrizzleClient }; customerId: string },
+  policyIds: string[],
+): Promise<void> {
+  const found = await ctx.db.drizzle
+    .select({ id: schema.policies.id })
+    .from(schema.policies)
+    .where(
+      and(eq(schema.policies.customerId, ctx.customerId), inArray(schema.policies.id, policyIds)),
+    );
+  if (found.length !== policyIds.length) {
+    throw new TRPCError({ code: 'NOT_FOUND', message: 'one or more policies not found' });
+  }
+}

@@ -124,13 +124,27 @@ describe.skipIf(!RUN)('signed bundle + revocations (requires postgres)', () => {
   });
 
   it('returns a valid signed bundle reflecting committed policies', async () => {
-    await client(cookie).policies.upsert.mutate({
+    const [agent] = await db.drizzle
+      .insert(schema.agents)
+      .values({
+        customerId,
+        name: 'bundle-agent',
+        did: `did:key:bundle-${Date.now()}-${Math.random()}`,
+        connectionApprovedAt: new Date(),
+        connectionApprovedBy: userId,
+      })
+      .returning();
+    const p1 = await client(cookie).policies.upsert.mutate({
       name: 'p1',
       cedarText: 'permit(principal, action == Action::"/x/y", resource);',
     });
-    await client(cookie).policies.upsert.mutate({
+    const p2 = await client(cookie).policies.upsert.mutate({
       name: 'p2',
       cedarText: 'forbid(principal, action == Action::"/danger/*", resource);',
+    });
+    await client(cookie).agents.assignPolicies.mutate({
+      agentId: agent!.id,
+      policyIds: [p1.id, p2.id],
     });
 
     const res = await app.request(`/v1/internal/bundles/${customerId}`, {

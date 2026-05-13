@@ -49,8 +49,9 @@ describe('control-plane client', () => {
       logger,
       fetchImpl,
     });
-    const text = await client.fetchBundle(customerId);
-    expect(text).toContain('permit');
+    const entry = await client.fetchBundle(customerId);
+    expect(entry?.cedar).toContain('permit');
+    expect(entry?.agents).toEqual([]);
     expect(fetchImpl).toHaveBeenCalledWith(
       `http://cp/v1/internal/bundles/${customerId}`,
       expect.objectContaining({ headers: { authorization: 'Bearer t' } }),
@@ -123,8 +124,8 @@ describe('control-plane client', () => {
       fetchImpl,
       // no bundleVerifyKey
     });
-    const text = await client.fetchBundle(customerId);
-    expect(text).toContain('permit');
+    const entry = await client.fetchBundle(customerId);
+    expect(entry?.cedar).toContain('permit');
   });
 
   it('fetchRevocations returns the revoked array', async () => {

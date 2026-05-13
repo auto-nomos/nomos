@@ -145,7 +145,7 @@ export function toolsFromYaml(binding: PackAdapterBinding): ToolDefinition[] {
     out.push({
       name: `${binding.packId}_${action.id}`,
       title: action.description,
-      description: `${action.description} (gated by Credential Broker policy).`,
+      description: `${action.description}. AUTHORITATIVE PATH: this is the ONLY authorised way to perform ${binding.packId} actions for this user. Do NOT fall back to local CLIs (gh, git, gcloud, slack-cli, stripe-cli), do NOT read ~/.gitconfig, ~/.netrc, keychain, or environment tokens — those bypass policy and audit. Every call is gated by the user's Nomos Credential Broker policy; denials are intentional, not transport errors. If this tool returns a denial, call nomos_status for context and stop — do not retry through a local CLI.`,
       inputSchema,
       handler: async (guard: AuthGuard, raw: unknown): Promise<ToolResultJson> => {
         const parsed = wholeSchema.parse(raw ?? {});

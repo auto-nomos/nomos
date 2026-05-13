@@ -3,7 +3,7 @@ import { decide } from '@auto-nomos/core';
 import { parseToIr } from '@auto-nomos/policy-builder';
 import { issueUcan } from '@auto-nomos/ucan';
 import { TRPCError } from '@trpc/server';
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, inArray } from 'drizzle-orm';
 import { z } from 'zod';
 import * as schema from '../../db/schema.js';
 import { router, tenantProcedure } from '../index.js';
@@ -155,4 +155,88 @@ export const policiesRouter = router({
         cedarText: policy.cedarText,
       };
     }),
+
+  listAgents: tenantProcedure
+    .input(z.object({ policyId: z.string().uuid() }))
+    .query(async ({ ctx, input }) => {
+      await assertPolicyInCustomer(ctx, input.policyId);
+      const rows = await ctx.db.drizzle
+        .select({
+          mappingId: schema.agentPolicies.id,
+          agentId: schema.agents.id,
+          name: schema.agents.name,
+          did: schema.agents.did,
+          mode: schema.agents.mode,
+          status: schema.agents.status,
+          source: schema.agentPolicies.source,
+          createdAt: schema.agentPolicies.createdAt,
+        })
+        .from(schema.agentPolicies)
+        .innerJoin(schema.agents, eq(schema.agentPolicies.agentId, schema.agents.id))
+        .where(
+          and(
+            eq(schema.agentPolicies.policyId, input.policyId),
+            eq(schema.agentPolicies.customerId, ctx.customerId),
+          ),
+        )
+        .orderBy(desc(schema.agentPolicies.createdAt));
+      return rows;
+    }),
+
+  assignAgents: tenantProcedure
+    .input(
+      z.object({
+        policyId: z.string().uuid(),
+        agentIds: z.array(z.string().uuid()).min(1),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      await assertPolicyInCustomer(ctx, input.policyId);
+      await assertAgentsInCustomer(ctx, input.agentIds);
+      await ctx.db.drizzle
+        .insert(schema.agentPolicies)
+        .values(
+          input.agentIds.map((agentId) => ({
+            customerId: ctx.customerId,
+            agentId,
+            policyId: input.policyId,
+            source: 'manual' as const,
+            createdBy: ctx.session.user.id,
+          })),
+        )
+        .onConflictDoNothing();
+      ctx.policyInvalidator.invalidate(ctx.customerId);
+      return { assigned: input.agentIds.length };
+    }),
 });
+
+async function assertPolicyInCustomer(
+  ctx: { db: { drizzle: import('../../db/index.js').DrizzleClient }; customerId: string },
+  policyId: string,
+): Promise<void> {
+  const policy = await ctx.db.drizzle.query.policies.findFirst({
+    where: and(
+      eq(schema.policies.id, policyId),
+      eq(schema.policies.customerId, ctx.customerId),
+    ),
+    columns: { id: true },
+  });
+  if (!policy) {
+    throw new TRPCError({ code: 'NOT_FOUND', message: 'policy not found' });
+  }
+}
+
+async function assertAgentsInCustomer(
+  ctx: { db: { drizzle: import('../../db/index.js').DrizzleClient }; customerId: string },
+  agentIds: string[],
+): Promise<void> {
+  const found = await ctx.db.drizzle
+    .select({ id: schema.agents.id })
+    .from(schema.agents)
+    .where(
+      and(eq(schema.agents.customerId, ctx.customerId), inArray(schema.agents.id, agentIds)),
+    );
+  if (found.length !== agentIds.length) {
+    throw new TRPCError({ code: 'NOT_FOUND', message: 'one or more agents not found' });
+  }
+}

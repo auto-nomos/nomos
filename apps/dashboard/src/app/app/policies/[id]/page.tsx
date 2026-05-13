@@ -3,6 +3,7 @@
 import { CheckCircle2, XCircle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { use, useEffect, useState } from 'react';
+import { PolicyAgentsCard } from '../../../../components/policy-agents-card';
 import { PolicyEditor } from '../../../../components/policy-editor';
 import { PolicyTestPanel } from '../../../../components/policy-test-panel';
 import { Button } from '../../../../components/ui/button';
@@ -177,6 +178,8 @@ export default function PolicyDetailPage({ params }: { params: Promise<{ id: str
           <PolicyTestPanel policyId={id} integrationId={policy.data.integrationId ?? null} />
         </TabsContent>
       </Tabs>
+
+      <PolicyAgentsCard policyId={id} />
     </div>
   );
 }

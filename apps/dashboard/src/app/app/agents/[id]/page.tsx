@@ -4,6 +4,7 @@ import { Copy, KeyRound, ShieldCheck, Trash2 } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { use, useEffect, useState } from 'react';
 import { AgentAuditPanel } from '../../../../components/agent-audit-panel';
+import { AgentPoliciesCard } from '../../../../components/agent-policies-card';
 import { Badge } from '../../../../components/ui/badge';
 import { Button } from '../../../../components/ui/button';
 import {
@@ -253,6 +254,8 @@ export default function AgentDetailPage({ params }: { params: Promise<{ id: stri
           </CardFooter>
         </Card>
       </div>
+
+      <AgentPoliciesCard agentId={id} />
 
       <Card>
         <CardHeader>

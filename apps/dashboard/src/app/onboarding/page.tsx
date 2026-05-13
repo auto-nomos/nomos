@@ -144,6 +144,7 @@ export default function OnboardingPage() {
         ) : null}
         {state.step === 3 ? (
           <PolicyStep
+            agentId={state.agentId}
             onBack={() => update({ step: 2 })}
             onNext={(policyId) => update({ step: 4, policyId })}
           />
@@ -412,9 +413,11 @@ function AgentStep({ onNext }: { onNext: (agent: CreatedAgent) => void }) {
 }
 
 function PolicyStep({
+  agentId,
   onBack,
   onNext,
 }: {
+  agentId: string | null;
   onBack: () => void;
   onNext: (policyId: string) => void;
 }) {
@@ -425,9 +428,21 @@ function PolicyStep({
     `permit (\n  principal,\n  action == Action::"/github/issue/create",\n  resource\n);`;
   const [name, setName] = useState(seedTemplate?.name ?? 'github-starter');
   const [text, setText] = useState(seedText);
+  const [bindToApp, setBindToApp] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const assign = trpc.agents.assignPolicies.useMutation();
   const upsert = trpc.policies.upsert.useMutation({
-    onSuccess: (p) => onNext(p.id),
+    onSuccess: async (p) => {
+      if (bindToApp && agentId) {
+        try {
+          await assign.mutateAsync({ agentId, policyIds: [p.id] });
+        } catch (err) {
+          setError(`policy saved but mapping failed: ${(err as Error).message}`);
+          return;
+        }
+      }
+      onNext(p.id);
+    },
     onError: (err) => setError(err.message),
   });
 
@@ -491,6 +506,23 @@ function PolicyStep({
             className="mt-2 block w-full rounded-sm border border-aegis-line bg-aegis-ink px-4 py-3 font-mono text-xs text-aegis-paper focus:border-aegis-signal focus:outline-none focus:ring-1 focus:ring-aegis-signal/40"
           />
         </div>
+        <label className="flex items-start gap-3 rounded-sm border border-aegis-line bg-aegis-ink/40 px-4 py-3">
+          <input
+            type="checkbox"
+            checked={bindToApp}
+            onChange={(e) => setBindToApp(e.target.checked)}
+            className="mt-0.5"
+          />
+          <span className="text-xs leading-relaxed text-aegis-mute">
+            <span className="font-mono uppercase tracking-[0.16em] text-aegis-paper">
+              Map to this App
+            </span>
+            <br />
+            Apps default-deny every command until a policy is mapped. Leave checked so this App can
+            use the policy you just authored. You can map it to other Apps later from the
+            policy&apos;s detail page.
+          </span>
+        </label>
       </div>
       {error ? (
         <div

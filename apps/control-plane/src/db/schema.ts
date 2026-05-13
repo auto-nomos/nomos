@@ -62,6 +62,7 @@ export const pushApprovalStateEnum = pgEnum('push_approval_state', [
 export const grantDecisionEnum = pgEnum('grant_decision', ['allow', 'deny']);
 export const grantScopeEnum = pgEnum('grant_scope', ['exact', 'any']);
 export const riskScoreEnum = pgEnum('risk_score', ['low', 'medium', 'high']);
+export const agentPoliciesSourceEnum = pgEnum('agent_policies_source', ['manual', 'step_up']);
 
 // ===== Better-Auth tables (auth identity) =====
 
@@ -411,6 +412,38 @@ export const agentGrants = pgTable(
   }),
 );
 
+/**
+ * Policy↔App mapping. By design, an app (agent) starts with **zero**
+ * mapped policies — that means deny everything. Operator must opt in by
+ * mapping at least one policy on the dashboard. Dynamic apps still hit
+ * deny on unmapped commands, which routes through the existing step-up
+ * loop; on approval-with-policy the system inserts a `policies` row
+ * plus an `agent_policies` row with `source = 'step_up'`.
+ */
+export const agentPolicies = pgTable(
+  'agent_policies',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    customerId: uuid('customer_id')
+      .notNull()
+      .references(() => customers.id, { onDelete: 'cascade' }),
+    agentId: uuid('agent_id')
+      .notNull()
+      .references(() => agents.id, { onDelete: 'cascade' }),
+    policyId: uuid('policy_id')
+      .notNull()
+      .references(() => policies.id, { onDelete: 'cascade' }),
+    source: agentPoliciesSourceEnum('source').notNull().default('manual'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    createdBy: uuid('created_by').references(() => user.id),
+  },
+  (t) => ({
+    agentIdx: index('agent_policies_agent_idx').on(t.agentId),
+    policyIdx: index('agent_policies_policy_idx').on(t.policyId),
+    agentPolicyUq: uniqueIndex('agent_policies_agent_policy_uq').on(t.agentId, t.policyId),
+  }),
+);
+
 export const mcpServers = pgTable(
   'mcp_servers',
   {
@@ -577,11 +610,20 @@ export const agentsRelations = relations(agents, ({ one, many }) => ({
   ucanIssues: many(ucanIssues),
   apiKeys: many(apiKeys),
   pushApprovals: many(pushApprovals),
+  agentPolicies: many(agentPolicies),
 }));
 
-export const policiesRelations = relations(policies, ({ one }) => ({
+export const policiesRelations = relations(policies, ({ one, many }) => ({
   customer: one(customers, { fields: [policies.customerId], references: [customers.id] }),
   schema: one(schemas, { fields: [policies.integrationId], references: [schemas.id] }),
+  agentPolicies: many(agentPolicies),
+}));
+
+export const agentPoliciesRelations = relations(agentPolicies, ({ one }) => ({
+  customer: one(customers, { fields: [agentPolicies.customerId], references: [customers.id] }),
+  agent: one(agents, { fields: [agentPolicies.agentId], references: [agents.id] }),
+  policy: one(policies, { fields: [agentPolicies.policyId], references: [policies.id] }),
+  createdByUser: one(user, { fields: [agentPolicies.createdBy], references: [user.id] }),
 }));
 
 export const ucanIssuesRelations = relations(ucanIssues, ({ one }) => ({
