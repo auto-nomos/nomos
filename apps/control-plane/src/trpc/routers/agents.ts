@@ -1,4 +1,4 @@
-import { generateKeypair } from '@auto-nomos/crypto';
+import { generateKeypair, privateKeyToHex, sealString } from '@auto-nomos/crypto';
 import { TRPCError } from '@trpc/server';
 import { and, desc, eq, inArray, isNull } from 'drizzle-orm';
 import { z } from 'zod';
@@ -21,7 +21,14 @@ export const agentsRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const { did } = generateKeypair();
+      const { did, privateKey } = generateKeypair();
+      // Seal the per-agent Ed25519 signing key with the same XChaCha20-Poly1305
+      // key the OAuth bridge uses. Without an oauth.encryptionKey (some test
+      // setups), the columns stay null — child UCAN minting then refuses with
+      // `agent_no_signing_key`. The legacy single-agent path is unaffected.
+      const sealed = ctx.oauth?.encryptionKey
+        ? sealString(ctx.oauth.encryptionKey, privateKeyToHex(privateKey))
+        : null;
       const now = new Date();
       const [agent] = await ctx.db.drizzle
         .insert(schema.agents)
@@ -30,6 +37,12 @@ export const agentsRouter = router({
           name: input.name,
           did,
           status: 'active',
+          ...(sealed
+            ? {
+                encryptedSigningKey: sealed.ciphertextHex,
+                signingKeyNonce: sealed.nonceHex,
+              }
+            : {}),
           ...(input.requireApproval
             ? {}
             : { connectionApprovedAt: now, connectionApprovedBy: ctx.session.user.id }),

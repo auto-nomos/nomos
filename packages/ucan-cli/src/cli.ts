@@ -118,11 +118,13 @@ async function main(): Promise<void> {
     if (!jwt) {
       process.stderr.write('parse requires --jwt\n');
       process.exit(2);
+      return;
     }
     const parsed = parseUcanJwt(jwt);
     if ('error' in parsed) {
       process.stderr.write(`${JSON.stringify({ ok: false, error: parsed.error })}\n`);
       process.exit(1);
+      return;
     }
     const cid = sha256Hex(jwt);
     process.stdout.write(

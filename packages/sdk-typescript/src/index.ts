@@ -21,6 +21,8 @@ export type {
   ChildEnvVars,
   ForkChildInput,
   ForkChildResult,
+  ForkChildViaCpInput,
+  ForkChildViaCpResult,
   ParentChainContext,
 } from './chain.js';
 export {
@@ -32,6 +34,7 @@ export {
   ENV_PARENT_RECEIPT,
   ENV_SWARM_ID,
   forkChild,
+  forkChildViaCp,
   readParentChainFromEnv,
 } from './chain.js';
 export type {

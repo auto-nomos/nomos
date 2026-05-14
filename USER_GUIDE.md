@@ -350,3 +350,76 @@ nomos audit-verify --chain ./bundle.json
 - **Env size**: chain JSON in env var bounded by OS limits (~128KB). Use `NOMOS_PARENT_UCAN_CHAIN_FILE` fallback for deep chains with bulky UCANs.
 
 Full technical details in [docs/SWARM_SECURITY.md](docs/SWARM_SECURITY.md).
+
+### Test locally — two ways
+
+You can prove the full chain works on your laptop in five minutes. Both paths
+talk to the same control plane + PDP — only the orchestration shape differs.
+
+**Path A — subprocess chain (single-machine, fastest).**
+
+A parent process spawns its child via `child_process.spawn`, propagating the
+chain through `NOMOS_PARENT_UCAN_CHAIN`. Three roles, three processes,
+one terminal.
+
+1. `pnpm db:up` (postgres on `:5433`)
+2. `pnpm dev` (control plane on `:8788`, PDP on `:8787`)
+3. In the dashboard:
+   - `/app/agents` → create three apps named `planner`, `researcher`, `writer`. Issue an API key for each (visible once — copy it).
+   - `/app/connections` → bind GitHub. Note the connection UUID.
+   - `/app/swarms` → create a swarm rooted at `planner`. Use **Attach child agent** to attach `researcher` under planner, then `writer` under researcher.
+4. `cp .env.swarm.example .env.swarm`. Fill in: 3 API keys, researcher + writer agent UUIDs, swarm UUID, GitHub connection UUID, owner + repo.
+5. `pnpm demo:swarm`
+
+You should see, in order:
+
+```
+━━━ planner ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ✓ minted root UCAN  cmd=/github/issue/list
+  ✓ proxy allow       receipt=8c1f02ab…
+  ✓ github status     200
+━━━ planner → researcher fork ━━━━━━━━━━━━━━━━━━━━━━━━
+  ✓ minted child UCAN cid=92ab… chain.depth=2
+━━━ researcher (depth=1) ━━━━━━━━━━━━━━━━━━━━
+  ✓ proxy allow       receipt=…
+  ✓ github status     200
+━━━ writer (depth=2) ━━━━━━━━━━━━━━━━━━━━
+  ✓ proxy allow       receipt=…
+  ✓ github status     200
+```
+
+Open `/app/swarms/<id>` — the tree shows three nodes; recent receipts shows
+three green allow rows. The Audit page lets you walk causation: every leaf
+receipt links back to its parent.
+
+To trigger a mid-chain step-up, set `NOMOS_DEMO_WRITE=1` in `.env.swarm` and
+rerun. Writer will attempt `POST /repos/.../issues`; if your Cedar policy
+requires cosigner for `/github/issue/create`, the PDP returns
+`requiresStepUp=true`. The script blocks; the dashboard shows a pending
+approval; you click Approve, the script retries with the cosigner attached,
+and the call lands.
+
+**Path B — docker swarm (multi-process, mirrors production-like topology).**
+
+Three docker services, each is a different agent. Chain propagates over
+HTTP between containers (env-var handoff would not work cross-container).
+A fourth container, the orchestrator, exposes a tiny HTML control panel on
+`localhost:3100`.
+
+1. `pnpm dev:up` (host stack — postgres + cp + pdp + dashboard)
+2. Same dashboard bootstrap as Path A (3 apps + GitHub connection + swarm).
+3. Same `.env.swarm`.
+4. `pnpm swarm:up`
+5. Open `http://localhost:3100`. Click **▶ Run swarm**.
+6. Watch the live log fill in as orchestrator → researcher → writer hand
+   the chain along. Open `/app/swarms/<id>` in another tab to see the tree
+   light up in real time.
+
+Tear down: `pnpm swarm:down`.
+
+Both paths use the new control-plane endpoint `POST /v1/mint-child-ucan`,
+which signs the child UCAN with the parent agent's per-agent Ed25519 key
+(sealed at agent registration). That's what makes `validateChain()` accept
+the resulting `iss == parent.aud` chain — without per-agent keys you cannot
+prove a child was actually delegated by its parent and not minted by the
+control plane on its own.

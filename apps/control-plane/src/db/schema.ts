@@ -220,6 +220,15 @@ export const agents = pgTable(
     rootAgentId: uuid('root_agent_id'),
     depth: integer('depth').notNull().default(0),
     swarmId: uuid('swarm_id').references(() => swarms.id, { onDelete: 'set null' }),
+    /**
+     * Sprint MAOS-A.2 — per-agent Ed25519 signing key, sealed with
+     * `OAUTH_TOKEN_ENCRYPTION_KEY` via `sealString`. Required so the
+     * control-plane can mint *child* UCANs whose `iss == parent.aud` (the
+     * delegation-chain integrity rule enforced by validateChain). Nullable
+     * for legacy rows; rotation/migration is a Phase 2 concern.
+     */
+    encryptedSigningKey: text('encrypted_signing_key'),
+    signingKeyNonce: text('signing_key_nonce'),
   },
   (t) => ({
     customerIdx: index('agents_customer_idx').on(t.customerId),

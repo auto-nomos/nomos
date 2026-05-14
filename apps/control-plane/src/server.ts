@@ -12,6 +12,7 @@ import { createAgentMeRoutes } from './routes/agent-me.js';
 import { createHealthRoutes } from './routes/health.js';
 import { createIntentRoutes } from './routes/intent.js';
 import { createInternalRoutes } from './routes/internal.js';
+import { createMintChildUcanRoutes } from './routes/mint-child-ucan.js';
 import { createMintUcanRoutes } from './routes/mint-ucan.js';
 import { createOAuthRoutes } from './routes/oauth.js';
 import { createSkillRoutes } from './routes/skill.js';
@@ -115,6 +116,22 @@ export function createServer(deps: ServerDeps): Hono {
   // SDK ↔ control-plane: trade an API key for short-lived UCANs. The PDP
   // never sees API keys; this route is the only one that does.
   app.route('/', createMintUcanRoutes({ db: deps.db, signing, usage }));
+
+  // Sprint MAOS-A.2 — child UCAN minting for delegation chains. Only
+  // mounted when oauth.encryptionKey is wired (it's needed to unseal the
+  // parent agent's per-agent signing key). Without it, /v1/mint-child-ucan
+  // can't decrypt the parent key, so the route is silently absent — the
+  // route's response would be 500 anyway.
+  if (deps.oauth?.encryptionKey) {
+    app.route(
+      '/',
+      createMintChildUcanRoutes({
+        db: deps.db,
+        encryptionKey: deps.oauth.encryptionKey,
+        usage,
+      }),
+    );
+  }
 
   // MCP-server / agent discovery: which integrations + commands are
   // available to this API key? Derived from the customer's policy set so

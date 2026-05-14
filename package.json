@@ -42,6 +42,9 @@
     "demo": "tsx scripts/demo.mts",
     "demo:dynamic-scope": "tsx scripts/demo-dynamic-scope.mts",
     "demo:dynamic-scope-github": "tsx scripts/demo-dynamic-scope-github.mts",
+    "demo:swarm": "tsx --env-file-if-exists=.env.swarm scripts/swarm-demo.mts",
+    "swarm:up": "docker compose -f infrastructure/docker/swarm/docker-compose.yml up --build",
+    "swarm:down": "docker compose -f infrastructure/docker/swarm/docker-compose.yml down -v",
     "sim:approve": "tsx --env-file-if-exists=.env.local scripts/simulate-approval.mts",
     "changeset": "changeset",
     "prepare": "husky"

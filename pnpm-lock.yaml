@@ -475,6 +475,25 @@ importers:
         specifier: 4.1.5
         version: 4.1.5(@opentelemetry/api@1.9.1)(@types/node@22.10.5)(@vitest/coverage-v8@4.1.5)(happy-dom@15.11.7)(msw@2.7.0(@types/node@22.10.5)(typescript@5.7.2))(vite@8.0.11(@types/node@22.10.5)(esbuild@0.27.7)(jiti@1.21.7)(tsx@4.21.0)(yaml@2.8.4))
 
+  examples/swarm-orchestrator:
+    dependencies:
+      '@auto-nomos/sdk':
+        specifier: workspace:*
+        version: link:../../packages/sdk-typescript
+      '@hono/node-server':
+        specifier: ^1.13.7
+        version: 1.13.7(hono@4.6.14)
+      hono:
+        specifier: ^4.6.14
+        version: 4.6.14
+    devDependencies:
+      tsx:
+        specifier: ^4.19.2
+        version: 4.21.0
+      typescript:
+        specifier: ^5.5.4
+        version: 5.7.2
+
   packages/adapters:
     dependencies:
       yaml:
@@ -775,6 +794,9 @@ importers:
         specifier: workspace:*
         version: link:../ucan
     devDependencies:
+      '@types/node':
+        specifier: ^22.7.0
+        version: 22.10.5
       typescript:
         specifier: ^5.5.4
         version: 5.7.2
