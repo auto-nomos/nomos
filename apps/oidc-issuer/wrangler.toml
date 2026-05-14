@@ -1,0 +1,40 @@
+# Nomos OIDC issuer Worker — id.auto-nomos.com
+#
+# Mirrors GET /.well-known/openid-configuration and GET /oidc/jwks.json from
+# the control-plane with edge cache. No signing happens here.
+#
+# Routes are configured via the Cloudflare dashboard / `wrangler deploy`:
+#   id.auto-nomos.com/* → this Worker
+#
+# `CONTROL_PLANE_PUBLIC_URL` is read at request time; rotate by updating
+# this var, no Worker redeploy needed for key rotation.
+
+name = "nomos-oidc-issuer"
+main = "src/worker.ts"
+compatibility_date = "2024-12-01"
+workers_dev = false
+
+# Production route. id.auto-nomos.com must be a registered hostname in
+# Cloudflare for the customer's domain. `custom_domain = true` provisions
+# a Cloudflare-managed origin cert and binds the apex of the subdomain.
+routes = [
+  { pattern = "id.auto-nomos.com/*", custom_domain = true },
+]
+
+[vars]
+# Override per environment in the CF dashboard.
+CONTROL_PLANE_PUBLIC_URL = "https://api.auto-nomos.com"
+# JWKS edge-cache TTL (seconds). 5min is the rotation safety margin.
+JWKS_EDGE_CACHE_TTL = "300"
+# Discovery doc edge-cache TTL (seconds). Doc is static; cache 1h.
+DISCOVERY_EDGE_CACHE_TTL = "3600"
+
+# Staging environment — workers.dev only, no custom routes.
+[env.staging]
+name = "nomos-oidc-issuer-staging"
+workers_dev = true
+
+[env.staging.vars]
+CONTROL_PLANE_PUBLIC_URL = "https://api-staging.auto-nomos.com"
+JWKS_EDGE_CACHE_TTL = "60"
+DISCOVERY_EDGE_CACHE_TTL = "300"

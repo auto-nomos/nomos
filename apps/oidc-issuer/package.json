@@ -1,0 +1,17 @@
+{
+  "name": "@auto-nomos/oidc-issuer",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Nomos OIDC issuer — Cloudflare Worker mirroring control-plane /.well-known + /jwks with edge cache.",
+  "type": "module",
+  "main": "src/worker.ts",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "4.20240725.0",
+    "typescript": "5.7.2",
+    "vitest": "4.1.5"
+  }
+}

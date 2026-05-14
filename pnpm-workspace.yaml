@@ -7,3 +7,4 @@ allowBuilds:
   msw: false
   protobufjs: true
   sharp: true
+  workerd: set this to true or false
