@@ -960,3 +960,62 @@ export const agentChainApprovals = pgTable(
     expiresAtIdx: index('agent_chain_approvals_expires_at_idx').on(t.expiresAt),
   }),
 );
+
+/**
+ * Observability v2 — per-tool-call execution telemetry.
+ *
+ * Every successful PDP authorize is followed by an actual tool invocation
+ * against an upstream provider (GitHub, Slack, etc). The mcp-server emits one
+ * `agent_spans` row per call AFTER the upstream returns, capturing outcome
+ * (status, latency, error code) and privacy-safe summaries (hashes + a tiny
+ * allowlisted projection of request/response). Never stores raw bodies.
+ *
+ * Distinct from `audit_events`, which records the authorization *decision* but
+ * tells you nothing about what the agent actually did with the granted scope.
+ * Spans are the "what they did" half of the question; audit_events are the
+ * "what they were allowed to do" half.
+ *
+ * `parent_span_id` self-references for nested causality (agent A's tool call
+ * triggered agent B's authorize → that authorize's span links back to A's).
+ * `receipt_id` is the `audit_events.event_id` (cast text) for the authorize
+ * that gated this call.
+ */
+export const agentSpans = pgTable(
+  'agent_spans',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    customerId: uuid('customer_id')
+      .notNull()
+      .references(() => customers.id, { onDelete: 'cascade' }),
+    swarmId: uuid('swarm_id'),
+    agentId: uuid('agent_id')
+      .notNull()
+      .references(() => agents.id, { onDelete: 'cascade' }),
+    receiptId: text('receipt_id').notNull(),
+    parentSpanId: uuid('parent_span_id'),
+    toolName: text('tool_name').notNull(),
+    status: text('status').notNull(),
+    httpStatus: integer('http_status'),
+    errorCode: text('error_code'),
+    errorMessage: text('error_message'),
+    requestArgsHash: text('request_args_hash').notNull(),
+    requestSummary: jsonb('request_summary'),
+    responseHash: text('response_hash'),
+    responseSummary: jsonb('response_summary'),
+    nextAgentHint: text('next_agent_hint'),
+    startedAt: timestamp('started_at', { withTimezone: true }).notNull(),
+    endedAt: timestamp('ended_at', { withTimezone: true }).notNull(),
+    latencyMs: integer('latency_ms').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    customerSwarmCreatedAtIdx: index('agent_spans_customer_swarm_created_at_idx').on(
+      t.customerId,
+      t.swarmId,
+      t.createdAt,
+    ),
+    receiptIdx: index('agent_spans_receipt_idx').on(t.receiptId),
+    parentIdx: index('agent_spans_parent_idx').on(t.parentSpanId),
+    customerReceiptUq: uniqueIndex('agent_spans_customer_receipt_uq').on(t.customerId, t.receiptId),
+  }),
+);

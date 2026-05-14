@@ -2,6 +2,26 @@ import { parseApiKey } from './api-key.js';
 import { applyParentChain, readParentChainFromEnv } from './chain.js';
 import { type FetchFn, fetchWithRetry } from './transport.js';
 
+export type SpanStatus = 'success' | 'failure' | 'timeout' | 'denied';
+
+export interface EmitSpanInput {
+  receiptId: string;
+  toolName: string;
+  status: SpanStatus;
+  startedAt: string;
+  endedAt: string;
+  latencyMs: number;
+  httpStatus?: number | null;
+  errorCode?: string | null;
+  errorMessage?: string | null;
+  requestArgsHash: string;
+  requestSummary?: Record<string, unknown> | null;
+  responseHash?: string | null;
+  responseSummary?: Record<string, unknown> | null;
+  parentSpanId?: string | null;
+  nextAgentHint?: string | null;
+}
+
 export type FailureMode = 'closed' | 'open';
 
 export interface AuthGuardOptions {
@@ -147,6 +167,14 @@ export interface AuthGuard {
   authorize(req: AuthorizeRequestInput): Promise<AuthorizeDecision>;
   emitReceipt(receiptId: string, input: ReceiptInput): Promise<void>;
   /**
+   * Observability v2 — post-execution telemetry. Records what actually
+   * happened after `proxy()` returned: upstream HTTP status, latency,
+   * hashes + tiny allowlisted summary. Fire-and-forget on the caller side
+   * (mcp-server wraps this with a queue); the method itself does throw on
+   * HTTP failure so callers can decide whether to surface.
+   */
+  emitSpan(input: EmitSpanInput): Promise<{ spanId: string; inserted: boolean } | null>;
+  /**
    * Trades the configured API key for short-lived UCANs (one per command).
    * Caches results in memory and refreshes when remaining TTL drops below
    * 60s. Requires `controlPlaneUrl` in `AuthGuardOptions`.
@@ -263,6 +291,30 @@ export function createAuthGuard(opts: AuthGuardOptions): AuthGuard {
       if (!res.ok) {
         throw new Error(`receipt rejected: HTTP ${res.status}`);
       }
+    },
+
+    async emitSpan(input) {
+      // /v1/spans is on the control plane (where the dashboard reads from);
+      // requires controlPlaneUrl. Without it we simply skip — span emission
+      // is a feature, not a correctness requirement.
+      if (!controlPlaneUrl) return null;
+      const res = await fetchWithRetry(
+        `${controlPlaneUrl}/v1/spans`,
+        {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(input),
+        },
+        { ...(opts.fetchFn !== undefined ? { fetchFn: opts.fetchFn } : {}), ...opts.retry },
+      );
+      if (!res.ok) {
+        throw new Error(`span rejected: HTTP ${res.status}`);
+      }
+      const body = (await res.json().catch(() => null)) as {
+        spanId: string;
+        inserted: boolean;
+      } | null;
+      return body;
     },
 
     async mintUcan(input) {
