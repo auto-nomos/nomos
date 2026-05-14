@@ -11,7 +11,6 @@
 import { spawn } from 'node:child_process';
 import { resolve } from 'node:path';
 import {
-  applyParentChain,
   createAuthGuard,
   ENV_PARENT_CHAIN,
   ENV_PARENT_RECEIPT,
@@ -51,21 +50,24 @@ async function main(): Promise<void> {
   console.info(`  parent receipt:      ${parent.parentReceiptId?.slice(0, 12) ?? '<none>'}…`);
   console.info(`  swarm id:            ${parent.swarmId?.slice(0, 12) ?? '<none>'}…`);
 
+  // The leaf is whatever the parent minted FOR us (chain.last). We do NOT
+  // mintUcan here — that would create a fresh CP-signed root whose iss=CP,
+  // breaking validateChain (parent.aud != child.iss).
+  if (parent.chain.length === 0) {
+    console.error(`[${role}] no parent chain in env`);
+    process.exit(1);
+  }
+  const leafJwt = parent.chain[parent.chain.length - 1] as string;
+
   const guard = createAuthGuard({ pdpUrl: PDP, controlPlaneUrl: CP, apiKey: API_KEY });
-  const ucans = await guard.mintUcan({
-    commands: [READ_CMD],
-    oauthConnectionId: OAUTH_CONN_ID,
-  });
-  const leafJwt = ucans.get(READ_CMD)?.jwt;
-  if (!leafJwt) throw new Error(`${role} failed to mint leaf UCAN`);
-
-  // applyParentChain stitches our just-minted UCAN onto the parent chain
-  // before the proxy call. Without this, PDP would see a single UCAN and
-  // treat us as a single-agent caller.
-  const proxyReq = applyParentChain({ ucan: leafJwt, command: READ_CMD }, parent);
-
   const proxy = await guard.proxy({
-    ...proxyReq,
+    ucan: leafJwt,
+    command: READ_CMD,
+    resource: { provider: 'github', owner: OWNER, repo: REPO },
+    context: {},
+    delegated_chain: parent.chain,
+    ...(parent.parentReceiptId ? { parent_receipt_id: parent.parentReceiptId } : {}),
+    ...(parent.swarmId ? { swarm_id: parent.swarmId } : {}),
     apiCall: { method: 'GET', path: `/repos/${OWNER}/${REPO}/issues`, query: { per_page: '1' } },
   });
   if (!proxy.allow) {
@@ -85,7 +87,7 @@ async function main(): Promise<void> {
     const fork = await forkChildViaCp({
       controlPlaneUrl: CP,
       apiKey: API_KEY,
-      parentChain: proxyReq.delegated_chain ?? [leafJwt],
+      parentChain: parent.chain,
       childAgentId: writerAgentId,
       command: process.env.NOMOS_DEMO_WRITE === '1' ? writeCmd : READ_CMD,
       ttlSeconds: 180,

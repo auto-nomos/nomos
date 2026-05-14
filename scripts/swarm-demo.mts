@@ -89,6 +89,8 @@ async function main(): Promise<void> {
   const plannerProxy = await planner.proxy({
     command: READ_CMD,
     ucan: plannerLeafJwt,
+    resource: { provider: 'github', owner: OWNER, repo: REPO },
+    context: {},
     swarm_id: SWARM_ID,
     apiCall: { method: 'GET', path: `/repos/${OWNER}/${REPO}/issues`, query: { per_page: '1' } },
   });

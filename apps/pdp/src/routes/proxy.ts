@@ -302,8 +302,17 @@ export function createProxyRoutes(deps: ProxyRouteDeps): Hono {
       };
     }
 
+    // Sprint MAOS-A — when the SDK supplies `request.delegated_chain`, the
+    // *chain* (root → leaf) is the authoritative input to validateChain, not
+    // the bare leaf in `body.ucan`. Without this swap, decide() sees a single
+    // UCAN whose iss is an agent DID (not the trusted root), and rejects with
+    // `untrusted_issuer` even though the chain itself roots at the CP signer.
+    const ucanForDecide =
+      Array.isArray(request.delegated_chain) && request.delegated_chain.length > 0
+        ? request.delegated_chain
+        : parsed.data.ucan;
     const decideInput: DecideInput = {
-      ucan: parsed.data.ucan,
+      ucan: ucanForDecide,
       request: effectiveRequest,
       policies,
       revokedCids,
