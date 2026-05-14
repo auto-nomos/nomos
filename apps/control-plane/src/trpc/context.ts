@@ -1,5 +1,6 @@
 import { eq } from 'drizzle-orm';
 import type { Auth } from '../auth/index.js';
+import type { CredsCache } from '../cloud/creds-cache.js';
 import type { Config } from '../config.js';
 import type { Db } from '../db/index.js';
 import * as schema from '../db/schema.js';
@@ -11,6 +12,7 @@ import {
   type RevocationPublisher,
 } from '../services/revocation-publisher.js';
 import type { WebAuthnConfig } from '../services/stepup/webauthn.js';
+import type { CloudVerifyPoll } from '../workers/cloud-verify-poll.js';
 
 export interface ContextDeps {
   db: Db;
@@ -28,6 +30,10 @@ export interface ContextDeps {
   oauth?: { config: Config; encryptionKey: Uint8Array };
   /** Telegram bot for event notifications. Optional — omit in tests. */
   telegramBot?: TelegramBot;
+  /** Session-creds cache; disconnect mutations invalidate by connectionId. */
+  credsCache?: CredsCache;
+  /** Verify-poll worker for `cloudConnections.verifyNow` mutation. */
+  cloudVerifyPoll?: CloudVerifyPoll;
 }
 
 export interface Context {
@@ -39,6 +45,8 @@ export interface Context {
   webauthn: WebAuthnConfig | null;
   oauth: { config: Config; encryptionKey: Uint8Array } | null;
   telegramBot: TelegramBot | null;
+  credsCache: CredsCache | null;
+  cloudVerifyPoll: CloudVerifyPoll | null;
   session: {
     user: { id: string; email: string; name: string | null };
     token: string;
@@ -88,6 +96,8 @@ export async function createContext(req: Request, deps: ContextDeps): Promise<Co
     webauthn: deps.webauthn ?? null,
     oauth: deps.oauth ?? null,
     telegramBot: deps.telegramBot ?? null,
+    credsCache: deps.credsCache ?? null,
+    cloudVerifyPoll: deps.cloudVerifyPoll ?? null,
     session: userPayload,
     customerId,
   };

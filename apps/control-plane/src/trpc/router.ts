@@ -4,6 +4,7 @@ import { apiKeysRouter } from './routers/api-keys.js';
 import { auditRouter } from './routers/audit.js';
 import { authRouter } from './routers/auth.js';
 import { billingRouter } from './routers/billing.js';
+import { cloudConnectionsRouter } from './routers/cloud-connections.js';
 import { customersRouter } from './routers/customers.js';
 import { envelopesRouter } from './routers/envelopes.js';
 import { grantsRouter } from './routers/grants.js';
@@ -26,6 +27,7 @@ export const appRouter = router({
   billing: billingRouter,
   stepup: stepupRouter,
   oauth: oauthRouter,
+  cloudConnections: cloudConnectionsRouter,
   envelopes: envelopesRouter,
   grants: grantsRouter,
   notificationPreferences: notificationPreferencesRouter,

@@ -1,3 +1,5 @@
+import type { CloudConnectorId, CloudProvider } from '@auto-nomos/core';
+import type { JwtSigner } from '@auto-nomos/crypto';
 import { generateKeypair } from '@auto-nomos/crypto';
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
@@ -8,12 +10,15 @@ import type { Db } from './db/index.js';
 import type { Logger } from './logger.js';
 import { loggerMiddleware } from './middleware/logger.js';
 import { requestId } from './middleware/request-id.js';
+import type { KeyStore } from './oidc/key-store.js';
 import { createAgentMeRoutes } from './routes/agent-me.js';
+import { createCloudInternalRoutes } from './routes/cloud-internal.js';
 import { createHealthRoutes } from './routes/health.js';
 import { createIntentRoutes } from './routes/intent.js';
 import { createInternalRoutes } from './routes/internal.js';
 import { createMintUcanRoutes } from './routes/mint-ucan.js';
 import { createOAuthRoutes } from './routes/oauth.js';
+import { createOidcRoutes } from './routes/oidc.js';
 import { createSkillRoutes } from './routes/skill.js';
 import type { CoherenceVerifier } from './services/intent-coherence.js';
 import type { TelegramBot } from './services/notify/telegram-bot.js';
@@ -70,6 +75,29 @@ export interface ServerDeps {
     controlPlanePublicUrl: string;
     pdpPublicUrl: string;
     dashboardPublicUrl: string;
+  };
+  /**
+   * M0 — Nomos OIDC issuer. When omitted, /.well-known/openid-configuration,
+   * /oidc/jwks.json, and /v1/internal/oidc/* are not mounted. Cloud federation
+   * (M1+) requires this; SaaS-only deployments can leave it off.
+   */
+  oidc?: {
+    issuer: string;
+    defaultTtlSeconds: number;
+    keyStore: KeyStore;
+    signer: JwtSigner;
+    serviceToken: string;
+    rateLimiter?: import('./oidc/rate-limit.js').RateLimiter;
+  };
+  /**
+   * M1 — cloud IAM federation. Requires `oidc` to also be set so the
+   * session-creds endpoint can mint ID tokens for the federation exchange.
+   */
+  cloud?: {
+    registry: Map<CloudConnectorId, CloudProvider>;
+    credsCache?: import('./cloud/creds-cache.js').CredsCache;
+    auditPublisher?: import('./services/cloud-audit-publisher.js').CloudAuditPublisher;
+    verifyPoll?: import('./workers/cloud-verify-poll.js').CloudVerifyPoll;
   };
 }
 
@@ -153,6 +181,8 @@ export function createServer(deps: ServerDeps): Hono {
         ? { oauth: { config: deps.oauth.config, encryptionKey: deps.oauth.encryptionKey } }
         : {}),
       ...(deps.telegramBot ? { telegramBot: deps.telegramBot } : {}),
+      ...(deps.cloud?.credsCache ? { credsCache: deps.cloud.credsCache } : {}),
+      ...(deps.cloud?.verifyPoll ? { cloudVerifyPoll: deps.cloud.verifyPoll } : {}),
     }),
   );
 
@@ -192,6 +222,28 @@ export function createServer(deps: ServerDeps): Hono {
 
   if (deps.skills) {
     app.route('/', createSkillRoutes(deps.skills));
+  }
+
+  // M0 — OIDC issuer (public discovery + JWKS + internal mint).
+  if (deps.oidc) {
+    app.route('/', createOidcRoutes(deps.oidc));
+    // M1 — cloud federation. Strictly requires oidc because session-creds
+    // mints an ID token before calling the cloud token endpoint.
+    if (deps.cloud) {
+      app.route(
+        '/',
+        createCloudInternalRoutes({
+          db: deps.db,
+          serviceToken: deps.oidc.serviceToken,
+          issuer: deps.oidc.issuer,
+          signer: deps.oidc.signer,
+          defaultTtlSeconds: deps.oidc.defaultTtlSeconds,
+          registry: deps.cloud.registry,
+          ...(deps.cloud.credsCache ? { credsCache: deps.cloud.credsCache } : {}),
+          ...(deps.cloud.auditPublisher ? { auditPublisher: deps.cloud.auditPublisher } : {}),
+        }),
+      );
+    }
   }
 
   app.onError((err, c) => {
