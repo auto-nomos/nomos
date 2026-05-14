@@ -66,6 +66,38 @@ describe('cloudApiCall', () => {
     }
   });
 
+  it('forwards parent_receipt_id / swarm_id / chain_depth into the request body', async () => {
+    let captured: Record<string, unknown> = {};
+    const fetchMock = vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
+      captured = JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>;
+      return new Response(
+        JSON.stringify({
+          status: 200,
+          body: { ok: true },
+          headers: {},
+          id_token_jti: 'jti-2',
+          connector: 'aws',
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      );
+    }) as unknown as typeof fetch;
+    await cloudApiCall(
+      { controlPlaneUrl: CP_URL, serviceToken: TOKEN, fetch: fetchMock },
+      'conn-2',
+      {
+        customerId: 'c',
+        agentId: 'a',
+        parentReceiptId: 'parent-receipt-hex',
+        swarmId: '00000000-0000-0000-0000-0000000000aa',
+        chainDepth: 2,
+      },
+      { method: 'GET', url: '/x' },
+    );
+    expect(captured.parent_receipt_id).toBe('parent-receipt-hex');
+    expect(captured.swarm_id).toBe('00000000-0000-0000-0000-0000000000aa');
+    expect(captured.chain_depth).toBe(2);
+  });
+
   it('throws plain Error on 502', async () => {
     const fetchMock = vi.fn(
       async () =>

@@ -261,4 +261,82 @@ describe('POST /v1/internal/cloud/api-call', () => {
     expect(body.error).toBe('cloud_call_failed');
     expect(body.retryable).toBe(false);
   });
+
+  it('forwards parent_receipt_id / swarm_id / chain_depth into auditPublisher.publish', async () => {
+    const { privateKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
+    const privateKeyPem = privateKey.export({ format: 'pem', type: 'pkcs8' }).toString();
+    const signer = new LocalRs256Signer({ kid: 'k', privateKeyPem });
+    const fetchMock = vi.fn(async (url: string | URL | Request) => {
+      if (String(url).startsWith('https://aad.test/')) {
+        return new Response(JSON.stringify({ access_token: 'tok', expires_in: 3600 }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      return new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }) as unknown as typeof fetch;
+    const azure = new AzureCloudProvider({
+      fetch: fetchMock,
+      aadHost: 'https://aad.test',
+      armHost: 'https://arm.test',
+    });
+    const registry = new Map<CloudConnectorId, CloudProvider>([['azure', azure]]);
+    const connection: CloudConnectionRow = {
+      id: 'c',
+      customerId: 'cust',
+      connector: 'azure',
+      accountId: 'sub',
+      tenantId: 'tenant',
+      externalId: 'ext',
+      config: { app_client_id: 'cid' },
+      displayName: null,
+      bootstrapStatus: 'verified',
+      lastVerifiedAt: null,
+      lastVerifyError: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    const captured: Array<Record<string, unknown>> = [];
+    const auditPublisher = {
+      publish: async (input: Record<string, unknown>) => {
+        captured.push(input);
+      },
+    };
+    const app = new Hono();
+    app.route(
+      '/',
+      createCloudInternalRoutes({
+        db: makeFakeDb(connection),
+        serviceToken: SERVICE_TOKEN,
+        issuer: ISSUER,
+        signer,
+        defaultTtlSeconds: 300,
+        registry,
+        auditPublisher,
+      }),
+    );
+    const res = await app.request('/v1/internal/cloud/api-call/c', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${SERVICE_TOKEN}` },
+      body: JSON.stringify({
+        customer_id: 'cust',
+        agent_id: 'a',
+        parent_receipt_id: 'parent-hex',
+        swarm_id: '00000000-0000-0000-0000-0000000000ab',
+        chain_depth: 1,
+        request: { method: 'GET', url: '/sub' },
+      }),
+    });
+    expect(res.status).toBe(200);
+    // Two publish calls in the cache-cold path: minted + exchanged.
+    expect(captured.length).toBeGreaterThanOrEqual(2);
+    for (const event of captured) {
+      expect(event.parentReceiptId).toBe('parent-hex');
+      expect(event.swarmId).toBe('00000000-0000-0000-0000-0000000000ab');
+      expect(event.chainDepth).toBe(1);
+    }
+  });
 });
