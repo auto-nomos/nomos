@@ -176,6 +176,13 @@
       "when": 1779800000000,
       "tag": "0024_agent_spans",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1779900000000,
+      "tag": "0025_agent_spans_intent",
+      "breakpoints": true
     }
   ]
 }

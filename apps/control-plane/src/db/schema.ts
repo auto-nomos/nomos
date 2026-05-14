@@ -1003,6 +1003,7 @@ export const agentSpans = pgTable(
     responseHash: text('response_hash'),
     responseSummary: jsonb('response_summary'),
     nextAgentHint: text('next_agent_hint'),
+    intent: text('intent'),
     startedAt: timestamp('started_at', { withTimezone: true }).notNull(),
     endedAt: timestamp('ended_at', { withTimezone: true }).notNull(),
     latencyMs: integer('latency_ms').notNull(),

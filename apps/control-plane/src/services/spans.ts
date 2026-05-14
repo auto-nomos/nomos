@@ -119,6 +119,7 @@ export async function ingestSpan(
       responseHash: input.responseHash ?? null,
       responseSummary: input.responseSummary ?? null,
       nextAgentHint: input.nextAgentHint ?? null,
+      intent: input.intent ?? null,
       startedAt: new Date(input.startedAt),
       endedAt: new Date(input.endedAt),
       latencyMs: input.latencyMs,
