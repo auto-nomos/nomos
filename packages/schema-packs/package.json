@@ -1,6 +1,6 @@
 {
   "name": "@auto-nomos/schema-packs",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "license": "MIT",
   "private": false,
   "type": "module",
@@ -14,6 +14,10 @@
     "./github": {
       "types": "./dist/github/index.d.ts",
       "import": "./dist/github/index.js"
+    },
+    "./github/path": {
+      "types": "./dist/github/path.d.ts",
+      "import": "./dist/github/path.js"
     },
     "./slack": {
       "types": "./dist/slack/index.d.ts",

@@ -28,6 +28,15 @@ export const AuditEvent = z.object({
    * always populate this so spans can correlate without jsonb scans.
    */
   receipt_id: z.string().optional(),
+  /**
+   * 2026-05-14 resource_mismatch fix — for /v1/proxy rows, the actual
+   * upstream HTTP method + path that the PDP would execute. Persisted as
+   * structured columns (not just inside `payload` jsonb) so investigators
+   * can query effective-target divergence from declared `resource` without
+   * scanning the payload blob. Null on /v1/authorize-only rows (no apiCall).
+   */
+  api_call_method: z.string().optional(),
+  api_call_path: z.string().optional(),
 });
 
 export const AuditProof = z.object({

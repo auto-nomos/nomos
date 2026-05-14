@@ -50,6 +50,7 @@ import {
   isKnownCommand,
   validateApiCall,
   validateResource,
+  validateResourceConsistency,
 } from './_shared.js';
 import type { AuditEmitInput } from './authorize.js';
 
@@ -285,6 +286,7 @@ export function createProxyRoutes(deps: ProxyRouteDeps): Hono {
           decision: { ...denyDecision },
           ts: Date.now(),
           agentDid: extractAgentDid(request.ucan),
+          apiCall: { method: parsed.data.apiCall.method, path: parsed.data.apiCall.path },
         });
       }
       return c.json({ allow: false, decision: denyDecision, error_code: 'unknown_customer' }, 200);
@@ -316,6 +318,7 @@ export function createProxyRoutes(deps: ProxyRouteDeps): Hono {
           decision: { ...denyDecision },
           ts: Date.now(),
           agentDid: extractAgentDid(firstUcan),
+          apiCall: { method: parsed.data.apiCall.method, path: parsed.data.apiCall.path },
         });
       }
       return c.json({ allow: false, decision: denyDecision, error_code: reason }, 403);
@@ -339,9 +342,70 @@ export function createProxyRoutes(deps: ProxyRouteDeps): Hono {
           decision: { ...denyDecision },
           ts: Date.now(),
           agentDid: extractAgentDid(firstUcan),
+          apiCall: { method: parsed.data.apiCall.method, path: parsed.data.apiCall.path },
         });
       }
       return c.json({ allow: false, decision: denyDecision, error_code: 'schema_violation' }, 403);
+    }
+
+    // 2026-05-14 resource_mismatch fix — declared `request.resource` must
+    // match the resource derived from `apiCall.{method,path}`. Closes
+    // Probe-14 (Cursor declared resource = octocat/Hello-World while
+    // apiCall.path targeted admin-brickexchange/test-repo; file landed on
+    // test-repo, audit logged octocat). Pack-driven: each schema-pack
+    // exports `extractResourceFromApiCall`; packs without one pass through.
+    const consistency = validateResourceConsistency(
+      request.command,
+      request.resource,
+      parsed.data.apiCall,
+    );
+    if (!consistency.ok) {
+      log.warn(
+        {
+          command: request.command,
+          customerId,
+          field: consistency.field,
+          declared: consistency.declared,
+          effective: consistency.effective,
+          apiCallPath: parsed.data.apiCall.path,
+        },
+        'request.resource diverges from apiCall.path',
+      );
+      const denyDecision: AuthorizeDecision = {
+        allow: false,
+        reason: 'resource_mismatch',
+        receiptId: sha256Hex(
+          `resource-mismatch|${request.command}|${consistency.field}|${String(consistency.declared)}|${String(consistency.effective)}`,
+        ),
+      };
+      recordAuthorize(decisionToAudit(denyDecision), denyDecision.reason);
+      if (deps.emitAudit) {
+        await deps.emitAudit({
+          customerId,
+          request,
+          decision: { ...denyDecision },
+          ts: Date.now(),
+          agentDid: extractAgentDid(firstUcan),
+          apiCall: { method: parsed.data.apiCall.method, path: parsed.data.apiCall.path },
+        });
+      }
+      fireSpan({
+        customerId,
+        agentDid: agentDidForSpan,
+        receiptId: denyDecision.receiptId,
+        toolStatus: 'denied',
+        errorCode: 'resource_mismatch',
+        requestArgs,
+      });
+      return c.json(
+        {
+          allow: false,
+          decision: denyDecision,
+          error_code: 'resource_mismatch',
+          field: consistency.field,
+        },
+        403,
+      );
     }
 
     const revokedCids = deps.revocationCache.getRevoked(customerId);
@@ -378,6 +442,7 @@ export function createProxyRoutes(deps: ProxyRouteDeps): Hono {
             decision: { ...denyDecision },
             ts: Date.now(),
             agentDid: extractAgentDid(request.ucan),
+            apiCall: { method: parsed.data.apiCall.method, path: parsed.data.apiCall.path },
           });
         }
         log.info(
@@ -481,6 +546,7 @@ export function createProxyRoutes(deps: ProxyRouteDeps): Hono {
         },
         ts: Date.now(),
         agentDid: leafForAudit?.payload.aud ?? 'unknown',
+        apiCall: { method: parsed.data.apiCall.method, path: parsed.data.apiCall.path },
         ...(request.parent_receipt_id !== undefined
           ? { parentReceiptId: request.parent_receipt_id }
           : {}),

@@ -38,7 +38,12 @@ function makePayload(iss: string, aud: string, overrides: Partial<UcanPayload> =
 interface ProxyAppFixture {
   app: ReturnType<typeof createServer>;
   policyCache: ReturnType<typeof createPolicyCache>;
-  audits: Array<{ command: string; allow: boolean; reason?: string }>;
+  audits: Array<{
+    command: string;
+    allow: boolean;
+    reason?: string;
+    apiCall?: { method: string; path: string };
+  }>;
   upstreamCalls: { url: string; method: string; headers: Record<string, string>; body?: string }[];
   tokenLookups: { customerId: string; connectionId: string }[];
   stepupCreate?: ReturnType<typeof vi.fn>;
@@ -64,7 +69,7 @@ function buildApp(opts: BuildAppOpts): ProxyAppFixture {
     refreshIntervalMs: 60_000,
     logger,
   });
-  const audits: Array<{ command: string; allow: boolean }> = [];
+  const audits: ProxyAppFixture['audits'] = [];
   const upstreamCalls: ProxyAppFixture['upstreamCalls'] = [];
   const tokenLookups: { customerId: string; connectionId: string }[] = [];
 
@@ -136,6 +141,7 @@ function buildApp(opts: BuildAppOpts): ProxyAppFixture {
         command: ev.request.command,
         allow: ev.decision.allow,
         ...(ev.decision.reason !== undefined ? { reason: ev.decision.reason } : {}),
+        ...(ev.apiCall !== undefined ? { apiCall: ev.apiCall } : {}),
       });
     },
     oauthProxy: { fetchOAuthToken, upstreamFetch: fakeUpstream },
@@ -766,5 +772,200 @@ permit(
     expect(body.error_code).toBe('schema_violation');
     expect(body.decision.reason).toBe('schema_violation');
     expect(fix.upstreamCalls).toHaveLength(0);
+  });
+
+  // ----------------------------------------------------------------------
+  // D6 — 2026-05-14 resource_mismatch (Probe-14)
+  // ----------------------------------------------------------------------
+  // The agent's `request.resource` must match the resource derived from
+  // `apiCall.{method,path}`. Otherwise audit lies about what was mutated.
+
+  it('D6 — declared resource.owner ≠ apiCall.path owner returns resource_mismatch', async () => {
+    const contentUpdatePolicy = `
+permit(
+  principal,
+  action == Action::"/github/content/update",
+  resource
+)
+when { resource.repo == "octocat/Hello-World" };
+`;
+    const fix = buildApp({});
+    fix.policyCache.set(CUSTOMER, contentUpdatePolicy);
+
+    const issuer = generateKeypair();
+    const agent = generateKeypair();
+    const ucan = issueUcan({
+      payload: makePayload(issuer.did, agent.did, {
+        cmd: '/github/content/update',
+        meta: { oauth_connection_id: 'conn-1', customer_id: CUSTOMER },
+      }),
+      privateKey: issuer.privateKey,
+    });
+
+    const res = await fix.app.request('/v1/proxy/github/content/update', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-cb-customer': CUSTOMER },
+      body: JSON.stringify({
+        ucan: ucan.jwt,
+        request: {
+          ucan: ucan.jwt,
+          command: '/github/content/update',
+          // Declared resource lies about which repo.
+          resource: {
+            repo: 'octocat/Hello-World',
+            owner: 'octocat',
+            repo_name: 'Hello-World',
+          },
+          context: {},
+        },
+        apiCall: {
+          method: 'PUT',
+          // Actually targets a different repo.
+          path: '/repos/admin-brickexchange/test-repo/contents/lie.txt',
+          body: { message: 'lie', content: 'aGVsbG8=' },
+        },
+      }),
+    });
+    expect(res.status).toBe(403);
+    const body = (await res.json()) as {
+      error_code: string;
+      field?: string;
+      decision: { reason: string };
+    };
+    expect(body.error_code).toBe('resource_mismatch');
+    expect(body.decision.reason).toBe('resource_mismatch');
+    expect(body.field).toBe('owner');
+    expect(fix.upstreamCalls).toHaveLength(0);
+  });
+
+  it('D6 — declared resource consistent with apiCall.path still allows', async () => {
+    const contentUpdatePolicy = `
+permit(
+  principal,
+  action == Action::"/github/content/update",
+  resource
+)
+when { resource.repo == "acme/billing" };
+`;
+    const fix = buildApp({});
+    fix.policyCache.set(CUSTOMER, contentUpdatePolicy);
+
+    const issuer = generateKeypair();
+    const agent = generateKeypair();
+    const ucan = issueUcan({
+      payload: makePayload(issuer.did, agent.did, {
+        cmd: '/github/content/update',
+        meta: { oauth_connection_id: 'conn-1', customer_id: CUSTOMER },
+      }),
+      privateKey: issuer.privateKey,
+    });
+
+    const res = await fix.app.request('/v1/proxy/github/content/update', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-cb-customer': CUSTOMER },
+      body: JSON.stringify({
+        ucan: ucan.jwt,
+        request: {
+          ucan: ucan.jwt,
+          command: '/github/content/update',
+          resource: { repo: 'acme/billing', owner: 'acme', repo_name: 'billing' },
+          context: {},
+        },
+        apiCall: {
+          method: 'PUT',
+          path: '/repos/acme/billing/contents/docs/readme.md',
+          body: { message: 'docs', content: 'aGVsbG8=' },
+        },
+      }),
+    });
+    expect(res.status).toBe(200);
+    expect(fix.upstreamCalls).toHaveLength(1);
+  });
+
+  it('D6 — empty resource on /github/user/read with GET /user passes', async () => {
+    // user-read has no path-bound resource; extractor returns null, consistency check skips.
+    const userReadPolicy = `
+permit(
+  principal,
+  action == Action::"/github/user/read",
+  resource
+);
+`;
+    const fix = buildApp({});
+    fix.policyCache.set(CUSTOMER, userReadPolicy);
+
+    const issuer = generateKeypair();
+    const agent = generateKeypair();
+    const ucan = issueUcan({
+      payload: makePayload(issuer.did, agent.did, {
+        cmd: '/github/user/read',
+        meta: { oauth_connection_id: 'conn-1', customer_id: CUSTOMER },
+      }),
+      privateKey: issuer.privateKey,
+    });
+
+    const res = await fix.app.request('/v1/proxy/github/user/read', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-cb-customer': CUSTOMER },
+      body: JSON.stringify({
+        ucan: ucan.jwt,
+        request: {
+          ucan: ucan.jwt,
+          command: '/github/user/read',
+          resource: {},
+          context: {},
+        },
+        apiCall: { method: 'GET', path: '/user' },
+      }),
+    });
+    expect(res.status).toBe(200);
+  });
+
+  it('D6 — audit row records apiCall.{method,path} on resource_mismatch deny', async () => {
+    const contentUpdatePolicy = `
+permit(
+  principal,
+  action == Action::"/github/content/update",
+  resource
+);
+`;
+    const fix = buildApp({});
+    fix.policyCache.set(CUSTOMER, contentUpdatePolicy);
+
+    const issuer = generateKeypair();
+    const agent = generateKeypair();
+    const ucan = issueUcan({
+      payload: makePayload(issuer.did, agent.did, {
+        cmd: '/github/content/update',
+        meta: { oauth_connection_id: 'conn-1', customer_id: CUSTOMER },
+      }),
+      privateKey: issuer.privateKey,
+    });
+
+    await fix.app.request('/v1/proxy/github/content/update', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-cb-customer': CUSTOMER },
+      body: JSON.stringify({
+        ucan: ucan.jwt,
+        request: {
+          ucan: ucan.jwt,
+          command: '/github/content/update',
+          resource: { owner: 'declared', repo_name: 'one' },
+          context: {},
+        },
+        apiCall: {
+          method: 'PUT',
+          path: '/repos/effective/two/contents/x.txt',
+          body: { message: 'm', content: 'aGVsbG8=' },
+        },
+      }),
+    });
+
+    const denyRow = fix.audits.find((a) => a.reason === 'resource_mismatch');
+    expect(denyRow).toBeDefined();
+    expect(denyRow?.apiCall).toEqual({
+      method: 'PUT',
+      path: '/repos/effective/two/contents/x.txt',
+    });
   });
 });

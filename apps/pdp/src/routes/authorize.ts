@@ -68,6 +68,15 @@ export interface AuditEmitInput {
   parentReceiptId?: string;
   swarmId?: string;
   chainDepth?: number;
+  /**
+   * 2026-05-14 resource_mismatch fix — for /v1/proxy rows, the
+   * effective upstream call about to be (or just) executed. Persisted
+   * as structured columns on audit_events so divergence between
+   * declared `request.resource` and the actual HTTP target is
+   * queryable without scanning the payload jsonb. Undefined on
+   * /v1/authorize-only rows.
+   */
+  apiCall?: { method: string; path: string };
 }
 
 export function createAuthorizeRoutes(deps: AuthorizeRouteDeps): Hono {

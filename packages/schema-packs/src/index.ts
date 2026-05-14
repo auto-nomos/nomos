@@ -142,3 +142,62 @@ export function validateResource(command: string, resource: unknown): ValidateRe
   if (parsed.success) return { ok: true };
   return { ok: false, reason: 'schema_violation', issues: parsed.error.issues };
 }
+
+/**
+ * 2026-05-14 resource_mismatch fix — cross-check the agent-declared
+ * `request.resource` against the resource derived from the actual
+ * `apiCall.{method,path}`. Closes Probe-14: a UCAN minted broadly let
+ * Cursor declare `resource = octocat/Hello-World` while
+ * `apiCall.path = /repos/admin/test-repo/...`; the file landed on
+ * test-repo, audit logged octocat.
+ *
+ * Semantics: every key the pack's extractor returns is compared against
+ * the declared resource. If the declared resource sets the key to a
+ * different value, deny. Undeclared keys don't force a deny — some
+ * commands legitimately have empty resource (e.g. `/github/user/read`).
+ * Packs without an extractor pass through (back-compat).
+ */
+export type ConsistencyResult =
+  | { ok: true }
+  | {
+      ok: false;
+      reason: 'resource_mismatch';
+      field: string;
+      declared: unknown;
+      effective: unknown;
+    };
+
+const COMPARED_KEYS = [
+  'owner',
+  'repo',
+  'repo_name',
+  'issue_number',
+  'pull_number',
+  'channel',
+  'channel_id',
+  'page_id',
+  'database_id',
+  'file_id',
+] as const;
+
+export function validateResourceConsistency(
+  command: string,
+  resource: unknown,
+  apiCall: { method: string; path: string },
+): ConsistencyResult {
+  const pack = packForCommand(command);
+  if (!pack?.extractResourceFromApiCall) return { ok: true };
+  const effective = pack.extractResourceFromApiCall(command, apiCall);
+  if (!effective) return { ok: true };
+  const declared = (resource ?? {}) as Record<string, unknown>;
+  for (const key of COMPARED_KEYS) {
+    const eff = effective[key];
+    if (eff === undefined) continue;
+    const dec = declared[key];
+    if (dec === undefined) continue;
+    if (dec !== eff) {
+      return { ok: false, reason: 'resource_mismatch', field: key, declared: dec, effective: eff };
+    }
+  }
+  return { ok: true };
+}

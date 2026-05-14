@@ -21,6 +21,7 @@ import {
   timestamp,
   uniqueIndex,
   uuid,
+  varchar,
 } from 'drizzle-orm/pg-core';
 
 // ===== Enums =====
@@ -363,6 +364,14 @@ export const auditEvents = pgTable(
      * span to its authorize-receipt in O(1).
      */
     receiptId: text('receipt_id'),
+    /**
+     * 2026-05-14 resource_mismatch fix — for /v1/proxy rows, the actual
+     * upstream HTTP method + path the PDP executed (or would have
+     * executed on a deny). Lets investigators query declared-vs-effective
+     * divergence directly. Null on /v1/authorize-only rows (no apiCall).
+     */
+    apiCallMethod: varchar('api_call_method', { length: 8 }),
+    apiCallPath: text('api_call_path'),
   },
   (t) => ({
     customerTsIdx: index('audit_events_customer_ts_idx').on(t.customerId, t.ts),

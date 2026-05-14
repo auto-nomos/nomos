@@ -158,6 +158,9 @@ async function main(): Promise<void> {
         ...(ev.swarmId !== undefined ? { swarm_id: ev.swarmId } : {}),
         ...(ev.chainDepth !== undefined ? { chain_depth: ev.chainDepth } : {}),
         receipt_id: ev.decision.receiptId,
+        ...(ev.apiCall !== undefined
+          ? { api_call_method: ev.apiCall.method, api_call_path: ev.apiCall.path }
+          : {}),
       });
     },
     emitReceipt: async (ev) => {

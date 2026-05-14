@@ -72,6 +72,23 @@ export interface IntegrationPack {
    * coverage is OK — the PDP treats missing entries as pass-through.
    */
   actionSchemas?: Partial<Record<string, ActionSchemas>>;
+  /**
+   * 2026-05-14 resource_mismatch fix — derive the effective resource
+   * (owner, repo, channel, page_id, …) from `apiCall.{method,path}`. The
+   * PDP's `validateResourceConsistency` compares each key returned here
+   * against the agent-declared `request.resource`; mismatch is a deny.
+   * Return null when the call has no path-bound resource (e.g. github
+   * `GET /user`, `GET /search/...`).
+   *
+   * Packs without this function are pass-through — declared resource is
+   * still validated by `resourceSchema` shape and by Cedar. Implementing
+   * this hardens the pack against agents lying about which resource they
+   * target while pointing apiCall at a different one.
+   */
+  extractResourceFromApiCall?: (
+    command: string,
+    apiCall: { method: string; path: string },
+  ) => Record<string, unknown> | null;
 }
 
 /**
