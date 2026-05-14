@@ -27,12 +27,23 @@ import { canonicalize, computeCid, parseUcanJwt } from '@auto-nomos/ucan';
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { validateGithubProxyCall } from '../adapters/github.js';
+import { validateGoogleCalendarProxyCall } from '../adapters/google_calendar.js';
+import { validateGoogleContactsProxyCall } from '../adapters/google_contacts.js';
+import { validateGoogleDocsProxyCall } from '../adapters/google_docs.js';
+import { validateGoogleDriveProxyCall } from '../adapters/google_drive.js';
+import { validateGoogleGmailProxyCall } from '../adapters/google_gmail.js';
+import { validateGoogleSheetsProxyCall } from '../adapters/google_sheets.js';
+import { validateGoogleTasksProxyCall } from '../adapters/google_tasks.js';
+import { validateLinearProxyCall } from '../adapters/linear.js';
+import { validateNotionProxyCall } from '../adapters/notion.js';
 import {
   isKnownProvider,
   type ProviderId,
   type ProxyRequest,
   proxyApiCall,
 } from '../adapters/oauth.js';
+import { validateSlackProxyCall } from '../adapters/slack.js';
+import { validateStripeProxyCall } from '../adapters/stripe.js';
 import { decisionToAudit } from '../audit/emit.js';
 import type { PolicyCache } from '../cache/policies.js';
 import type { RevocationCache } from '../cache/revocations.js';
@@ -636,48 +647,146 @@ export function createProxyRoutes(deps: ProxyRouteDeps): Hono {
     const provider: ProviderId = token.connector;
     const apiCall = parsed.data.apiCall as ProxyRequest;
 
-    // GitHub gate: the agent's `resource` already passed the pre-Cedar
-    // `constraintMatchesResource` check, but the upstream URL might
-    // still target a different repo. Re-derive the target from
-    // `apiCall.path` and refuse anything outside the UCAN's signed
-    // github constraint.
+    // Per-provider data-plane gate. The agent's `resource` already
+    // passed the pre-Cedar `constraintMatchesResource` check, but the
+    // upstream URL might still target a different object. Re-derive the
+    // target from `apiCall` and refuse anything outside the UCAN's
+    // signed `meta.resource_constraint`. One validator per provider —
+    // each mirrors the shape of `validateGithubProxyCall`.
     const leafMeta = leaf?.payload.meta as Record<string, unknown> | undefined;
-    const ghConstraint =
+    const constraint =
       leafMeta && typeof leafMeta.resource_constraint === 'object'
         ? (leafMeta.resource_constraint as { provider?: string })
         : undefined;
-    if (ghConstraint?.provider === 'github') {
-      const ghCheck = validateGithubProxyCall(
-        ghConstraint as Parameters<typeof validateGithubProxyCall>[0],
-        apiCall,
-        apiCall.query,
-      );
-      if (!ghCheck.ok) {
-        const oosReceiptId = sha256Hex(
-          `proxy-out-of-scope|${request.command}|${canonicalize(request as unknown as Record<string, unknown>)}`,
-        );
-        fireSpan({
-          customerId,
-          agentDid: agentDidForSpan,
-          receiptId: oosReceiptId,
-          toolStatus: 'denied',
-          errorCode: 'resource_out_of_scope',
-          requestArgs,
-        });
-        return c.json(
-          {
-            allow: false,
-            decision: {
-              allow: false,
-              reason: 'resource_out_of_scope',
-              receiptId: oosReceiptId,
-            },
-            error_code: 'resource_out_of_scope',
-            adapter_reason: ghCheck.reason,
-          },
-          403,
-        );
+    let adapterReason: string | undefined;
+    if (constraint?.provider) {
+      switch (constraint.provider) {
+        case 'github': {
+          const r = validateGithubProxyCall(
+            constraint as Parameters<typeof validateGithubProxyCall>[0],
+            apiCall,
+            apiCall.query,
+          );
+          if (!r.ok) adapterReason = r.reason;
+          break;
+        }
+        case 'slack': {
+          const r = validateSlackProxyCall(
+            constraint as Parameters<typeof validateSlackProxyCall>[0],
+            apiCall,
+          );
+          if (!r.ok) adapterReason = r.reason;
+          break;
+        }
+        case 'stripe': {
+          const r = validateStripeProxyCall(
+            constraint as Parameters<typeof validateStripeProxyCall>[0],
+            apiCall,
+          );
+          if (!r.ok) adapterReason = r.reason;
+          break;
+        }
+        case 'linear': {
+          const r = validateLinearProxyCall(
+            constraint as Parameters<typeof validateLinearProxyCall>[0],
+            apiCall,
+          );
+          if (!r.ok) adapterReason = r.reason;
+          break;
+        }
+        case 'notion': {
+          const r = validateNotionProxyCall(
+            constraint as Parameters<typeof validateNotionProxyCall>[0],
+            apiCall,
+          );
+          if (!r.ok) adapterReason = r.reason;
+          break;
+        }
+        case 'google_drive': {
+          const r = validateGoogleDriveProxyCall(
+            constraint as Parameters<typeof validateGoogleDriveProxyCall>[0],
+            apiCall,
+          );
+          if (!r.ok) adapterReason = r.reason;
+          break;
+        }
+        case 'google_gmail': {
+          const r = validateGoogleGmailProxyCall(
+            constraint as Parameters<typeof validateGoogleGmailProxyCall>[0],
+            apiCall,
+          );
+          if (!r.ok) adapterReason = r.reason;
+          break;
+        }
+        case 'google_calendar': {
+          const r = validateGoogleCalendarProxyCall(
+            constraint as Parameters<typeof validateGoogleCalendarProxyCall>[0],
+            apiCall,
+          );
+          if (!r.ok) adapterReason = r.reason;
+          break;
+        }
+        case 'google_docs': {
+          const r = validateGoogleDocsProxyCall(
+            constraint as Parameters<typeof validateGoogleDocsProxyCall>[0],
+            apiCall,
+          );
+          if (!r.ok) adapterReason = r.reason;
+          break;
+        }
+        case 'google_sheets': {
+          const r = validateGoogleSheetsProxyCall(
+            constraint as Parameters<typeof validateGoogleSheetsProxyCall>[0],
+            apiCall,
+          );
+          if (!r.ok) adapterReason = r.reason;
+          break;
+        }
+        case 'google_tasks': {
+          const r = validateGoogleTasksProxyCall(
+            constraint as Parameters<typeof validateGoogleTasksProxyCall>[0],
+            apiCall,
+          );
+          if (!r.ok) adapterReason = r.reason;
+          break;
+        }
+        case 'google_contacts': {
+          const r = validateGoogleContactsProxyCall(
+            constraint as Parameters<typeof validateGoogleContactsProxyCall>[0],
+            apiCall,
+          );
+          if (!r.ok) adapterReason = r.reason;
+          break;
+        }
+        // 'filesystem' constraint is enforced upstream in the adapter
+        // executor; PDP proxy does not handle filesystem requests.
       }
+    }
+    if (adapterReason !== undefined) {
+      const oosReceiptId = sha256Hex(
+        `proxy-out-of-scope|${request.command}|${canonicalize(request as unknown as Record<string, unknown>)}`,
+      );
+      fireSpan({
+        customerId,
+        agentDid: agentDidForSpan,
+        receiptId: oosReceiptId,
+        toolStatus: 'denied',
+        errorCode: 'resource_out_of_scope',
+        requestArgs,
+      });
+      return c.json(
+        {
+          allow: false,
+          decision: {
+            allow: false,
+            reason: 'resource_out_of_scope',
+            receiptId: oosReceiptId,
+          },
+          error_code: 'resource_out_of_scope',
+          adapter_reason: adapterReason,
+        },
+        403,
+      );
     }
 
     let upstream: Awaited<ReturnType<typeof proxyApiCall>>;

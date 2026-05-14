@@ -2,6 +2,7 @@ export { filesystemPack } from './filesystem/index.js';
 export { githubPack } from './github/index.js';
 export { googlePack } from './google/index.js';
 export { googleCalendarPack } from './google_calendar/index.js';
+export { googleContactsPack } from './google_contacts/index.js';
 export { googleDocsPack } from './google_docs/index.js';
 export { googleGmailPack } from './google_gmail/index.js';
 export { googleSheetsPack } from './google_sheets/index.js';
@@ -17,6 +18,7 @@ import { filesystemPack } from './filesystem/index.js';
 import { githubPack } from './github/index.js';
 import { googlePack } from './google/index.js';
 import { googleCalendarPack } from './google_calendar/index.js';
+import { googleContactsPack } from './google_contacts/index.js';
 import { googleDocsPack } from './google_docs/index.js';
 import { googleGmailPack } from './google_gmail/index.js';
 import { googleSheetsPack } from './google_sheets/index.js';
@@ -37,6 +39,7 @@ export const PACKS: IntegrationPack[] = [
   googleDocsPack,
   googleSheetsPack,
   googleTasksPack,
+  googleContactsPack,
   notionPack,
   linearPack,
   stripePack,
@@ -168,22 +171,58 @@ export type ConsistencyResult =
     };
 
 const COMPARED_KEYS = [
+  // github
   'owner',
   'repo',
   'repo_name',
   'issue_number',
   'pull_number',
+  // slack
   'channel',
   'channel_id',
+  'user_id',
+  'thread_ts',
+  // notion
   'page_id',
   'database_id',
+  'block_id',
+  // google drive
   'file_id',
+  'folder_id',
+  'drive_id',
+  'permission_id',
+  // google gmail
+  'message_id',
+  'thread_id',
+  'label_id',
+  // google calendar
+  'calendar_id',
+  'event_id',
+  // google docs / sheets / tasks
+  'document_id',
+  'spreadsheet_id',
+  'sheet_id',
+  'range',
+  'tasklist_id',
+  'task_id',
+  // google contacts
+  'resource_name',
+  // stripe
+  'customer_id',
+  'payment_intent',
+  'charge_id',
+  'subscription_id',
+  'invoice_id',
+  // linear
+  'team_id',
+  'project_id',
+  'issue_id',
 ] as const;
 
 export function validateResourceConsistency(
   command: string,
   resource: unknown,
-  apiCall: { method: string; path: string },
+  apiCall: { method: string; path: string; body?: unknown; query?: Record<string, string> },
 ): ConsistencyResult {
   const pack = packForCommand(command);
   if (!pack?.extractResourceFromApiCall) return { ok: true };

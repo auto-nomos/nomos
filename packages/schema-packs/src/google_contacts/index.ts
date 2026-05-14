@@ -1,23 +1,23 @@
-import { generated } from '../__generated__/stripe-api-schemas.js';
+import { generated } from '../__generated__/google_contacts-api-schemas.js';
 import { type IntegrationPack, mergeActionSchemas } from '../types.js';
 import { actionToCommand, resourceFor } from './actions.js';
 import { extractResourceFromApiCall } from './extract.js';
-import { stripeActionSchemas } from './schemas.js';
+import { googleContactsActionSchemas } from './schemas.js';
 import { actions, templates } from './templates.js';
 
-export const stripePack: IntegrationPack = {
-  id: 'stripe',
-  name: 'Stripe',
+export const googleContactsPack: IntegrationPack = {
+  id: 'google_contacts',
+  name: 'Google Contacts',
   templates,
   actions: [...actions],
-  actionSchemas: mergeActionSchemas(generated, stripeActionSchemas),
+  actionSchemas: mergeActionSchemas(generated, googleContactsActionSchemas),
   extractResourceFromApiCall,
 };
 export {
   actions,
   actionToCommand,
   extractResourceFromApiCall,
+  googleContactsActionSchemas,
   resourceFor,
-  stripeActionSchemas,
   templates,
 };

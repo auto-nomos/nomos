@@ -41,13 +41,168 @@ export const GithubConstraint = z.object({
   pr_number: z.number().int().positive().optional(),
 });
 
+/**
+ * Slack variant. `team_id` (T…) is the workspace; `channel_id` (C…)
+ * pins to a specific channel; `user_id` (U…) pins DMs / membership ops;
+ * `thread_ts` narrows replies to a single thread.
+ */
+export const SlackConstraint = z.object({
+  provider: z.literal('slack'),
+  team_id: z.string().min(1).optional(),
+  channel_id: z
+    .string()
+    .regex(/^[CDG][A-Z0-9]+$/, 'expected slack channel id')
+    .optional(),
+  user_id: z
+    .string()
+    .regex(/^[UW][A-Z0-9]+$/, 'expected slack user id')
+    .optional(),
+  thread_ts: z
+    .string()
+    .regex(/^\d+\.\d+$/, 'expected slack ts')
+    .optional(),
+});
+
+/**
+ * Stripe variant. `account_id` (acct_) scopes to a Connect account;
+ * `customer_id` (cus_), `payment_intent` (pi_), `charge_id` (ch_),
+ * `subscription_id` (sub_), `invoice_id` (in_) each pin a specific
+ * Stripe object. `path_prefix` narrows to one API namespace.
+ */
+export const StripeConstraint = z.object({
+  provider: z.literal('stripe'),
+  account_id: z
+    .string()
+    .regex(/^acct_[A-Za-z0-9]+$/)
+    .optional(),
+  customer_id: z
+    .string()
+    .regex(/^cus_[A-Za-z0-9]+$/)
+    .optional(),
+  payment_intent: z
+    .string()
+    .regex(/^pi_[A-Za-z0-9]+$/)
+    .optional(),
+  charge_id: z
+    .string()
+    .regex(/^ch_[A-Za-z0-9]+$/)
+    .optional(),
+  subscription_id: z
+    .string()
+    .regex(/^sub_[A-Za-z0-9]+$/)
+    .optional(),
+  invoice_id: z
+    .string()
+    .regex(/^in_[A-Za-z0-9]+$/)
+    .optional(),
+  path_prefix: z.string().min(1).optional(),
+});
+
+/**
+ * Linear variant. Linear is GraphQL — the validator inspects
+ * `body.query` (operation-name allowlist) and `body.variables`. Ids are
+ * Linear UUIDs.
+ */
+export const LinearConstraint = z.object({
+  provider: z.literal('linear'),
+  workspace_id: z.string().min(1).optional(),
+  team_id: z.string().min(1).optional(),
+  project_id: z.string().min(1).optional(),
+  issue_id: z.string().min(1).optional(),
+});
+
+/**
+ * Notion variant. UUIDs are accepted with or without hyphens; the
+ * validator normalizes by stripping `-` before equality.
+ */
+export const NotionConstraint = z.object({
+  provider: z.literal('notion'),
+  workspace_id: z.string().min(1).optional(),
+  database_id: z.string().min(1).optional(),
+  page_id: z.string().min(1).optional(),
+  block_id: z.string().min(1).optional(),
+});
+
+/**
+ * Google Drive variant. `file_id` pins one file; `folder_id` scopes to a
+ * folder (parents check); `drive_id` scopes to a shared drive;
+ * `path_prefix` is reserved for future tree-walk scopes (currently unused
+ * since Drive uses ids, not paths).
+ */
+export const GoogleDriveConstraint = z.object({
+  provider: z.literal('google_drive'),
+  file_id: z.string().min(1).optional(),
+  folder_id: z.string().min(1).optional(),
+  drive_id: z.string().min(1).optional(),
+  path_prefix: z.string().min(1).optional(),
+});
+
+export const GoogleGmailConstraint = z.object({
+  provider: z.literal('google_gmail'),
+  user_id: z.string().min(1).optional(),
+  message_id: z.string().min(1).optional(),
+  thread_id: z.string().min(1).optional(),
+  label_id: z.string().min(1).optional(),
+});
+
+export const GoogleCalendarConstraint = z.object({
+  provider: z.literal('google_calendar'),
+  calendar_id: z.string().min(1).optional(),
+  event_id: z.string().min(1).optional(),
+});
+
+export const GoogleDocsConstraint = z.object({
+  provider: z.literal('google_docs'),
+  document_id: z.string().min(1).optional(),
+});
+
+export const GoogleSheetsConstraint = z.object({
+  provider: z.literal('google_sheets'),
+  spreadsheet_id: z.string().min(1).optional(),
+  sheet_id: z.string().min(1).optional(),
+  range: z.string().min(1).optional(),
+});
+
+export const GoogleTasksConstraint = z.object({
+  provider: z.literal('google_tasks'),
+  tasklist_id: z.string().min(1).optional(),
+  task_id: z.string().min(1).optional(),
+});
+
+export const GoogleContactsConstraint = z.object({
+  provider: z.literal('google_contacts'),
+  resource_name: z.string().min(1).optional(),
+});
+
 export const ResourceConstraint = z.discriminatedUnion('provider', [
   FilesystemConstraint,
   GithubConstraint,
+  SlackConstraint,
+  StripeConstraint,
+  LinearConstraint,
+  NotionConstraint,
+  GoogleDriveConstraint,
+  GoogleGmailConstraint,
+  GoogleCalendarConstraint,
+  GoogleDocsConstraint,
+  GoogleSheetsConstraint,
+  GoogleTasksConstraint,
+  GoogleContactsConstraint,
 ]);
 
 export type FilesystemConstraint = z.infer<typeof FilesystemConstraint>;
 export type GithubConstraint = z.infer<typeof GithubConstraint>;
+export type SlackConstraint = z.infer<typeof SlackConstraint>;
+export type StripeConstraint = z.infer<typeof StripeConstraint>;
+export type LinearConstraint = z.infer<typeof LinearConstraint>;
+export type NotionConstraint = z.infer<typeof NotionConstraint>;
+export type GoogleDriveConstraint = z.infer<typeof GoogleDriveConstraint>;
+export type GoogleGmailConstraint = z.infer<typeof GoogleGmailConstraint>;
+export type GoogleCalendarConstraint = z.infer<typeof GoogleCalendarConstraint>;
+export type GoogleDocsConstraint = z.infer<typeof GoogleDocsConstraint>;
+export type GoogleSheetsConstraint = z.infer<typeof GoogleSheetsConstraint>;
+export type GoogleTasksConstraint = z.infer<typeof GoogleTasksConstraint>;
+export type GoogleContactsConstraint = z.infer<typeof GoogleContactsConstraint>;
 export type ResourceConstraint = z.infer<typeof ResourceConstraint>;
 
 export const UcanPayload = z

@@ -20,7 +20,8 @@ export type IntegrationId =
   | 'google_gmail'
   | 'google_docs'
   | 'google_sheets'
-  | 'google_tasks';
+  | 'google_tasks'
+  | 'google_contacts';
 
 export interface PolicyTemplate {
   /** Stable id, namespaced on integration: `github:read-only`. */
@@ -87,7 +88,7 @@ export interface IntegrationPack {
    */
   extractResourceFromApiCall?: (
     command: string,
-    apiCall: { method: string; path: string },
+    apiCall: { method: string; path: string; body?: unknown },
   ) => Record<string, unknown> | null;
 }
 
