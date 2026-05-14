@@ -80,30 +80,47 @@ export function isKnownCommand(command: string): boolean {
   return !KNOWN_INTEGRATIONS.has(seg);
 }
 
-/** Find the pack that owns a command, if any. Returns undefined for
- *  pass-through integrations (first segment not in KNOWN_INTEGRATIONS). */
+/** Find the pack that owns a command, if any. Uses longest-prefix match
+ *  so multi-word pack ids resolve correctly: `/google/calendar/event/create`
+ *  routes to `google_calendar` rather than `google` (Drive). Falls back to
+ *  the first segment for single-word packs (github, slack, notion, …). */
 function packForCommand(command: string): IntegrationPack | undefined {
-  const seg = command.split('/')[1];
-  if (!seg) return undefined;
-  return PACKS.find((p) => p.id === seg);
+  const segs = command.split('/').filter(Boolean);
+  if (segs.length === 0) return undefined;
+  for (let n = Math.min(segs.length, 4); n >= 1; n--) {
+    const candidateId = segs.slice(0, n).join('_');
+    const pack = PACKS.find((p) => p.id === candidateId);
+    if (pack) return pack;
+  }
+  return undefined;
 }
 
 export type ValidateResult = { ok: true } | { ok: false; reason: string; issues?: unknown };
 
 /**
  * D3 (Lane B): Validate a proxy /v1/proxy `apiCall` against the schema-pack
- * for its command. Returns `{ ok: true }` when:
- *   - the pack defines no schema for the command (pass-through), OR
- *   - the pack declares a schema and the apiCall conforms.
- * Returns `{ ok: false, reason: 'schema_violation', issues }` otherwise.
- *
- * Callers should fail-closed on `ok: false` with deny + receipt.
+ * for its command. Behaviour:
+ *   - Unknown integration namespace → pass (Cedar handles authorization).
+ *   - Known pack + command listed in `pack.actions` + missing schema →
+ *     deny with `schema_missing`. Closes the 2026-05-14 smuggle class:
+ *     before this fix, an in-tree write command without an apiCallSchema
+ *     would pass through and let the agent point the proxy at any HTTP
+ *     endpoint that satisfied the connector's repo-gate.
+ *   - Known pack + command NOT in `pack.actions` → pass (lets tests and
+ *     bespoke Cedar deployments use ad-hoc commands without forcing every
+ *     test to mint a schema).
+ *   - Known schema present → enforce it; mismatch is `schema_violation`.
  */
 export function validateApiCall(command: string, apiCall: unknown): ValidateResult {
   const pack = packForCommand(command);
-  if (!pack) return { ok: true }; // unknown integration → Cedar pass-through
+  if (!pack) return { ok: true };
   const schema = pack.actionSchemas?.[command]?.apiCallSchema;
-  if (!schema) return { ok: true }; // pack hasn't declared per-action shape yet
+  if (!schema) {
+    if (pack.actions.includes(command)) {
+      return { ok: false, reason: 'schema_missing' };
+    }
+    return { ok: true };
+  }
   const parsed = schema.safeParse(apiCall);
   if (parsed.success) return { ok: true };
   return { ok: false, reason: 'schema_violation', issues: parsed.error.issues };
@@ -111,8 +128,10 @@ export function validateApiCall(command: string, apiCall: unknown): ValidateResu
 
 /**
  * D3 (Lane B): Validate a Cedar `request.resource` object against the
- * schema-pack for its command. Same pass-through semantics as
- * validateApiCall.
+ * schema-pack for its command. Resource validation stays pass-through when
+ * no schema is declared (the smuggle class is on `apiCall`, not resource —
+ * see `validateApiCall`). Hand-curated resourceSchema entries still enforce
+ * when present.
  */
 export function validateResource(command: string, resource: unknown): ValidateResult {
   const pack = packForCommand(command);

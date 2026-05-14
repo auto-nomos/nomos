@@ -73,3 +73,22 @@ export interface IntegrationPack {
    */
   actionSchemas?: Partial<Record<string, ActionSchemas>>;
 }
+
+/**
+ * Shallow-merge two action-schema maps per command. Used to layer
+ * hand-curated schemas (in `<pack>/schemas.ts`) over the YAML-generated
+ * floor in `__generated__/<pack>-api-schemas.ts`. Hand-curated tightens
+ * generated — when both define `apiCallSchema` for the same command, the
+ * hand-curated one wins; `resourceSchema` is overlaid the same way.
+ */
+export function mergeActionSchemas(
+  base: Partial<Record<string, ActionSchemas>>,
+  override: Partial<Record<string, ActionSchemas>>,
+): Partial<Record<string, ActionSchemas>> {
+  const out: Partial<Record<string, ActionSchemas>> = {};
+  const keys = new Set([...Object.keys(base), ...Object.keys(override)]);
+  for (const k of keys) {
+    out[k] = { ...base[k], ...override[k] };
+  }
+  return out;
+}
