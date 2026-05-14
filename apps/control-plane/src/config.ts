@@ -99,6 +99,42 @@ const Config = z.object({
     .default(false),
   INTENT_COHERENCE_TIMEOUT_MS: z.coerce.number().int().positive().default(1500),
 
+  // M0 (Cloud IAM) — Nomos-hosted OIDC issuer that AWS STS / Azure AD /
+  // GCP WIF federate to. The Cloudflare Worker at id.auto-nomos.com serves
+  // the public JWKS; the control-plane mints ID tokens internally for the
+  // PDP. In dev we run JWKS + mint on the same Hono server.
+  /** Public issuer URL — appears in token `iss` and JWKS `issuer` discovery. */
+  OIDC_ISSUER_URL: z.string().url().default('http://localhost:8788/oidc'),
+  /** Default ID-token TTL. Min 60s, max 900s (cloud federation caps). */
+  OIDC_ID_TOKEN_TTL_SECONDS: z.coerce.number().int().min(60).max(900).default(300),
+  /**
+   * Dev RS256 signer — PEM-encoded PKCS#8 private key. When set, mint uses
+   * this instead of AWS KMS. Empty in prod; production sets OIDC_KMS_KEY_ARN.
+   * Generate via `openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048`.
+   */
+  OIDC_DEV_RSA_PRIVATE_KEY_PEM: z.string().optional(),
+  /** Matching kid for the dev key. Must equal the kid in OIDC_DEV_RSA_PUBLIC_JWK. */
+  OIDC_DEV_KID: z.string().optional(),
+  /**
+   * Matching public JWK as JSON string (kid, kty, n, e, alg, use). Served
+   * verbatim at /oidc/jwks.json when dev signer is active.
+   */
+  OIDC_DEV_RSA_PUBLIC_JWK: z.string().optional(),
+  /**
+   * AWS KMS key ARN for the issuer signing key in prod. Empty = dev signer
+   * required (mint refuses to start with neither). Asymmetric RSA_2048
+   * key with RSASSA_PKCS1_V1_5_SHA_256 algorithm.
+   */
+  OIDC_KMS_KEY_ARN: z.string().optional(),
+  /** Per-agent ID-token mint rate-limit (tokens/minute). Burst = limit / 6. */
+  OIDC_MINT_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().positive().default(60),
+  /** How often the cloud verify-poll worker probes each cloud_connection. Default 24h. */
+  CLOUD_VERIFY_POLL_INTERVAL_MS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(24 * 60 * 60 * 1_000),
+
   // Sprint 8.5 — Cloudflare R2 audit archive. When any of these are blank the
   // archive worker is disabled (the audit_events Postgres rows still keep
   // every event; the archive is for long-term immutable retention).
