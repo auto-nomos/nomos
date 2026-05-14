@@ -21,6 +21,7 @@ import {
 import { canonicalize, computeCid, parseUcanJwt } from '@auto-nomos/ucan';
 import { Hono } from 'hono';
 import { z } from 'zod';
+import { type CloudAdapterDeps, CloudCallError, cloudApiCall } from '../adapters/cloud.js';
 import { validateGithubProxyCall } from '../adapters/github.js';
 import {
   isKnownProvider,
@@ -35,6 +36,7 @@ import type { OAuthTokenResponse, StepUpStateResponse } from '../control-plane/c
 import { getLog } from '../middleware/logger.js';
 import { sanitizeResponseBody } from '../middleware/sanitize-response.js';
 import { recordAuthorize } from '../observability/metrics.js';
+import { shouldForceStepUp } from '../services/cloud-risk-rules.js';
 import { validateCosigner } from '../services/cosigner-validate.js';
 import { evaluateStepUpPotential, shouldDetectStepUp } from '../services/stepup.js';
 import {
@@ -93,6 +95,12 @@ export interface ProxyRouteDeps {
   };
   /** Injectable upstream fetch — defaults to global fetch. */
   upstreamFetch?: typeof fetch;
+  /**
+   * M1 — cloud federation. When set, proxy requests whose UCAN carries
+   * `meta.cloud_connection_id` route through control-plane's
+   * /v1/internal/cloud/api-call instead of the OAuth bearer adapter.
+   */
+  cloud?: CloudAdapterDeps;
 }
 
 export function createProxyRoutes(deps: ProxyRouteDeps): Hono {
@@ -375,6 +383,186 @@ export function createProxyRoutes(deps: ProxyRouteDeps): Hono {
     }
 
     const leaf = leafUcan(parsed.data.ucan);
+
+    // M1 — cloud federation branch. UCAN may carry meta.cloud_connection_id
+    // instead of meta.oauth_connection_id; control-plane handles credential
+    // acquisition + the upstream call in one shot.
+    const cloudConnectionId =
+      leaf?.payload.meta && typeof leaf.payload.meta.cloud_connection_id === 'string'
+        ? leaf.payload.meta.cloud_connection_id
+        : undefined;
+    if (cloudConnectionId) {
+      if (!deps.cloud) {
+        return c.json(
+          {
+            error: 'cloud_proxy_disabled',
+            error_code: 'cloud_proxy_disabled',
+            decision,
+          },
+          501,
+        );
+      }
+      // extractAgentId reads from the leaf UCAN JWT string.
+      const leafJwt = Array.isArray(parsed.data.ucan)
+        ? parsed.data.ucan[parsed.data.ucan.length - 1]
+        : parsed.data.ucan;
+      const agentId = leafJwt ? extractAgentId(leafJwt) : undefined;
+      if (!agentId) {
+        return c.json(
+          { error: 'ucan missing agent_id', error_code: 'missing_agent_id', decision },
+          400,
+        );
+      }
+      const apiCall = parsed.data.apiCall as ProxyRequest;
+      const ucanCid = leaf
+        ? computeCid(canonicalize(leaf.payload as Record<string, unknown>))
+        : undefined;
+      // Cloud risk rules: destructive verbs (delete/stop/drain/run_command
+      // /scale/rotate/redeploy/invoke) require cosigner=true even when
+      // Cedar allowed. Defense-in-depth against over-permissive policies.
+      if (shouldForceStepUp(decision, { request })) {
+        return c.json(
+          {
+            error: 'cosigner_required',
+            error_code: 'cosigner_required',
+            decision: {
+              ...decision,
+              allow: false,
+              requiresStepUp: true,
+              reason: 'destructive_cloud_action_requires_cosigner',
+            },
+          },
+          403,
+        );
+      }
+      try {
+        const cloudUpstream = await cloudApiCall(
+          deps.cloud,
+          cloudConnectionId,
+          {
+            customerId,
+            agentId,
+            ...(ucanCid ? { ucanCid } : {}),
+          },
+          {
+            method: apiCall.method,
+            url: apiCall.path,
+            ...(apiCall.query ? { query: apiCall.query } : {}),
+            ...(apiCall.body !== undefined ? { body: apiCall.body } : {}),
+            ...(apiCall.headers ? { headers: apiCall.headers } : {}),
+          },
+        );
+        const sanitized = sanitizeResponseBody(
+          cloudUpstream.body,
+          cloudUpstream.headers['content-type'],
+        );
+        log.info(
+          {
+            customerId,
+            connectionId: cloudConnectionId,
+            connector: cloudUpstream.connector,
+            status: cloudUpstream.status,
+            idTokenJti: cloudUpstream.idTokenJti,
+          },
+          'cloud proxy call completed',
+        );
+        // M1 audit polish (#1) — emit chain entry capturing the three stages
+        // of the cloud call: mint (jti), federation exchange (implied by the
+        // control-plane returning a connector), and the upstream call.
+        if (deps.emitAudit) {
+          const cloudReceiptId = sha256Hex(
+            `cloud-call|${request.command}|${cloudConnectionId}|${cloudUpstream.idTokenJti}|${cloudUpstream.status}`,
+          );
+          await deps.emitAudit({
+            customerId,
+            request: {
+              ...request,
+              context: {
+                ...(request.context as Record<string, unknown>),
+                cloud_kind: 'cloud.call.allowed',
+                cloud_connection_id: cloudConnectionId,
+                cloud_connector: cloudUpstream.connector,
+                cloud_id_token_jti: cloudUpstream.idTokenJti,
+                cloud_upstream_status: cloudUpstream.status,
+              },
+            },
+            decision: {
+              allow: cloudUpstream.status >= 200 && cloudUpstream.status < 400,
+              reason:
+                cloudUpstream.status >= 200 && cloudUpstream.status < 400
+                  ? 'cloud_call_allowed'
+                  : 'cloud_upstream_status_' + cloudUpstream.status,
+              receiptId: cloudReceiptId,
+            },
+            ts: Date.now(),
+            agentDid: leafJwt ? extractAgentDid(leafJwt) : '',
+          });
+        }
+        return c.json({
+          allow: true,
+          decision,
+          upstream: {
+            status: cloudUpstream.status,
+            body: sanitized,
+            headers: cloudUpstream.headers,
+          },
+          connection: { id: cloudConnectionId, connector: cloudUpstream.connector },
+        });
+      } catch (err) {
+        if (err instanceof CloudCallError) {
+          log.warn(
+            {
+              connectionId: cloudConnectionId,
+              providerStatus: err.providerStatus,
+              retryable: err.retryable,
+            },
+            'cloud federation rejected the call',
+          );
+          if (deps.emitAudit) {
+            await deps.emitAudit({
+              customerId,
+              request: {
+                ...request,
+                context: {
+                  ...(request.context as Record<string, unknown>),
+                  cloud_kind: 'cloud.federation.exchanged.failed',
+                  cloud_connection_id: cloudConnectionId,
+                  cloud_provider_status: err.providerStatus,
+                  cloud_retryable: err.retryable,
+                },
+              },
+              decision: {
+                allow: false,
+                reason: 'cloud_call_failed',
+                receiptId: sha256Hex(
+                  `cloud-call-failed|${request.command}|${cloudConnectionId}|${err.providerStatus}`,
+                ),
+              },
+              ts: Date.now(),
+              agentDid: leafJwt ? extractAgentDid(leafJwt) : '',
+            });
+          }
+          return c.json(
+            {
+              error: 'cloud_call_failed',
+              error_code: 'cloud_call_failed',
+              decision,
+              connectionId: cloudConnectionId,
+              providerStatus: err.providerStatus,
+              providerBody: err.providerBody,
+              retryable: err.retryable,
+            },
+            err.retryable ? 503 : 502,
+          );
+        }
+        log.error({ err, connectionId: cloudConnectionId }, 'cloud proxy call failed');
+        return c.json(
+          { error: 'cloud_call_failed', error_code: 'cloud_call_failed', decision },
+          502,
+        );
+      }
+    }
+
     const connectionId =
       leaf?.payload.meta && typeof leaf.payload.meta.oauth_connection_id === 'string'
         ? leaf.payload.meta.oauth_connection_id

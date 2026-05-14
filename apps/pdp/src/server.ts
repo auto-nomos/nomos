@@ -41,6 +41,17 @@ export interface ServerDeps {
     upstreamFetch?: typeof fetch;
   };
   /**
+   * M1 — cloud IAM federation. When supplied, /v1/proxy/:command UCANs
+   * carrying meta.cloud_connection_id route through control-plane's
+   * /v1/internal/cloud/api-call instead of the OAuth bearer adapter.
+   * Requires `internal.serviceToken` (re-used to authenticate calls into
+   * the control-plane).
+   */
+  cloudProxy?: {
+    controlPlaneUrl: string;
+    fetch?: typeof fetch;
+  };
+  /**
    * Sprint 9 step-up. When supplied, authorize denies that would allow with
    * cosigner=true synthesize a push_approvals row, and `/v1/stepup/:id`
    * exposes state for SDK polling.
@@ -98,6 +109,7 @@ export function createServer(deps: ServerDeps): Hono {
         revocationCache: deps.revocationCache,
         serviceToken: deps.internal.serviceToken,
         logger: deps.logger,
+        ...(deps.emitAudit !== undefined ? { emitAudit: deps.emitAudit } : {}),
       }),
     );
   }
@@ -123,6 +135,15 @@ export function createServer(deps: ServerDeps): Hono {
           : {}),
         ...(deps.oauthProxy.upstreamFetch !== undefined
           ? { upstreamFetch: deps.oauthProxy.upstreamFetch }
+          : {}),
+        ...(deps.cloudProxy && deps.internal
+          ? {
+              cloud: {
+                controlPlaneUrl: deps.cloudProxy.controlPlaneUrl,
+                serviceToken: deps.internal.serviceToken,
+                ...(deps.cloudProxy.fetch ? { fetch: deps.cloudProxy.fetch } : {}),
+              },
+            }
           : {}),
       }),
     );

@@ -163,6 +163,9 @@ async function main(): Promise<void> {
       fetchOAuthToken: cpClient.fetchOAuthToken,
       refreshOAuthToken: cpClient.refreshOAuthToken,
     },
+    cloudProxy: {
+      controlPlaneUrl: config.CONTROL_PLANE_URL,
+    },
     stepup: {
       create: async (args) => {
         const created = await cpClient.createStepUp(args);
