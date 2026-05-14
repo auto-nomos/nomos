@@ -55,17 +55,40 @@ const AuthenticationResponseSchema = z
   .object({ id: z.string(), rawId: z.string(), type: z.literal('public-key') })
   .passthrough();
 
+/**
+ * Cosigner-mint window: the first N seconds after request creation, during
+ * which the SDK's `waitForApproval` is still polling and the agent's
+ * in-flight call can be resumed. After this window the approval is still
+ * actionable for 7 days — but only as a policy-save, not as a cosigner.
+ */
+const COSIGNER_WINDOW_SECONDS = 60;
+
+function deriveStage(
+  state: string,
+  requestedAt: Date,
+  expiresAt: Date,
+  now: Date,
+): 'pending' | 'awaiting_review' | 'approved' | 'denied' | 'expired' {
+  if (state !== 'pending') return state as 'approved' | 'denied';
+  if (expiresAt.getTime() <= now.getTime()) return 'expired';
+  if (requestedAt.getTime() + COSIGNER_WINDOW_SECONDS * 1_000 <= now.getTime()) {
+    return 'awaiting_review';
+  }
+  return 'pending';
+}
+
 export const stepupRouter = router({
-  /** All non-expired pending approvals for the current customer (for dashboard widget). */
+  /** Non-expired pending + awaiting_review approvals for the current customer. */
   listPending: tenantProcedure.query(async ({ ctx }) => {
     const now = new Date();
-    return ctx.db.drizzle
+    const rows = await ctx.db.drizzle
       .select({
         id: schema.pushApprovals.id,
         agentId: schema.pushApprovals.agentId,
         agentName: schema.agents.name,
         command: schema.pushApprovals.command,
         resource: schema.pushApprovals.resource,
+        state: schema.pushApprovals.state,
         expiresAt: schema.pushApprovals.expiresAt,
         requestedAt: schema.pushApprovals.requestedAt,
       })
@@ -80,6 +103,13 @@ export const stepupRouter = router({
       )
       .orderBy(desc(schema.pushApprovals.requestedAt))
       .limit(20);
+    return rows.map((r) => ({
+      ...r,
+      state: deriveStage(r.state, r.requestedAt, r.expiresAt, now),
+      cosignerWindowEndsAt: new Date(
+        r.requestedAt.getTime() + COSIGNER_WINDOW_SECONDS * 1_000,
+      ).toISOString(),
+    }));
   }),
 
   /**
@@ -202,10 +232,12 @@ export const stepupRouter = router({
       if (!row) {
         throw new TRPCError({ code: 'NOT_FOUND', message: 'approval_not_found' });
       }
-      const now = Date.now();
-      const effectiveState =
-        row.state === 'pending' && row.expiresAt.getTime() <= now ? 'expired' : row.state;
-      return { ...row, state: effectiveState };
+      const now = new Date();
+      const effectiveState = deriveStage(row.state, row.requestedAt, row.expiresAt, now);
+      const cosignerWindowEndsAt = new Date(
+        row.requestedAt.getTime() + COSIGNER_WINDOW_SECONDS * 1_000,
+      ).toISOString();
+      return { ...row, state: effectiveState, cosignerWindowEndsAt };
     }),
 
   assertOptions: tenantProcedure

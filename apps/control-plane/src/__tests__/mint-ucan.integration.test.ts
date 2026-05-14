@@ -69,6 +69,7 @@ describe.skipIf(!RUN)('POST /v1/mint-ucan (requires postgres)', () => {
         name: `agent-${Math.random()}`,
         did: `did:key:test-${Date.now()}-${Math.random()}`,
         status,
+        connectionApprovedAt: new Date(),
       })
       .returning();
     return a!.id;

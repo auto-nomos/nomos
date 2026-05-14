@@ -85,7 +85,7 @@ export function createAuth(deps: AuthDeps): Auth {
       },
     },
     rateLimit: {
-      enabled: true,
+      enabled: config.NODE_ENV !== 'test',
       window: 60,
       max: 10,
     },

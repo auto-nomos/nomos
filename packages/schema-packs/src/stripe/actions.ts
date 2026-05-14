@@ -27,6 +27,9 @@ export const actionToCommand: Record<string, string> = {
   list_prices: '/stripe/price/list',
   list_disputes: '/stripe/dispute/list',
   list_balance_transactions: '/stripe/balance_transaction/list',
+  get_balance: '/stripe/balance/read',
+  list_setup_intents: '/stripe/setup_intent/list',
+  list_refunds: '/stripe/refund/list',
 };
 
 export function resourceFor(
@@ -43,8 +46,7 @@ export function resourceFor(
   const invoiceId = typeof params.invoice_id === 'string' ? params.invoice_id : undefined;
   const subscriptionId =
     typeof params.subscription_id === 'string' ? params.subscription_id : undefined;
-  const piId =
-    typeof params.payment_intent_id === 'string' ? params.payment_intent_id : undefined;
+  const piId = typeof params.payment_intent_id === 'string' ? params.payment_intent_id : undefined;
 
   switch (actionId) {
     case 'list_customers':
@@ -60,6 +62,9 @@ export function resourceFor(
     case 'list_prices':
     case 'list_disputes':
     case 'list_balance_transactions':
+    case 'get_balance':
+    case 'list_setup_intents':
+    case 'list_refunds':
       return {};
     case 'get_customer':
     case 'update_customer':

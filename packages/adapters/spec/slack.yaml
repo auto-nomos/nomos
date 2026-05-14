@@ -290,3 +290,77 @@ actions:
       - { name: channel, in: body, required: true, type: string }
       - { name: timestamp, in: body, required: true, type: string }
       - { name: name, in: body, required: true, type: string }
+
+  - id: archive_channel
+    description: Archive a channel (make it read-only).
+    expected_use: Retire an old project channel.
+    auto_execute: false
+    required_scopes: [channels:manage, groups:write, im:write, mpim:write]
+    risk: { category: write, sensitivity: medium }
+    http:
+      method: POST
+      path: "/conversations.archive"
+    params:
+      - { name: channel, in: body, required: true, type: string }
+
+  - id: unarchive_channel
+    description: Unarchive a previously archived channel.
+    expected_use: Restore an archived channel for active use.
+    auto_execute: false
+    required_scopes: [channels:manage, groups:write, im:write, mpim:write]
+    risk: { category: write, sensitivity: medium }
+    http:
+      method: POST
+      path: "/conversations.unarchive"
+    params:
+      - { name: channel, in: body, required: true, type: string }
+
+  - id: list_files
+    description: List uploaded files visible to the calling user.
+    expected_use: Find a file the agent uploaded earlier.
+    auto_execute: true
+    required_scopes: [files:read]
+    risk: { category: read, sensitivity: medium }
+    http:
+      method: GET
+      path: "/files.list"
+    params:
+      - { name: channel, in: query, type: string }
+      - { name: user, in: query, type: string }
+      - { name: count, in: query, type: integer, default: 25 }
+
+  - id: delete_file
+    description: Permanently delete an uploaded file.
+    expected_use: Clean up an attachment uploaded in error.
+    auto_execute: false
+    required_scopes: [files:write]
+    risk: { category: delete, sensitivity: high }
+    http:
+      method: POST
+      path: "/files.delete"
+    params:
+      - { name: file, in: body, required: true, type: string }
+
+  - id: get_file_info
+    description: Get metadata for a single file.
+    expected_use: Inspect file ownership and type before sharing.
+    auto_execute: true
+    required_scopes: [files:read]
+    risk: { category: read, sensitivity: low }
+    http:
+      method: GET
+      path: "/files.info"
+    params:
+      - { name: file, in: query, required: true, type: string }
+
+  - id: leave_channel
+    description: Leave a channel the bot is a member of.
+    expected_use: Step out of a channel after a temporary task.
+    auto_execute: false
+    required_scopes: [channels:manage, groups:write, im:write, mpim:write]
+    risk: { category: write, sensitivity: low }
+    http:
+      method: POST
+      path: "/conversations.leave"
+    params:
+      - { name: channel, in: body, required: true, type: string }

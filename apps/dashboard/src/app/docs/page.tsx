@@ -30,6 +30,12 @@ const ANCHORS = [
     title: 'Policies & API',
     body: 'Cedar shape, visual builder rules, REST endpoints, tRPC procedures. The reference index.',
   },
+  {
+    href: '/docs#swarms',
+    eyebrow: '04 · beta · maos',
+    title: 'Swarms (delegation chains)',
+    body: 'Multi-agent orchestration security: parent → child UCAN propagation, scope containment, swarm-scoped approval.',
+  },
 ];
 
 export default function DocsPage() {
@@ -47,7 +53,7 @@ export default function DocsPage() {
           </p>
         </header>
 
-        <section className="mt-12 grid gap-px overflow-hidden rounded-sm border border-aegis-line bg-aegis-line md:grid-cols-3">
+        <section className="mt-12 grid gap-px overflow-hidden rounded-sm border border-aegis-line bg-aegis-line md:grid-cols-2 lg:grid-cols-4">
           {ANCHORS.map((a) => (
             <Link
               key={a.href}

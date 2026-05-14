@@ -11,8 +11,10 @@ import {
   Cog,
   FileLock2,
   Gauge,
+  GitBranch,
   KeyRound,
   Layers,
+  LayoutGrid,
   LogOut,
   Plug,
   ShieldCheck,
@@ -29,6 +31,8 @@ interface NavItem {
   label: string;
   icon: React.ComponentType<{ className?: string }>;
   hint?: string;
+  badge?: string;
+  external?: boolean;
 }
 
 const NAV_GROUPS: { id: string; label: string; items: NavItem[] }[] = [
@@ -47,9 +51,23 @@ const NAV_GROUPS: { id: string; label: string; items: NavItem[] }[] = [
     label: 'Build',
     items: [
       { href: '/app/agents', label: 'Apps', icon: Boxes, hint: 'agents + keys' },
+      {
+        href: '/app/swarms',
+        label: 'Swarms',
+        icon: GitBranch,
+        hint: 'delegation chains',
+        badge: 'beta',
+      },
       { href: '/app/policies', label: 'Policies', icon: FileLock2, hint: 'cedar + visual' },
       { href: '/app/connections', label: 'Connections', icon: Plug, hint: 'OAuth bridge' },
       { href: '/app/cloud', label: 'Cloud accounts', icon: Cloud, hint: 'AWS / Azure / GCP' },
+      {
+        href: '/integrations',
+        label: 'Marketplace',
+        icon: LayoutGrid,
+        hint: 'connector catalog',
+        external: true,
+      },
     ],
   },
   {
@@ -151,11 +169,15 @@ function Sidebar() {
             <div className="eyebrow mb-3 px-3">{group.label}</div>
             <ul className="space-y-0.5">
               {group.items.map((item) => {
-                const active = pathname === item.href || pathname?.startsWith(`${item.href}/`);
+                const active =
+                  !item.external &&
+                  (pathname === item.href || pathname?.startsWith(`${item.href}/`));
                 return (
                   <li key={item.href}>
                     <Link
                       href={item.href}
+                      target={item.external ? '_blank' : undefined}
+                      rel={item.external ? 'noreferrer' : undefined}
                       className={cn(
                         'group flex items-center gap-3 rounded-sm px-3 py-2 text-sm transition-colors',
                         active
@@ -167,10 +189,18 @@ function Sidebar() {
                         className={cn('h-4 w-4', active ? 'text-aegis-signal' : 'text-aegis-faint')}
                       />
                       <span className="flex-1">{item.label}</span>
+                      {item.badge ? (
+                        <span className="rounded-sm border border-aegis-iris/40 bg-aegis-iris/10 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.16em] text-aegis-iris">
+                          {item.badge}
+                        </span>
+                      ) : null}
                       {item.hint ? (
                         <span className="font-mono text-[10px] uppercase tracking-wider text-aegis-faint group-hover:text-aegis-mute">
                           {item.hint}
                         </span>
+                      ) : null}
+                      {item.external ? (
+                        <span className="font-mono text-[10px] text-aegis-faint">↗</span>
                       ) : null}
                     </Link>
                   </li>
@@ -299,6 +329,10 @@ const ROUTE_LABEL: Record<string, string> = {
   connections: 'connections',
   policies: 'policies',
   grants: 'standing',
+  swarms: 'swarms',
+  approvals: 'approvals',
+  billing: 'billing',
+  integrations: 'marketplace',
   settings: 'settings',
   notifications: 'notifications',
   guide: 'user-guide',

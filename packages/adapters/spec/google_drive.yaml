@@ -217,3 +217,67 @@ actions:
       path: "/about"
     params:
       - { name: fields, in: query, type: string, default: "storageQuota" }
+
+  - id: trash_file
+    description: Move a file to trash (soft-delete).
+    expected_use: Soft-delete a generated artifact (can be restored).
+    auto_execute: false
+    required_scopes: [https://www.googleapis.com/auth/drive.file]
+    risk: { category: delete, sensitivity: medium }
+    http:
+      method: PATCH
+      path: "/files/{fileId}"
+    params:
+      - { name: fileId, in: path, required: true, type: string }
+      - { name: trashed, in: body, required: true, type: boolean, default: true }
+
+  - id: untrash_file
+    description: Restore a file from trash.
+    expected_use: Recover a soft-deleted artifact.
+    auto_execute: false
+    required_scopes: [https://www.googleapis.com/auth/drive.file]
+    risk: { category: write, sensitivity: medium }
+    http:
+      method: PATCH
+      path: "/files/{fileId}"
+    params:
+      - { name: fileId, in: path, required: true, type: string }
+      - { name: trashed, in: body, required: true, type: boolean, default: false }
+
+  - id: list_changes
+    description: List recent Drive changes for the user.
+    expected_use: Detect newly-shared or modified files since a checkpoint.
+    auto_execute: true
+    required_scopes: [https://www.googleapis.com/auth/drive.readonly]
+    risk: { category: read, sensitivity: medium }
+    http:
+      method: GET
+      path: "/changes"
+    params:
+      - { name: pageToken, in: query, required: true, type: string }
+      - { name: pageSize, in: query, type: integer, default: 100 }
+
+  - id: get_revision
+    description: Get a single revision's metadata.
+    expected_use: Inspect a prior revision before rolling back.
+    auto_execute: true
+    required_scopes: [https://www.googleapis.com/auth/drive.readonly]
+    risk: { category: read, sensitivity: medium }
+    http:
+      method: GET
+      path: "/files/{fileId}/revisions/{revisionId}"
+    params:
+      - { name: fileId, in: path, required: true, type: string }
+      - { name: revisionId, in: path, required: true, type: string }
+
+  - id: get_about
+    description: Get the calling user's Drive profile and storage info.
+    expected_use: Identify the active Drive account.
+    auto_execute: true
+    required_scopes: [https://www.googleapis.com/auth/drive.readonly]
+    risk: { category: read, sensitivity: low }
+    http:
+      method: GET
+      path: "/about"
+    params:
+      - { name: fields, in: query, type: string, default: "user,storageQuota" }

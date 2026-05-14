@@ -55,7 +55,11 @@ export function ApproveClient({ approvalId }: ApproveClientProps) {
   const a = approval.data;
   if (!a) return null;
 
-  const expiredOrDecided = a.state !== 'pending';
+  // Both pending (within cosigner window) and awaiting_review (past window
+  // but within 7-day review TTL) remain actionable. Only terminal states
+  // (approved / denied / expired) hide the action buttons.
+  const expiredOrDecided = a.state !== 'pending' && a.state !== 'awaiting_review';
+  const isReviewOnly = a.state === 'awaiting_review';
 
   async function handleRegister() {
     try {
@@ -259,6 +263,13 @@ export function ApproveClient({ approvalId }: ApproveClientProps) {
         </p>
       ) : (
         <div className="flex flex-col gap-2">
+          {isReviewOnly ? (
+            <p className="rounded border border-amber-300 bg-amber-50 p-3 text-xs text-amber-800 dark:border-amber-700/40 dark:bg-amber-900/20 dark:text-amber-200">
+              The original agent call already timed out. Approving now will{' '}
+              <strong>save a policy</strong> so the next identical call auto-allows — it can no
+              longer resume the original request.
+            </p>
+          ) : null}
           {isEnvelopeSpec(a.resource) ? (
             <fieldset className="rounded-md border border-zinc-200 p-3 text-sm">
               <legend className="px-1 text-xs font-medium text-zinc-500">Lifetime</legend>

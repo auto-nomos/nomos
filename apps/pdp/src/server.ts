@@ -1,3 +1,4 @@
+import type { EmitSpanInput } from '@auto-nomos/shared-types';
 import { Hono } from 'hono';
 import { secureHeaders } from 'hono/secure-headers';
 import type { PolicyCache } from './cache/policies.js';
@@ -22,6 +23,11 @@ export interface ServerDeps {
   /** Expected root UCAN issuer DID, derived from the control-plane verify key. */
   trustedIssuerDid?: string;
   /**
+   * Sprint MAOS-A — chain depth cap (env: NOMOS_MAX_CHAIN_DEPTH, default 8).
+   * Hard guard against runaway delegation in agent swarms.
+   */
+  maxChainDepth?: number;
+  /**
    * Sprint 8 push-revocation. When supplied, mounts
    * POST /v1/internal/refresh-revocations so the control plane can flush a
    * customer's revocation set within ~1s of a revoke.
@@ -39,6 +45,15 @@ export interface ServerDeps {
     refreshOAuthToken?: (customerId: string, connectionId: string) => Promise<OAuthTokenResponse>;
     /** Injectable upstream fetch — defaults to global fetch. */
     upstreamFetch?: typeof fetch;
+    /**
+     * Observability v2 — per-tool-call span emit. Best-effort, fire-and-forget.
+     * Bound to control-plane's POST /v1/internal/spans/emit at boot.
+     */
+    emitSpan?: (args: {
+      customerId: string;
+      agentDid: string;
+      input: EmitSpanInput;
+    }) => Promise<void> | void;
   };
   /**
    * M1 — cloud IAM federation. When supplied, /v1/proxy/:command UCANs
@@ -82,6 +97,7 @@ export function createServer(deps: ServerDeps): Hono {
       revocationCache: deps.revocationCache,
       ...(deps.emitAudit !== undefined ? { emitAudit: deps.emitAudit } : {}),
       ...(deps.trustedIssuerDid !== undefined ? { trustedIssuerDid: deps.trustedIssuerDid } : {}),
+      ...(deps.maxChainDepth !== undefined ? { maxChainDepth: deps.maxChainDepth } : {}),
       ...(deps.stepup
         ? {
             stepup: {
@@ -145,6 +161,7 @@ export function createServer(deps: ServerDeps): Hono {
               },
             }
           : {}),
+        ...(deps.oauthProxy.emitSpan !== undefined ? { emitSpan: deps.oauthProxy.emitSpan } : {}),
       }),
     );
   }

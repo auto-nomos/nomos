@@ -11,14 +11,24 @@ export const READS = [
   '/google/gmail/thread/list',
   '/google/gmail/thread/read',
   '/google/gmail/label/list',
+  '/google/gmail/label/read',
   '/google/gmail/profile/read',
+  '/google/gmail/draft/list',
+  '/google/gmail/draft/read',
 ] as const;
 export const WRITES = [
   '/google/gmail/message/send',
   '/google/gmail/message/modify',
+  '/google/gmail/message/untrash',
   '/google/gmail/draft/create',
+  '/google/gmail/draft/send',
+  '/google/gmail/label/create',
 ] as const;
-export const DELETES = ['/google/gmail/message/trash'] as const;
+export const DELETES = [
+  '/google/gmail/message/trash',
+  '/google/gmail/draft/delete',
+  '/google/gmail/label/delete',
+] as const;
 export const actions = [...READS, ...WRITES, ...DELETES] as const;
 
 const READ_LIST = READS.map((a) => `Action::"${a}"`).join(', ');

@@ -54,3 +54,81 @@ actions:
     params:
       - { name: resourceName, in: path, required: true, type: string }
       - { name: personFields, in: query, type: string, default: "names,emailAddresses,phoneNumbers,addresses" }
+
+  - id: create_contact
+    description: Create a new contact.
+    expected_use: Add a new collaborator from a meeting attendee list.
+    auto_execute: false
+    required_scopes: [https://www.googleapis.com/auth/contacts]
+    risk: { category: write, sensitivity: medium }
+    http:
+      method: POST
+      path: "/people:createContact"
+    params:
+      - { name: names, in: body, type: array }
+      - { name: emailAddresses, in: body, type: array }
+      - { name: phoneNumbers, in: body, type: array }
+
+  - id: update_contact
+    description: Update an existing contact.
+    expected_use: Fix a typo or update an email address.
+    auto_execute: false
+    required_scopes: [https://www.googleapis.com/auth/contacts]
+    risk: { category: write, sensitivity: medium }
+    http:
+      method: PATCH
+      path: "/{resourceName}:updateContact"
+    params:
+      - { name: resourceName, in: path, required: true, type: string }
+      - { name: updatePersonFields, in: query, required: true, type: string }
+      - { name: names, in: body, type: array }
+      - { name: emailAddresses, in: body, type: array }
+
+  - id: delete_contact
+    description: Delete a contact.
+    expected_use: Remove an outdated contact entry.
+    auto_execute: false
+    required_scopes: [https://www.googleapis.com/auth/contacts]
+    risk: { category: delete, sensitivity: high }
+    http:
+      method: DELETE
+      path: "/{resourceName}:deleteContact"
+    params:
+      - { name: resourceName, in: path, required: true, type: string }
+
+  - id: list_contact_groups
+    description: List the user's contact groups.
+    expected_use: Find a group to add a contact to.
+    auto_execute: true
+    required_scopes: [https://www.googleapis.com/auth/contacts.readonly]
+    risk: { category: read, sensitivity: low }
+    http:
+      method: GET
+      path: "/contactGroups"
+    params:
+      - { name: pageSize, in: query, type: integer, default: 25 }
+
+  - id: get_contact_group
+    description: Get a contact group by resource name.
+    expected_use: Inspect group membership before sending invites.
+    auto_execute: true
+    required_scopes: [https://www.googleapis.com/auth/contacts.readonly]
+    risk: { category: read, sensitivity: low }
+    http:
+      method: GET
+      path: "/{resourceName}"
+    params:
+      - { name: resourceName, in: path, required: true, type: string }
+
+  - id: batch_get_contacts
+    description: Get multiple contacts in one call.
+    expected_use: Resolve a list of resource names to full records.
+    auto_execute: true
+    required_scopes: [https://www.googleapis.com/auth/contacts.readonly]
+    risk: { category: read, sensitivity: medium }
+    http:
+      method: GET
+      path: "/people:batchGet"
+    params:
+      - { name: resourceNames, in: query, required: true, type: string }
+      - { name: personFields, in: query, type: string, default: "names,emailAddresses" }

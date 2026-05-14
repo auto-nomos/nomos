@@ -21,14 +21,17 @@ import {
 } from '../../../components/ui/table';
 import { trpc } from '../../../lib/trpc';
 
-type Tab = 'pending' | 'approved' | 'denied' | 'expired';
+type Tab = 'pending' | 'awaiting_review' | 'approved' | 'denied' | 'expired';
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'pending', label: 'Pending' },
+  { id: 'awaiting_review', label: 'Awaiting review' },
   { id: 'approved', label: 'Approved' },
   { id: 'denied', label: 'Denied' },
   { id: 'expired', label: 'Expired' },
 ];
+
+const PENDING_TABS = new Set<Tab>(['pending', 'awaiting_review']);
 
 function decisionBadge(state: string): ReactElement {
   if (state === 'approved')
@@ -86,29 +89,32 @@ export default function ApprovalsPage() {
   const [tab, setTab] = useState<Tab>('pending');
   const [agentId, setAgentId] = useState<string>('all');
 
+  const isPendingTab = PENDING_TABS.has(tab);
   const agents = trpc.agents.list.useQuery();
   const pending = trpc.stepup.listPending.useQuery(undefined, {
-    refetchInterval: tab === 'pending' ? 3000 : false,
-    enabled: tab === 'pending',
+    refetchInterval: isPendingTab ? 3000 : false,
+    enabled: isPendingTab,
   });
   const history = trpc.stepup.listHistory.useQuery(
     {
-      ...(tab !== 'pending' ? { state: [tab] } : {}),
+      ...(!isPendingTab ? { state: [tab as 'approved' | 'denied' | 'expired'] } : {}),
       ...(agentId !== 'all' ? { agentId } : {}),
       limit: 100,
     },
-    { enabled: tab !== 'pending', refetchInterval: 10000 },
+    { enabled: !isPendingTab, refetchInterval: 10000 },
   );
 
   const rows = useMemo(() => {
-    if (tab === 'pending') {
+    if (isPendingTab) {
       const data = pending.data ?? [];
-      return agentId === 'all' ? data : data.filter((r) => r.agentId === agentId);
+      const filtered = agentId === 'all' ? data : data.filter((r) => r.agentId === agentId);
+      // listPending returns both 'pending' and 'awaiting_review'; split by tab.
+      return filtered.filter((r) => r.state === tab);
     }
     return history.data ?? [];
-  }, [tab, pending.data, history.data, agentId]);
+  }, [isPendingTab, tab, pending.data, history.data, agentId]);
 
-  const loading = tab === 'pending' ? pending.isLoading : history.isLoading;
+  const loading = isPendingTab ? pending.isLoading : history.isLoading;
 
   return (
     <div className="space-y-6">
@@ -165,8 +171,10 @@ export default function ApprovalsPage() {
           </CardTitle>
           <CardDescription>
             {tab === 'pending'
-              ? 'Approvals expire automatically. Open one to register a passkey + approve / deny, or use the Telegram bot for one-tap decisions.'
-              : 'Resolved approval history. Click a row to inspect the same UI you saw at decision time.'}
+              ? "Live step-up requests: the agent's call is paused for up to 60s waiting for your decision. Approve to resume the call; the Telegram bot offers one-tap."
+              : tab === 'awaiting_review'
+                ? 'Step-ups whose 60-second cosigner window already closed. Approving now saves a policy for the next identical call — it cannot rescue the original.'
+                : 'Resolved approval history. Click a row to inspect the same UI you saw at decision time.'}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -176,7 +184,9 @@ export default function ApprovalsPage() {
             <p className="text-sm text-zinc-500">
               {tab === 'pending'
                 ? "No pending approvals. When an agent's call is denied by policy, a step-up request shows up here and a Telegram push (if linked) fires simultaneously."
-                : 'No matching rows.'}
+                : tab === 'awaiting_review'
+                  ? 'Nothing waiting for review. Step-ups land here automatically 60 seconds after they are first raised, if you have not yet decided.'
+                  : 'No matching rows.'}
             </p>
           ) : (
             <Table>
@@ -185,11 +195,11 @@ export default function ApprovalsPage() {
                   <TableHead>Agent</TableHead>
                   <TableHead>Command</TableHead>
                   <TableHead>Resource</TableHead>
-                  {tab !== 'pending' ? <TableHead>State</TableHead> : null}
-                  {tab !== 'pending' ? <TableHead>Scope</TableHead> : null}
-                  {tab !== 'pending' ? <TableHead>Decided by</TableHead> : null}
-                  <TableHead>{tab === 'pending' ? 'Requested' : 'Decided'}</TableHead>
-                  <TableHead>{tab === 'pending' ? 'Expires' : 'Requested'}</TableHead>
+                  {!isPendingTab ? <TableHead>State</TableHead> : null}
+                  {!isPendingTab ? <TableHead>Scope</TableHead> : null}
+                  {!isPendingTab ? <TableHead>Decided by</TableHead> : null}
+                  <TableHead>{isPendingTab ? 'Requested' : 'Decided'}</TableHead>
+                  <TableHead>{isPendingTab ? 'Expires' : 'Requested'}</TableHead>
                   <TableHead className="text-right">Action</TableHead>
                 </TableRow>
               </TableHeader>
@@ -197,7 +207,7 @@ export default function ApprovalsPage() {
                 {rows.map((r) => {
                   const resourceStr = JSON.stringify(r.resource).slice(0, 80);
                   const requestedAt = new Date(r.requestedAt).toLocaleString();
-                  const isHistory = tab !== 'pending';
+                  const isHistory = !isPendingTab;
                   const decidedAt =
                     isHistory && 'decidedAt' in r && r.decidedAt
                       ? new Date(r.decidedAt as string | Date).toLocaleString()

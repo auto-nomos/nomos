@@ -22,6 +22,10 @@ export const actionToCommand: Record<string, string> = {
   list_comments: '/notion/comment/list',
   create_comment: '/notion/comment/create',
   get_bot_user: '/notion/user/me',
+  archive_page: '/notion/page/archive',
+  search_pages: '/notion/page/search',
+  restore_page: '/notion/page/restore',
+  get_page_properties: '/notion/page/property/read',
 };
 
 export function resourceFor(
@@ -50,6 +54,12 @@ export function resourceFor(
       return databaseId ? { database: databaseId } : {};
     case 'get_user':
       return userId ? { user: userId } : {};
+    case 'archive_page':
+    case 'restore_page':
+    case 'get_page_properties':
+      return pageId ? { page: pageId } : {};
+    case 'search_pages':
+      return {};
     default:
       return {};
   }

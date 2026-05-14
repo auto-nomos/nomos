@@ -1,6 +1,6 @@
 {
   "name": "@auto-nomos/schema-packs",
-  "version": "0.0.7",
+  "version": "0.2.0",
   "license": "MIT",
   "private": false,
   "type": "module",
@@ -15,45 +15,97 @@
       "types": "./dist/github/index.d.ts",
       "import": "./dist/github/index.js"
     },
+    "./github/path": {
+      "types": "./dist/github/path.d.ts",
+      "import": "./dist/github/path.js"
+    },
     "./slack": {
       "types": "./dist/slack/index.d.ts",
       "import": "./dist/slack/index.js"
+    },
+    "./slack/path": {
+      "types": "./dist/slack/path.d.ts",
+      "import": "./dist/slack/path.js"
     },
     "./google": {
       "types": "./dist/google/index.d.ts",
       "import": "./dist/google/index.js"
     },
+    "./google/path": {
+      "types": "./dist/google/path.d.ts",
+      "import": "./dist/google/path.js"
+    },
     "./notion": {
       "types": "./dist/notion/index.d.ts",
       "import": "./dist/notion/index.js"
+    },
+    "./notion/path": {
+      "types": "./dist/notion/path.d.ts",
+      "import": "./dist/notion/path.js"
     },
     "./linear": {
       "types": "./dist/linear/index.d.ts",
       "import": "./dist/linear/index.js"
     },
+    "./linear/path": {
+      "types": "./dist/linear/path.d.ts",
+      "import": "./dist/linear/path.js"
+    },
     "./stripe": {
       "types": "./dist/stripe/index.d.ts",
       "import": "./dist/stripe/index.js"
+    },
+    "./stripe/path": {
+      "types": "./dist/stripe/path.d.ts",
+      "import": "./dist/stripe/path.js"
     },
     "./google_calendar": {
       "types": "./dist/google_calendar/index.d.ts",
       "import": "./dist/google_calendar/index.js"
     },
+    "./google_calendar/path": {
+      "types": "./dist/google_calendar/path.d.ts",
+      "import": "./dist/google_calendar/path.js"
+    },
     "./google_gmail": {
       "types": "./dist/google_gmail/index.d.ts",
       "import": "./dist/google_gmail/index.js"
+    },
+    "./google_gmail/path": {
+      "types": "./dist/google_gmail/path.d.ts",
+      "import": "./dist/google_gmail/path.js"
     },
     "./google_docs": {
       "types": "./dist/google_docs/index.d.ts",
       "import": "./dist/google_docs/index.js"
     },
+    "./google_docs/path": {
+      "types": "./dist/google_docs/path.d.ts",
+      "import": "./dist/google_docs/path.js"
+    },
     "./google_sheets": {
       "types": "./dist/google_sheets/index.d.ts",
       "import": "./dist/google_sheets/index.js"
     },
+    "./google_sheets/path": {
+      "types": "./dist/google_sheets/path.d.ts",
+      "import": "./dist/google_sheets/path.js"
+    },
     "./google_tasks": {
       "types": "./dist/google_tasks/index.d.ts",
       "import": "./dist/google_tasks/index.js"
+    },
+    "./google_tasks/path": {
+      "types": "./dist/google_tasks/path.d.ts",
+      "import": "./dist/google_tasks/path.js"
+    },
+    "./google_contacts": {
+      "types": "./dist/google_contacts/index.d.ts",
+      "import": "./dist/google_contacts/index.js"
+    },
+    "./google_contacts/path": {
+      "types": "./dist/google_contacts/path.d.ts",
+      "import": "./dist/google_contacts/path.js"
     }
   },
   "files": [
@@ -65,6 +117,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "gen:schemas": "tsx scripts/generate-action-schemas.mts",
+    "parity": "tsx scripts/parity-check.mts",
     "clean": "rm -rf dist .turbo"
   },
   "dependencies": {
@@ -72,8 +126,10 @@
     "zod": "3.25.76"
   },
   "devDependencies": {
+    "@auto-nomos/adapters": "workspace:*",
     "@auto-nomos/policy-builder": "workspace:*",
     "@types/node": "22.10.5",
+    "tsx": "4.21.0",
     "typescript": "5.7.2",
     "vitest": "4.1.5"
   }

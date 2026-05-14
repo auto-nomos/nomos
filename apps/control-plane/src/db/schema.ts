@@ -21,6 +21,7 @@ import {
   timestamp,
   uniqueIndex,
   uuid,
+  varchar,
 } from 'drizzle-orm/pg-core';
 
 // ===== Enums =====
@@ -179,6 +180,31 @@ export const memberships = pgTable(
   }),
 );
 
+/**
+ * Sprint MAOS-A — `swarms` groups agents that participate in delegation chains.
+ * One swarm is rooted at a single agent (`rootAgentId`); children are linked
+ * via `agents.parentAgentId`. `crossCustomerEnabled` is a reserved design
+ * hook for Phase 2 federation; enforcement stays intra-customer at launch.
+ */
+export const swarms = pgTable(
+  'swarms',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    customerId: uuid('customer_id')
+      .notNull()
+      .references(() => customers.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    rootAgentId: uuid('root_agent_id'),
+    maxDepth: integer('max_depth'),
+    crossCustomerEnabled: boolean('cross_customer_enabled').notNull().default(false),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    customerIdx: index('swarms_customer_idx').on(t.customerId),
+    rootAgentIdx: index('swarms_root_agent_idx').on(t.rootAgentId),
+  }),
+);
+
 export const agents = pgTable(
   'agents',
   {
@@ -196,10 +222,31 @@ export const agents = pgTable(
     lastActiveAt: timestamp('last_active_at', { withTimezone: true }),
     connectionApprovedAt: timestamp('connection_approved_at', { withTimezone: true }),
     connectionApprovedBy: uuid('connection_approved_by'),
+    /**
+     * Sprint MAOS-A — chain identity. Nullable for legacy single-agent rows.
+     * `rootAgentId` self-references when this agent is the swarm root.
+     * `depth` is 0 for root; children increment by 1.
+     */
+    parentAgentId: uuid('parent_agent_id'),
+    rootAgentId: uuid('root_agent_id'),
+    depth: integer('depth').notNull().default(0),
+    swarmId: uuid('swarm_id').references(() => swarms.id, { onDelete: 'set null' }),
+    /**
+     * Sprint MAOS-A.2 — per-agent Ed25519 signing key, sealed with
+     * `OAUTH_TOKEN_ENCRYPTION_KEY` via `sealString`. Required so the
+     * control-plane can mint *child* UCANs whose `iss == parent.aud` (the
+     * delegation-chain integrity rule enforced by validateChain). Nullable
+     * for legacy rows; rotation/migration is a Phase 2 concern.
+     */
+    encryptedSigningKey: text('encrypted_signing_key'),
+    signingKeyNonce: text('signing_key_nonce'),
   },
   (t) => ({
     customerIdx: index('agents_customer_idx').on(t.customerId),
     didIdx: uniqueIndex('agents_did_idx').on(t.did),
+    parentIdx: index('agents_parent_idx').on(t.parentAgentId),
+    rootIdx: index('agents_root_idx').on(t.rootAgentId),
+    swarmIdx: index('agents_swarm_idx').on(t.swarmId),
   }),
 );
 
@@ -313,11 +360,39 @@ export const auditEvents = pgTable(
     prevHash: text('prev_hash').notNull(),
     hash: text('hash').notNull(),
     payload: jsonb('payload').notNull(),
+    /**
+     * Sprint MAOS-A — chain causation. `parentReceiptId` back-links the
+     * authorize-receipt that triggered this call (orthogonal to prevHash,
+     * which links the tamper-evidence chain). Nullable for root receipts.
+     */
+    parentReceiptId: text('parent_receipt_id'),
+    swarmId: uuid('swarm_id'),
+    chainDepth: integer('chain_depth'),
+    /**
+     * PDP `decision.receiptId` (sha256 hex). Distinct from `event_id` (uuid
+     * primary key). Indexed so observability span ingestion can correlate a
+     * span to its authorize-receipt in O(1).
+     */
+    receiptId: text('receipt_id'),
+    /**
+     * 2026-05-14 resource_mismatch fix — for /v1/proxy rows, the actual
+     * upstream HTTP method + path the PDP executed (or would have
+     * executed on a deny). Lets investigators query declared-vs-effective
+     * divergence directly. Null on /v1/authorize-only rows (no apiCall).
+     */
+    apiCallMethod: varchar('api_call_method', { length: 8 }),
+    apiCallPath: text('api_call_path'),
   },
   (t) => ({
     customerTsIdx: index('audit_events_customer_ts_idx').on(t.customerId, t.ts),
     prevHashIdx: index('audit_events_prev_hash_idx').on(t.prevHash),
     hashIdx: uniqueIndex('audit_events_hash_idx').on(t.hash),
+    parentReceiptIdx: index('audit_events_parent_receipt_idx').on(t.parentReceiptId),
+    swarmIdx: index('audit_events_swarm_idx').on(t.swarmId),
+    customerReceiptIdIdx: index('audit_events_customer_receipt_id_idx').on(
+      t.customerId,
+      t.receiptId,
+    ),
   }),
 );
 
@@ -663,6 +738,12 @@ export const agentsRelations = relations(agents, ({ one, many }) => ({
   apiKeys: many(apiKeys),
   pushApprovals: many(pushApprovals),
   agentPolicies: many(agentPolicies),
+  swarm: one(swarms, { fields: [agents.swarmId], references: [swarms.id] }),
+}));
+
+export const swarmsRelations = relations(swarms, ({ one, many }) => ({
+  customer: one(customers, { fields: [swarms.customerId], references: [customers.id] }),
+  agents: many(agents),
 }));
 
 export const policiesRelations = relations(policies, ({ one, many }) => ({
@@ -877,6 +958,97 @@ export const usageCountersRelations = relations(usageCounters, ({ one }) => ({
     references: [customers.id],
   }),
 }));
+
+/**
+ * Sprint MAOS-B — swarm-scoped step-up approvals.
+ * `approvedAgentIds` is a *snapshot* of children at approval time. New
+ * agents forked after approval need a fresh approval — never auto-extend.
+ */
+export const agentChainApprovals = pgTable(
+  'agent_chain_approvals',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    customerId: uuid('customer_id')
+      .notNull()
+      .references(() => customers.id, { onDelete: 'cascade' }),
+    rootAgentId: uuid('root_agent_id').notNull(),
+    swarmId: uuid('swarm_id'),
+    scope: jsonb('scope').notNull(),
+    approvedAgentIds: jsonb('approved_agent_ids').$type<string[]>().notNull(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    approverEmail: text('approver_email').notNull(),
+    appliesToCurrentChildrenOnly: boolean('applies_to_current_children_only')
+      .notNull()
+      .default(true),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    customerIdx: index('agent_chain_approvals_customer_idx').on(t.customerId),
+    rootAgentIdx: index('agent_chain_approvals_root_agent_idx').on(t.rootAgentId),
+    swarmIdx: index('agent_chain_approvals_swarm_idx').on(t.swarmId),
+    expiresAtIdx: index('agent_chain_approvals_expires_at_idx').on(t.expiresAt),
+  }),
+);
+
+/**
+ * Observability v2 — per-tool-call execution telemetry.
+ *
+ * Every successful PDP authorize is followed by an actual tool invocation
+ * against an upstream provider (GitHub, Slack, etc). The mcp-server emits one
+ * `agent_spans` row per call AFTER the upstream returns, capturing outcome
+ * (status, latency, error code) and privacy-safe summaries (hashes + a tiny
+ * allowlisted projection of request/response). Never stores raw bodies.
+ *
+ * Distinct from `audit_events`, which records the authorization *decision* but
+ * tells you nothing about what the agent actually did with the granted scope.
+ * Spans are the "what they did" half of the question; audit_events are the
+ * "what they were allowed to do" half.
+ *
+ * `parent_span_id` self-references for nested causality (agent A's tool call
+ * triggered agent B's authorize → that authorize's span links back to A's).
+ * `receipt_id` is the `audit_events.event_id` (cast text) for the authorize
+ * that gated this call.
+ */
+export const agentSpans = pgTable(
+  'agent_spans',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    customerId: uuid('customer_id')
+      .notNull()
+      .references(() => customers.id, { onDelete: 'cascade' }),
+    swarmId: uuid('swarm_id'),
+    agentId: uuid('agent_id')
+      .notNull()
+      .references(() => agents.id, { onDelete: 'cascade' }),
+    receiptId: text('receipt_id').notNull(),
+    parentSpanId: uuid('parent_span_id'),
+    toolName: text('tool_name').notNull(),
+    status: text('status').notNull(),
+    httpStatus: integer('http_status'),
+    errorCode: text('error_code'),
+    errorMessage: text('error_message'),
+    requestArgsHash: text('request_args_hash').notNull(),
+    requestSummary: jsonb('request_summary'),
+    responseHash: text('response_hash'),
+    responseSummary: jsonb('response_summary'),
+    nextAgentHint: text('next_agent_hint'),
+    intent: text('intent'),
+    startedAt: timestamp('started_at', { withTimezone: true }).notNull(),
+    endedAt: timestamp('ended_at', { withTimezone: true }).notNull(),
+    latencyMs: integer('latency_ms').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    customerSwarmCreatedAtIdx: index('agent_spans_customer_swarm_created_at_idx').on(
+      t.customerId,
+      t.swarmId,
+      t.createdAt,
+    ),
+    receiptIdx: index('agent_spans_receipt_idx').on(t.receiptId),
+    parentIdx: index('agent_spans_parent_idx').on(t.parentSpanId),
+    customerReceiptUq: uniqueIndex('agent_spans_customer_receipt_uq').on(t.customerId, t.receiptId),
+  }),
+);
 
 // ===== M0: OIDC issuer keys =====
 

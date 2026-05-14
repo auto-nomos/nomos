@@ -8,8 +8,14 @@ export const READS = [
 export const WRITES = [
   '/google/tasks/task/create',
   '/google/tasks/task/update',
+  '/google/tasks/task/move',
+  '/google/tasks/tasklist/create',
 ] as const;
-export const DELETES = ['/google/tasks/task/delete'] as const;
+export const DELETES = [
+  '/google/tasks/task/delete',
+  '/google/tasks/task/clear_completed',
+  '/google/tasks/tasklist/delete',
+] as const;
 export const actions = [...READS, ...WRITES, ...DELETES] as const;
 
 const READ_LIST = READS.map((a) => `Action::"${a}"`).join(', ');

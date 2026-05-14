@@ -14,7 +14,10 @@
  * `acme/billing` to read `acme/payroll`, regardless of what `resource`
  * it puts in the authorize body.
  */
+import { parseGithubPath } from '@auto-nomos/schema-packs/github/path';
 import type { GithubConstraint } from '@auto-nomos/shared-types';
+
+export { parseGithubPath };
 
 export type GithubAdapterFailure =
   | 'owner_mismatch'
@@ -33,41 +36,6 @@ export interface GithubProxyCall {
   query?: Record<string, string>;
   body?: unknown;
   headers?: Record<string, string>;
-}
-
-/**
- * Parse the leading `/repos/{owner}/{repo}` segment from a GitHub
- * REST path. Returns null when the path doesn't start that way (e.g.
- * `/users/{u}` for user lookups). Caller decides whether `null` should
- * be allowed.
- */
-export function parseGithubPath(path: string): {
-  owner?: string;
-  repo?: string;
-  issueNumber?: number;
-  prNumber?: number;
-  filePath?: string;
-} | null {
-  if (!path.startsWith('/')) return null;
-  const segs = path.split('?')[0]!.split('/').filter(Boolean);
-  if (segs[0] !== 'repos') return null;
-  const owner = segs[1];
-  const repo = segs[2];
-  if (!owner || !repo) return null;
-  const out: ReturnType<typeof parseGithubPath> = { owner, repo };
-  // /repos/{o}/{r}/issues/{n}
-  // /repos/{o}/{r}/pulls/{n} (also /pulls/{n}/merge etc.)
-  // /repos/{o}/{r}/contents/{path...}
-  if (segs[3] === 'issues' && segs[4]) {
-    const n = Number.parseInt(segs[4], 10);
-    if (Number.isFinite(n)) out.issueNumber = n;
-  } else if (segs[3] === 'pulls' && segs[4]) {
-    const n = Number.parseInt(segs[4], 10);
-    if (Number.isFinite(n)) out.prNumber = n;
-  } else if (segs[3] === 'contents' && segs.length > 4) {
-    out.filePath = segs.slice(4).join('/');
-  }
-  return out;
 }
 
 export function validateGithubProxyCall(

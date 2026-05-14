@@ -1,6 +1,6 @@
 {
   "name": "@auto-nomos/sdk",
-  "version": "0.1.2",
+  "version": "0.1.6",
   "private": false,
   "license": "MIT",
   "homepage": "https://github.com/auto-nomos/nomos/tree/main/packages/sdk-typescript#readme",

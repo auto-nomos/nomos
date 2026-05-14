@@ -322,6 +322,84 @@ actions:
           query Comments($issueId: String!) { comments(filter: { issue: { id: { eq: $issueId } } }) { nodes { id body createdAt user { name } } } }
       - { name: variables, in: body, required: true, type: object }
 
+  - id: assign_issue
+    description: Assign a Linear issue to a user via GraphQL mutation.
+    expected_use: Reassign an issue to a teammate.
+    auto_execute: false
+    required_scopes: []
+    risk: { category: write, sensitivity: medium }
+    http:
+      method: POST
+      path: "/"
+    params:
+      - { name: query, in: body, required: true, type: string, default: "mutation IssueUpdate($id: String!, $input: IssueUpdateInput!) { issueUpdate(id: $id, input: $input) { success issue { id assignee { id } } } }" }
+      - { name: variables, in: body, type: object }
+
+  - id: archive_project
+    description: Archive a Linear project.
+    expected_use: Retire a completed project.
+    auto_execute: false
+    required_scopes: []
+    risk: { category: delete, sensitivity: medium }
+    http:
+      method: POST
+      path: "/"
+    params:
+      - { name: query, in: body, required: true, type: string, default: "mutation ProjectArchive($id: String!) { projectArchive(id: $id) { success } }" }
+      - { name: variables, in: body, type: object }
+
+  - id: list_cycles
+    description: List cycles (sprints) in Linear.
+    expected_use: See current and upcoming sprints.
+    auto_execute: true
+    required_scopes: []
+    risk: { category: read, sensitivity: low }
+    http:
+      method: POST
+      path: "/"
+    params:
+      - { name: query, in: body, required: true, type: string, default: "query Cycles { cycles { nodes { id name startsAt endsAt } } }" }
+      - { name: variables, in: body, type: object }
+
+  - id: get_team
+    description: Read a Linear team's details.
+    expected_use: Inspect team membership and settings.
+    auto_execute: true
+    required_scopes: []
+    risk: { category: read, sensitivity: low }
+    http:
+      method: POST
+      path: "/"
+    params:
+      - { name: query, in: body, required: true, type: string, default: "query Team($id: String!) { team(id: $id) { id name key } }" }
+      - { name: variables, in: body, type: object }
+
+  - id: create_comment
+    description: Create a comment on a Linear issue.
+    expected_use: Add context or status update to an issue.
+    auto_execute: false
+    required_scopes: []
+    risk: { category: write, sensitivity: low }
+    http:
+      method: POST
+      path: "/"
+    params:
+      - { name: query, in: body, required: true, type: string, default: "mutation CommentCreate($input: CommentCreateInput!) { commentCreate(input: $input) { success } }" }
+      - { name: variables, in: body, type: object }
+
+  - id: move_issue
+    description: Move an issue to a different team.
+    expected_use: Reassign an issue to the correct team.
+    auto_execute: false
+    required_scopes: []
+    risk: { category: write, sensitivity: medium }
+    http:
+      method: POST
+      path: "/"
+    params:
+      - { name: query, in: body, required: true, type: string, default: "mutation IssueUpdate($id: String!, $input: IssueUpdateInput!) { issueUpdate(id: $id, input: $input) { success } }" }
+      - { name: variables, in: body, type: object }
+
 notes: |
   Linear's API is GraphQL-only; every action POSTs to /graphql with
   `query` + `variables`. The YAML wraps that with default queries so an

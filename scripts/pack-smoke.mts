@@ -67,6 +67,35 @@ function smokeInstall(tarball: string): void {
   if (!hasDist) throw new Error('tarball missing dist/ artifacts');
 }
 
+/**
+ * Build-time invariant — every shipped schema-pack with a non-empty
+ * `actions` list must expose `extractResourceFromApiCall`. Skipping
+ * means `validateResourceConsistency` falls through and the
+ * apiCall-smuggle / resource_mismatch gates are silently disabled for
+ * that provider. Mirrors `scripts/audit-pack-extractor-coverage.mts` —
+ * run here too so a CI pack smoke catches a missing extractor before
+ * tarballs ship.
+ */
+async function assertPackExtractorCoverage(): Promise<void> {
+  shInherit('pnpm --filter @auto-nomos/schema-packs build');
+  const { PACKS } = (await import('@auto-nomos/schema-packs')) as typeof import('@auto-nomos/schema-packs');
+  const NON_PROXY = new Set<string>(['filesystem']);
+  const missing: string[] = [];
+  for (const pack of PACKS) {
+    if (pack.actions.length === 0) continue;
+    if (NON_PROXY.has(pack.id)) continue;
+    if (typeof pack.extractResourceFromApiCall !== 'function') missing.push(pack.id);
+  }
+  if (missing.length > 0) {
+    console.error(`\nextractor coverage FAILED — pack(s) missing extractResourceFromApiCall:`);
+    for (const id of missing) console.error(`  - ${id}`);
+    process.exit(1);
+  }
+  console.info(`extractor coverage OK — ${PACKS.length} packs scanned`);
+}
+
+await assertPackExtractorCoverage();
+
 if (existsSync(OUT)) rmSync(OUT, { recursive: true, force: true });
 mkdirSync(OUT, { recursive: true });
 

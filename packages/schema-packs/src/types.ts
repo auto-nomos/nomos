@@ -21,6 +21,8 @@ export type IntegrationId =
   | 'google_docs'
   | 'google_sheets'
   | 'google_tasks'
+  | 'google_contacts'
+  | 'swarm'
   // M1+ — cloud IAM. One pack per cloud; per-service surfaces (compute,
   // storage, observability) live as namespaced action prefixes inside
   // each pack (e.g. /azure/vm/list, /azure/storage/blob_read).
@@ -78,4 +80,40 @@ export interface IntegrationPack {
    * coverage is OK — the PDP treats missing entries as pass-through.
    */
   actionSchemas?: Partial<Record<string, ActionSchemas>>;
+  /**
+   * 2026-05-14 resource_mismatch fix — derive the effective resource
+   * (owner, repo, channel, page_id, …) from `apiCall.{method,path}`. The
+   * PDP's `validateResourceConsistency` compares each key returned here
+   * against the agent-declared `request.resource`; mismatch is a deny.
+   * Return null when the call has no path-bound resource (e.g. github
+   * `GET /user`, `GET /search/...`).
+   *
+   * Packs without this function are pass-through — declared resource is
+   * still validated by `resourceSchema` shape and by Cedar. Implementing
+   * this hardens the pack against agents lying about which resource they
+   * target while pointing apiCall at a different one.
+   */
+  extractResourceFromApiCall?: (
+    command: string,
+    apiCall: { method: string; path: string; body?: unknown },
+  ) => Record<string, unknown> | null;
+}
+
+/**
+ * Shallow-merge two action-schema maps per command. Used to layer
+ * hand-curated schemas (in `<pack>/schemas.ts`) over the YAML-generated
+ * floor in `__generated__/<pack>-api-schemas.ts`. Hand-curated tightens
+ * generated — when both define `apiCallSchema` for the same command, the
+ * hand-curated one wins; `resourceSchema` is overlaid the same way.
+ */
+export function mergeActionSchemas(
+  base: Partial<Record<string, ActionSchemas>>,
+  override: Partial<Record<string, ActionSchemas>>,
+): Partial<Record<string, ActionSchemas>> {
+  const out: Partial<Record<string, ActionSchemas>> = {};
+  const keys = new Set([...Object.keys(base), ...Object.keys(override)]);
+  for (const k of keys) {
+    out[k] = { ...base[k], ...override[k] };
+  }
+  return out;
 }

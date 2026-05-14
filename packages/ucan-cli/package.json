@@ -1,0 +1,27 @@
+{
+  "name": "@auto-nomos/ucan-cli",
+  "version": "0.0.1",
+  "private": false,
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "nomos-ucan": "./dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@auto-nomos/crypto": "workspace:*",
+    "@auto-nomos/shared-types": "workspace:*",
+    "@auto-nomos/ucan": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.7.0",
+    "typescript": "^5.5.4"
+  }
+}

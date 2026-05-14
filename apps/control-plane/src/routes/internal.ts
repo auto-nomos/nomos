@@ -1,4 +1,7 @@
+import { EmitSpanInputSchema } from '@auto-nomos/shared-types';
+import { and, eq } from 'drizzle-orm';
 import { Hono } from 'hono';
+import { z } from 'zod';
 import type { Config } from '../config.js';
 import type { Db } from '../db/index.js';
 import * as schema from '../db/schema.js';
@@ -8,6 +11,7 @@ import { loadConnectionById } from '../oauth/tokens.js';
 import { generateBundle } from '../services/bundle.js';
 import { RefreshError, refreshConnection } from '../services/oauth-refresh.js';
 import { fetchRevokedCids } from '../services/revocations.js';
+import { ingestSpan, SpanIngestError } from '../services/spans.js';
 import { createStepUpApproval, StepUpCreateError } from '../services/stepup/create.js';
 import { getStepUpApproval, isExpired } from '../services/stepup/get.js';
 import type { StepUpNotifier } from '../services/stepup/notify.js';
@@ -185,6 +189,62 @@ export function createInternalRoutes(deps: InternalDeps): Hono {
       });
     });
   }
+
+  // PDP emits one span per /v1/proxy invocation here using the service token.
+  // Auth is by Bearer (PDP knows the token); we trust PDP's claim of
+  // customerId + agentDid and resolve agentId server-side. mcp-server still
+  // uses /v1/spans with apiKeyAuth for the authorize-only fallback path.
+  const InternalEmitSpanSchema = z
+    .object({
+      customerId: z.string().uuid(),
+      agentDid: z.string().min(1),
+    })
+    .merge(EmitSpanInputSchema);
+
+  app.post('/v1/internal/spans/emit', async (c) => {
+    const raw = await c.req.json().catch(() => null);
+    if (!raw) return c.json({ error: 'invalid JSON body' }, 400);
+    const parsed = InternalEmitSpanSchema.safeParse(raw);
+    if (!parsed.success) {
+      return c.json(
+        { error: 'invalid request', error_code: 'invalid_body', issues: parsed.error.issues },
+        400,
+      );
+    }
+    const { customerId, agentDid, ...spanInput } = parsed.data;
+    const agentRow = await deps.db.drizzle.query.agents.findFirst({
+      where: and(eq(schema.agents.did, agentDid), eq(schema.agents.customerId, customerId)),
+      columns: { id: true },
+    });
+    if (!agentRow) {
+      return c.json(
+        { error: 'agent not found for did + customer', error_code: 'agent_not_found' },
+        404,
+      );
+    }
+    try {
+      const result = await ingestSpan(
+        { customerId, agentId: agentRow.id, input: spanInput },
+        deps.db,
+      );
+      return c.json({
+        spanId: result.spanId,
+        inserted: result.inserted,
+        swarmId: result.swarmId,
+      });
+    } catch (err) {
+      if (err instanceof SpanIngestError) {
+        const status =
+          err.code === 'receipt_not_found'
+            ? 404
+            : err.code === 'receipt_wrong_tenant' || err.code === 'agent_mismatch'
+              ? 403
+              : 400;
+        return c.json({ error: err.message, error_code: err.code }, status);
+      }
+      throw err;
+    }
+  });
 
   app.post('/v1/internal/oauth-tokens/:connectionId/refresh', async (c) => {
     if (!deps.encryptionKey || !deps.config) {

@@ -1,0 +1,64 @@
+# Path B — multi-process swarm runtime, layered on top of the dev stack.
+#
+# Prerequisites:
+#   1. `pnpm dev:up` running in another terminal — supplies postgres + cp + pdp
+#   2. /app/swarms has 1 swarm + 3 apps (planner / researcher / writer)
+#   3. .env.swarm in repo root with NOMOS_PLANNER_API_KEY, etc.
+#      (copy from .env.swarm.example and fill in)
+#
+# Bring up:    pnpm swarm:up
+# Open UI:     http://localhost:3100
+# Tear down:   pnpm swarm:down
+
+name: nomos-swarm
+
+x-shared-env: &shared-env
+  NOMOS_CP_URL: ${NOMOS_CP_URL:-http://host.docker.internal:8788}
+  NOMOS_PDP_URL: ${NOMOS_PDP_URL:-http://host.docker.internal:8787}
+  NOMOS_OAUTH_CONNECTION_ID: ${NOMOS_OAUTH_CONNECTION_ID}
+  NOMOS_SWARM_ID: ${NOMOS_SWARM_ID}
+  NOMOS_GITHUB_OWNER: ${NOMOS_GITHUB_OWNER:-octocat}
+  NOMOS_GITHUB_REPO: ${NOMOS_GITHUB_REPO:-hello-world}
+
+services:
+  orchestrator:
+    build:
+      context: ../../..
+      dockerfile: infrastructure/docker/swarm/Dockerfile
+    image: nomos-swarm:latest
+    environment:
+      <<: *shared-env
+      NOMOS_ROLE: orchestrator
+      PORT: "3100"
+      NOMOS_PLANNER_API_KEY: ${NOMOS_PLANNER_API_KEY}
+      NOMOS_RESEARCHER_AGENT_ID: ${NOMOS_RESEARCHER_AGENT_ID}
+    ports:
+      - "3100:3100"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - agent-researcher
+
+  agent-researcher:
+    image: nomos-swarm:latest
+    environment:
+      <<: *shared-env
+      NOMOS_ROLE: agent
+      PORT: "3101"
+      NOMOS_API_KEY: ${NOMOS_RESEARCHER_API_KEY}
+      NOMOS_CHILD_URL: http://agent-writer:3102/run
+      NOMOS_CHILD_AGENT_ID: ${NOMOS_WRITER_AGENT_ID}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - agent-writer
+
+  agent-writer:
+    image: nomos-swarm:latest
+    environment:
+      <<: *shared-env
+      NOMOS_ROLE: agent
+      PORT: "3102"
+      NOMOS_API_KEY: ${NOMOS_WRITER_API_KEY}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"

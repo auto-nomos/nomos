@@ -36,7 +36,9 @@ describe.skipIf(!RUN)('db migration smoke (requires postgres)', () => {
     await db.pool.end();
   });
 
-  it('all 25 tables exist (21 application + 4 Better-Auth)', async () => {
+  it('all 29 tables exist (24 application + 4 Better-Auth + passkey)', async () => {
+    // Sprint MAOS-A/B added `swarms` + `agent_chain_approvals` (2 tables).
+    // Observability v2 added `agent_spans`.
     const result = await db.pool.query<{ table_name: string }>(
       `SELECT table_name FROM information_schema.tables
        WHERE table_schema = 'public' AND table_type = 'BASE TABLE'
@@ -45,8 +47,10 @@ describe.skipIf(!RUN)('db migration smoke (requires postgres)', () => {
     const tables = result.rows.map((r) => r.table_name).sort();
     expect(tables).toEqual([
       'account',
+      'agent_chain_approvals',
       'agent_grants',
       'agent_policies',
+      'agent_spans',
       'agents',
       'api_keys',
       'audit_events',
@@ -59,11 +63,13 @@ describe.skipIf(!RUN)('db migration smoke (requires postgres)', () => {
       'memberships',
       'notification_preferences',
       'oauth_connections',
+      'passkey',
       'policies',
       'push_approvals',
       'revocations',
       'schemas',
       'session',
+      'swarms',
       'telegram_link_tokens',
       'ucan_issues',
       'usage_counters',

@@ -38,7 +38,12 @@ function makePayload(iss: string, aud: string, overrides: Partial<UcanPayload> =
 interface ProxyAppFixture {
   app: ReturnType<typeof createServer>;
   policyCache: ReturnType<typeof createPolicyCache>;
-  audits: Array<{ command: string; allow: boolean; reason?: string }>;
+  audits: Array<{
+    command: string;
+    allow: boolean;
+    reason?: string;
+    apiCall?: { method: string; path: string };
+  }>;
   upstreamCalls: { url: string; method: string; headers: Record<string, string>; body?: string }[];
   tokenLookups: { customerId: string; connectionId: string }[];
   stepupCreate?: ReturnType<typeof vi.fn>;
@@ -64,7 +69,7 @@ function buildApp(opts: BuildAppOpts): ProxyAppFixture {
     refreshIntervalMs: 60_000,
     logger,
   });
-  const audits: Array<{ command: string; allow: boolean }> = [];
+  const audits: ProxyAppFixture['audits'] = [];
   const upstreamCalls: ProxyAppFixture['upstreamCalls'] = [];
   const tokenLookups: { customerId: string; connectionId: string }[] = [];
 
@@ -136,6 +141,7 @@ function buildApp(opts: BuildAppOpts): ProxyAppFixture {
         command: ev.request.command,
         allow: ev.decision.allow,
         ...(ev.decision.reason !== undefined ? { reason: ev.decision.reason } : {}),
+        ...(ev.apiCall !== undefined ? { apiCall: ev.apiCall } : {}),
       });
     },
     oauthProxy: { fetchOAuthToken, upstreamFetch: fakeUpstream },
@@ -574,5 +580,392 @@ permit (
     const body = (await res.json()) as { error_code: string };
     expect(body.error_code).toBe('schema_violation');
     expect(fix.upstreamCalls).toHaveLength(0);
+  });
+
+  // Regression for 2026-05-14 incident: an agent minted a UCAN for
+  // /github/content/update and called /v1/proxy/github/content/update with
+  // an apiCall pointing at POST /repos/o/r/git/refs (branch creation). The
+  // PDP allowed it because no apiCallSchema existed for content/update;
+  // the generated schema in __generated__/github-api-schemas.ts now binds
+  // PUT + /repos/{o}/{r}/contents/{path} and this smuggle path denies.
+  it('D3 — /github/content/update with smuggled git/refs path returns schema_violation', async () => {
+    const contentUpdatePolicy = `
+permit(
+  principal,
+  action == Action::"/github/content/update",
+  resource
+)
+when { resource.repo == "acme/billing" };
+`;
+    const fix = buildApp({});
+    fix.policyCache.set(CUSTOMER, contentUpdatePolicy);
+
+    const issuer = generateKeypair();
+    const agent = generateKeypair();
+    const ucan = issueUcan({
+      payload: makePayload(issuer.did, agent.did, {
+        cmd: '/github/content/update',
+        meta: { oauth_connection_id: 'conn-1', customer_id: CUSTOMER },
+      }),
+      privateKey: issuer.privateKey,
+    });
+
+    const res = await fix.app.request('/v1/proxy/github/content/update', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-cb-customer': CUSTOMER },
+      body: JSON.stringify({
+        ucan: ucan.jwt,
+        request: {
+          ucan: ucan.jwt,
+          command: '/github/content/update',
+          resource: { repo: 'acme/billing', owner: 'acme', repo_name: 'billing' },
+          context: {},
+        },
+        apiCall: {
+          method: 'POST',
+          path: '/repos/acme/billing/git/refs',
+          body: { ref: 'refs/heads/smuggle', sha: 'deadbeef' },
+        },
+      }),
+    });
+    expect(res.status).toBe(403);
+    const body = (await res.json()) as { error_code: string; decision: { reason: string } };
+    expect(body.error_code).toBe('schema_violation');
+    expect(body.decision.reason).toBe('schema_violation');
+    expect(fix.upstreamCalls).toHaveLength(0);
+  });
+
+  it('D3 — /github/content/update accepts the bound PUT /contents/{path} call', async () => {
+    const contentUpdatePolicy = `
+permit(
+  principal,
+  action == Action::"/github/content/update",
+  resource
+)
+when { resource.repo == "acme/billing" };
+`;
+    const fix = buildApp({});
+    fix.policyCache.set(CUSTOMER, contentUpdatePolicy);
+
+    const issuer = generateKeypair();
+    const agent = generateKeypair();
+    const ucan = issueUcan({
+      payload: makePayload(issuer.did, agent.did, {
+        cmd: '/github/content/update',
+        meta: { oauth_connection_id: 'conn-1', customer_id: CUSTOMER },
+      }),
+      privateKey: issuer.privateKey,
+    });
+
+    const res = await fix.app.request('/v1/proxy/github/content/update', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-cb-customer': CUSTOMER },
+      body: JSON.stringify({
+        ucan: ucan.jwt,
+        request: {
+          ucan: ucan.jwt,
+          command: '/github/content/update',
+          resource: { repo: 'acme/billing', owner: 'acme', repo_name: 'billing' },
+          context: {},
+        },
+        apiCall: {
+          method: 'PUT',
+          path: '/repos/acme/billing/contents/docs/readme.md',
+          body: { message: 'docs', content: 'aGVsbG8=' },
+        },
+      }),
+    });
+    // Allowed by Cedar + schema; upstream gets the PUT (fake fetch returns 200).
+    expect(res.status).toBe(200);
+    expect(fix.upstreamCalls).toHaveLength(1);
+    expect(fix.upstreamCalls[0]?.method).toBe('PUT');
+    expect(fix.upstreamCalls[0]?.url).toContain('/contents/docs/readme.md');
+  });
+
+  it('D3 — /github/branch/create binds POST /git/refs (no longer smuggleable under content/update)', async () => {
+    const branchPolicy = `
+permit(
+  principal,
+  action == Action::"/github/branch/create",
+  resource
+)
+when { resource.repo == "acme/billing" };
+`;
+    const fix = buildApp({});
+    fix.policyCache.set(CUSTOMER, branchPolicy);
+
+    const issuer = generateKeypair();
+    const agent = generateKeypair();
+    const ucan = issueUcan({
+      payload: makePayload(issuer.did, agent.did, {
+        cmd: '/github/branch/create',
+        meta: { oauth_connection_id: 'conn-1', customer_id: CUSTOMER },
+      }),
+      privateKey: issuer.privateKey,
+    });
+
+    const res = await fix.app.request('/v1/proxy/github/branch/create', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-cb-customer': CUSTOMER },
+      body: JSON.stringify({
+        ucan: ucan.jwt,
+        request: {
+          ucan: ucan.jwt,
+          command: '/github/branch/create',
+          resource: { repo: 'acme/billing', owner: 'acme', repo_name: 'billing' },
+          context: {},
+        },
+        apiCall: {
+          method: 'POST',
+          path: '/repos/acme/billing/git/refs',
+          body: { ref: 'refs/heads/feature', sha: 'deadbeef' },
+        },
+      }),
+    });
+    expect(res.status).toBe(200);
+    expect(fix.upstreamCalls).toHaveLength(1);
+    expect(fix.upstreamCalls[0]?.method).toBe('POST');
+  });
+
+  it('D3 — slack/message/post denies a smuggled chat.delete path (cross-pack)', async () => {
+    const slackPolicy = `
+permit(
+  principal,
+  action == Action::"/slack/message/post",
+  resource
+);
+`;
+    const fix = buildApp({});
+    fix.policyCache.set(CUSTOMER, slackPolicy);
+
+    const issuer = generateKeypair();
+    const agent = generateKeypair();
+    const ucan = issueUcan({
+      payload: makePayload(issuer.did, agent.did, {
+        cmd: '/slack/message/post',
+        meta: { oauth_connection_id: 'conn-1', customer_id: CUSTOMER },
+      }),
+      privateKey: issuer.privateKey,
+    });
+
+    const res = await fix.app.request('/v1/proxy/slack/message/post', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-cb-customer': CUSTOMER },
+      body: JSON.stringify({
+        ucan: ucan.jwt,
+        request: {
+          ucan: ucan.jwt,
+          command: '/slack/message/post',
+          resource: { channel: 'C123' },
+          context: {},
+        },
+        // chat.postMessage is POST; chat.delete would be a smuggle.
+        apiCall: {
+          method: 'POST',
+          path: '/api/chat.delete',
+          body: { channel: 'C123', ts: '1' },
+        },
+      }),
+    });
+    expect(res.status).toBe(403);
+    const body = (await res.json()) as { error_code: string; decision: { reason: string } };
+    expect(body.error_code).toBe('schema_violation');
+    expect(body.decision.reason).toBe('schema_violation');
+    expect(fix.upstreamCalls).toHaveLength(0);
+  });
+
+  // ----------------------------------------------------------------------
+  // D6 — 2026-05-14 resource_mismatch (Probe-14)
+  // ----------------------------------------------------------------------
+  // The agent's `request.resource` must match the resource derived from
+  // `apiCall.{method,path}`. Otherwise audit lies about what was mutated.
+
+  it('D6 — declared resource.owner ≠ apiCall.path owner returns resource_mismatch', async () => {
+    const contentUpdatePolicy = `
+permit(
+  principal,
+  action == Action::"/github/content/update",
+  resource
+)
+when { resource.repo == "octocat/Hello-World" };
+`;
+    const fix = buildApp({});
+    fix.policyCache.set(CUSTOMER, contentUpdatePolicy);
+
+    const issuer = generateKeypair();
+    const agent = generateKeypair();
+    const ucan = issueUcan({
+      payload: makePayload(issuer.did, agent.did, {
+        cmd: '/github/content/update',
+        meta: { oauth_connection_id: 'conn-1', customer_id: CUSTOMER },
+      }),
+      privateKey: issuer.privateKey,
+    });
+
+    const res = await fix.app.request('/v1/proxy/github/content/update', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-cb-customer': CUSTOMER },
+      body: JSON.stringify({
+        ucan: ucan.jwt,
+        request: {
+          ucan: ucan.jwt,
+          command: '/github/content/update',
+          // Declared resource lies about which repo.
+          resource: {
+            repo: 'octocat/Hello-World',
+            owner: 'octocat',
+            repo_name: 'Hello-World',
+          },
+          context: {},
+        },
+        apiCall: {
+          method: 'PUT',
+          // Actually targets a different repo.
+          path: '/repos/admin-brickexchange/test-repo/contents/lie.txt',
+          body: { message: 'lie', content: 'aGVsbG8=' },
+        },
+      }),
+    });
+    expect(res.status).toBe(403);
+    const body = (await res.json()) as {
+      error_code: string;
+      field?: string;
+      decision: { reason: string };
+    };
+    expect(body.error_code).toBe('resource_mismatch');
+    expect(body.decision.reason).toBe('resource_mismatch');
+    expect(body.field).toBe('owner');
+    expect(fix.upstreamCalls).toHaveLength(0);
+  });
+
+  it('D6 — declared resource consistent with apiCall.path still allows', async () => {
+    const contentUpdatePolicy = `
+permit(
+  principal,
+  action == Action::"/github/content/update",
+  resource
+)
+when { resource.repo == "acme/billing" };
+`;
+    const fix = buildApp({});
+    fix.policyCache.set(CUSTOMER, contentUpdatePolicy);
+
+    const issuer = generateKeypair();
+    const agent = generateKeypair();
+    const ucan = issueUcan({
+      payload: makePayload(issuer.did, agent.did, {
+        cmd: '/github/content/update',
+        meta: { oauth_connection_id: 'conn-1', customer_id: CUSTOMER },
+      }),
+      privateKey: issuer.privateKey,
+    });
+
+    const res = await fix.app.request('/v1/proxy/github/content/update', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-cb-customer': CUSTOMER },
+      body: JSON.stringify({
+        ucan: ucan.jwt,
+        request: {
+          ucan: ucan.jwt,
+          command: '/github/content/update',
+          resource: { repo: 'acme/billing', owner: 'acme', repo_name: 'billing' },
+          context: {},
+        },
+        apiCall: {
+          method: 'PUT',
+          path: '/repos/acme/billing/contents/docs/readme.md',
+          body: { message: 'docs', content: 'aGVsbG8=' },
+        },
+      }),
+    });
+    expect(res.status).toBe(200);
+    expect(fix.upstreamCalls).toHaveLength(1);
+  });
+
+  it('D6 — empty resource on /github/user/read with GET /user passes', async () => {
+    // user-read has no path-bound resource; extractor returns null, consistency check skips.
+    const userReadPolicy = `
+permit(
+  principal,
+  action == Action::"/github/user/read",
+  resource
+);
+`;
+    const fix = buildApp({});
+    fix.policyCache.set(CUSTOMER, userReadPolicy);
+
+    const issuer = generateKeypair();
+    const agent = generateKeypair();
+    const ucan = issueUcan({
+      payload: makePayload(issuer.did, agent.did, {
+        cmd: '/github/user/read',
+        meta: { oauth_connection_id: 'conn-1', customer_id: CUSTOMER },
+      }),
+      privateKey: issuer.privateKey,
+    });
+
+    const res = await fix.app.request('/v1/proxy/github/user/read', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-cb-customer': CUSTOMER },
+      body: JSON.stringify({
+        ucan: ucan.jwt,
+        request: {
+          ucan: ucan.jwt,
+          command: '/github/user/read',
+          resource: {},
+          context: {},
+        },
+        apiCall: { method: 'GET', path: '/user' },
+      }),
+    });
+    expect(res.status).toBe(200);
+  });
+
+  it('D6 — audit row records apiCall.{method,path} on resource_mismatch deny', async () => {
+    const contentUpdatePolicy = `
+permit(
+  principal,
+  action == Action::"/github/content/update",
+  resource
+);
+`;
+    const fix = buildApp({});
+    fix.policyCache.set(CUSTOMER, contentUpdatePolicy);
+
+    const issuer = generateKeypair();
+    const agent = generateKeypair();
+    const ucan = issueUcan({
+      payload: makePayload(issuer.did, agent.did, {
+        cmd: '/github/content/update',
+        meta: { oauth_connection_id: 'conn-1', customer_id: CUSTOMER },
+      }),
+      privateKey: issuer.privateKey,
+    });
+
+    await fix.app.request('/v1/proxy/github/content/update', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-cb-customer': CUSTOMER },
+      body: JSON.stringify({
+        ucan: ucan.jwt,
+        request: {
+          ucan: ucan.jwt,
+          command: '/github/content/update',
+          resource: { owner: 'declared', repo_name: 'one' },
+          context: {},
+        },
+        apiCall: {
+          method: 'PUT',
+          path: '/repos/effective/two/contents/x.txt',
+          body: { message: 'm', content: 'aGVsbG8=' },
+        },
+      }),
+    });
+
+    const denyRow = fix.audits.find((a) => a.reason === 'resource_mismatch');
+    expect(denyRow).toBeDefined();
+    expect(denyRow?.apiCall).toEqual({
+      method: 'PUT',
+      path: '/repos/effective/two/contents/x.txt',
+    });
   });
 });

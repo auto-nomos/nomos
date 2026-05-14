@@ -34,6 +34,13 @@ export interface EgressObservation {
   ts: number;
   /** M11 — populated when the target hostname matches a cloud API host. */
   cloud?: { connector: DetectedConnector; service?: string; region?: string };
+  /**
+   * Sprint MAOS-A — W3C `traceparent` value when the agent emitted one.
+   * Lets downstream correlation see "this egress was triggered by trace X
+   * which was authorized by PDP receipt Y". Header itself is never
+   * redacted (no secret), so passes through outbound unchanged.
+   */
+  traceparent?: string;
 }
 
 export type AuditFn = (obs: EgressObservation) => void;
@@ -81,12 +88,14 @@ export function createEgressProxy(opts: EgressProxyOptions): {
 
   const server = createServer((req: IncomingMessage, res: ServerResponse) => {
     const target = req.url ?? '';
+    const traceparent = req.headers.traceparent;
     const obs: EgressObservation = {
       kind: 'http_request',
       target,
       method: req.method,
       headers: sanitize(req.headers),
       ts: Date.now(),
+      ...(typeof traceparent === 'string' ? { traceparent } : {}),
     };
     try {
       opts.audit(obs);
@@ -135,12 +144,14 @@ export function createEgressProxy(opts: EgressProxyOptions): {
     const [host, portStr] = target.split(':');
     const port = Number(portStr ?? '443');
     const cloudMatch = host ? detectCloudHost(host) : null;
+    const traceparent = req.headers.traceparent;
     const obs: EgressObservation = {
       kind: 'connect',
       target,
       headers: sanitize(req.headers),
       ts: Date.now(),
       ...(cloudMatch ? { cloud: cloudMatch } : {}),
+      ...(typeof traceparent === 'string' ? { traceparent } : {}),
     };
     try {
       opts.audit(obs);

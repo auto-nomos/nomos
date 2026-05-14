@@ -20,6 +20,9 @@ export const READS = [
   '/stripe/price/list',
   '/stripe/dispute/list',
   '/stripe/balance_transaction/list',
+  '/stripe/balance/read',
+  '/stripe/setup_intent/list',
+  '/stripe/refund/list',
 ] as const;
 export const WRITES = [
   '/stripe/customer/create',

@@ -10,6 +10,9 @@ export const READS = [
   '/google/calendar/event/list',
   '/google/calendar/list/list',
   '/google/calendar/list/read',
+  '/google/calendar/meta/read',
+  '/google/calendar/acl/list',
+  '/google/calendar/settings/read',
   '/google/calendar/freebusy/read',
 ] as const;
 export const WRITES = [
@@ -19,7 +22,9 @@ export const WRITES = [
   '/google/calendar/event/quick_add',
   '/google/calendar/event/move',
   '/google/calendar/event/import',
+  '/google/calendar/event/respond',
   '/google/calendar/list/create',
+  '/google/calendar/list/clear',
 ] as const;
 export const DELETES = ['/google/calendar/list/delete'] as const;
 export const actions = [...READS, ...WRITES, ...DELETES] as const;

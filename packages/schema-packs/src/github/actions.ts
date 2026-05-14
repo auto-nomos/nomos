@@ -27,6 +27,7 @@ export const actionToCommand: Record<string, string> = {
   get_pr: '/github/pr/read',
   create_pr: '/github/pr/create',
   merge_pr: '/github/pr/merge',
+  create_branch: '/github/branch/create',
   update_file: '/github/content/update',
   list_commits: '/github/commit/list',
   search_issues: '/github/issue/search',
@@ -92,6 +93,10 @@ export function resourceFor(
       return {
         ...(typeof params.name === 'string' ? { name: params.name } : {}),
       };
+    case 'create_branch': {
+      const ref = typeof params.ref === 'string' ? params.ref : undefined;
+      return { ...base, ...(ref ? { ref } : {}) };
+    }
     default:
       return base;
   }

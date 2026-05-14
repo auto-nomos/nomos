@@ -16,10 +16,12 @@ import { createCloudInternalRoutes } from './routes/cloud-internal.js';
 import { createHealthRoutes } from './routes/health.js';
 import { createIntentRoutes } from './routes/intent.js';
 import { createInternalRoutes } from './routes/internal.js';
+import { createMintChildUcanRoutes } from './routes/mint-child-ucan.js';
 import { createMintUcanRoutes } from './routes/mint-ucan.js';
 import { createOAuthRoutes } from './routes/oauth.js';
 import { createOidcRoutes } from './routes/oidc.js';
 import { createSkillRoutes } from './routes/skill.js';
+import { createSpansRoutes } from './routes/spans.js';
 import type { CoherenceVerifier } from './services/intent-coherence.js';
 import type { TelegramBot } from './services/notify/telegram-bot.js';
 import type { PolicyInvalidator } from './services/policy-invalidator.js';
@@ -144,10 +146,31 @@ export function createServer(deps: ServerDeps): Hono {
   // never sees API keys; this route is the only one that does.
   app.route('/', createMintUcanRoutes({ db: deps.db, signing, usage }));
 
+  // Sprint MAOS-A.2 — child UCAN minting for delegation chains. Only
+  // mounted when oauth.encryptionKey is wired (it's needed to unseal the
+  // parent agent's per-agent signing key). Without it, /v1/mint-child-ucan
+  // can't decrypt the parent key, so the route is silently absent — the
+  // route's response would be 500 anyway.
+  if (deps.oauth?.encryptionKey) {
+    app.route(
+      '/',
+      createMintChildUcanRoutes({
+        db: deps.db,
+        encryptionKey: deps.oauth.encryptionKey,
+        usage,
+      }),
+    );
+  }
+
   // MCP-server / agent discovery: which integrations + commands are
   // available to this API key? Derived from the customer's policy set so
   // the platform stays single-source-of-truth (no CB_INTEGRATIONS drift).
   app.route('/', createAgentMeRoutes({ db: deps.db }));
+
+  // Observability v2 — MCP emits one span per tool call after the upstream
+  // returns. Records outcome/latency/hashes + tiny redacted summary; never
+  // raw bodies. Idempotent on (customer_id, receipt_id).
+  app.route('/', createSpansRoutes({ db: deps.db }));
 
   // SDK ↔ control-plane: dynamic per-request scope narrowing via the
   // Approval Envelope model. Mounted only when step-up is configured —

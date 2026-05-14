@@ -39,6 +39,7 @@ interface AuditRow {
   eventId: string;
   ts: string | Date;
   agent: string;
+  agentName: string | null;
   command: string;
   decision: Decision;
   resource: unknown;
@@ -46,6 +47,9 @@ interface AuditRow {
   prevHash: string;
   hash: string;
   payload: unknown;
+  parentReceiptId?: string | null;
+  swarmId?: string | null;
+  chainDepth?: number | null;
 }
 
 export default function AuditPage() {
@@ -78,17 +82,38 @@ export default function AuditPage() {
   }
 
   function exportCsv() {
-    const header = ['ts', 'agent', 'command', 'decision', 'eventId', 'hash'];
+    const header = [
+      'ts',
+      'agentName',
+      'agentDid',
+      'command',
+      'decision',
+      'eventId',
+      'prevHash',
+      'hash',
+      'chainDepth',
+      'swarmId',
+      'parentReceiptId',
+      'resource',
+      'context',
+    ];
     const lines = [header.join(',')];
     for (const r of rows) {
       lines.push(
         [
           new Date(r.ts).toISOString(),
+          csvEscape(r.agentName ?? ''),
           csvEscape(r.agent),
           csvEscape(r.command),
           r.decision,
           r.eventId,
+          r.prevHash,
           r.hash,
+          r.chainDepth ?? '',
+          r.swarmId ?? '',
+          r.parentReceiptId ?? '',
+          csvEscape(JSON.stringify(r.resource ?? null)),
+          csvEscape(JSON.stringify(r.context ?? null)),
         ].join(','),
       );
     }
@@ -204,10 +229,16 @@ export default function AuditPage() {
                     onClick={() => setSelected(r)}
                   >
                     <TableCell className="text-xs">{formatDate(r.ts)}</TableCell>
-                    <TableCell className="font-mono text-xs">
-                      {r.agent.length > 24
-                        ? `${r.agent.slice(0, 18)}…${r.agent.slice(-4)}`
-                        : r.agent}
+                    <TableCell title={r.agent}>
+                      {r.agentName ? (
+                        <span className="font-medium">{r.agentName}</span>
+                      ) : (
+                        <span className="font-mono text-xs">
+                          {r.agent.length > 24
+                            ? `${r.agent.slice(0, 18)}…${r.agent.slice(-4)}`
+                            : r.agent}
+                        </span>
+                      )}
                     </TableCell>
                     <TableCell className="font-mono text-xs">{r.command}</TableCell>
                     <TableCell>
@@ -309,11 +340,27 @@ function AuditDrawer({ event, onClose }: { event: AuditRow | null; onClose: () =
             </Row>
             <Row label="Time">{formatDate(event.ts)}</Row>
             <Row label="App">
-              <span className="font-mono text-xs">{event.agent}</span>
+              <div className="flex flex-col items-end">
+                {event.agentName ? <span className="font-medium">{event.agentName}</span> : null}
+                <span className="font-mono text-[11px] text-muted-foreground">{event.agent}</span>
+              </div>
             </Row>
             <Row label="Command">
               <span className="font-mono text-xs">{event.command}</span>
             </Row>
+            {event.chainDepth !== null && event.chainDepth !== undefined ? (
+              <Row label="Chain depth">{event.chainDepth}</Row>
+            ) : null}
+            {event.swarmId ? (
+              <Row label="Swarm">
+                <span className="font-mono text-xs">{event.swarmId}</span>
+              </Row>
+            ) : null}
+            {event.parentReceiptId ? (
+              <Row label="Parent receipt">
+                <span className="font-mono text-xs">{event.parentReceiptId.slice(0, 16)}…</span>
+              </Row>
+            ) : null}
             <Row label="Decision">
               <Badge
                 variant={

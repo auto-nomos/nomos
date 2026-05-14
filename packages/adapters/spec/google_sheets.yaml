@@ -97,3 +97,70 @@ actions:
     params:
       - { name: spreadsheetId, in: path, required: true, type: string }
       - { name: requests, in: body, required: true, type: array }
+
+  - id: clear_values
+    description: Clear values in a range, preserving formatting.
+    expected_use: Reset a region before re-populating data.
+    auto_execute: false
+    required_scopes: [https://www.googleapis.com/auth/spreadsheets]
+    risk: { category: delete, sensitivity: medium }
+    http:
+      method: POST
+      path: "/spreadsheets/{spreadsheetId}/values/{range}:clear"
+    params:
+      - { name: spreadsheetId, in: path, required: true, type: string }
+      - { name: range, in: path, required: true, type: string }
+
+  - id: batch_get_values
+    description: Read multiple ranges in one call.
+    expected_use: Read several non-contiguous ranges efficiently.
+    auto_execute: true
+    required_scopes: [https://www.googleapis.com/auth/spreadsheets.readonly]
+    risk: { category: read, sensitivity: medium }
+    http:
+      method: GET
+      path: "/spreadsheets/{spreadsheetId}/values:batchGet"
+    params:
+      - { name: spreadsheetId, in: path, required: true, type: string }
+      - { name: ranges, in: query, type: string }
+
+  - id: copy_spreadsheet
+    description: Copy a sheet within a spreadsheet to another spreadsheet.
+    expected_use: Replicate a template into a new workbook.
+    auto_execute: false
+    required_scopes: [https://www.googleapis.com/auth/spreadsheets]
+    risk: { category: write, sensitivity: medium }
+    http:
+      method: POST
+      path: "/spreadsheets/{spreadsheetId}/sheets/{sheetId}:copyTo"
+    params:
+      - { name: spreadsheetId, in: path, required: true, type: string }
+      - { name: sheetId, in: path, required: true, type: string }
+      - { name: destinationSpreadsheetId, in: body, required: true, type: string }
+
+  - id: list_developer_metadata
+    description: List developer metadata on a spreadsheet.
+    expected_use: Inspect automation-managed metadata.
+    auto_execute: true
+    required_scopes: [https://www.googleapis.com/auth/spreadsheets.readonly]
+    risk: { category: read, sensitivity: low }
+    http:
+      method: POST
+      path: "/spreadsheets/{spreadsheetId}/developerMetadata:search"
+    params:
+      - { name: spreadsheetId, in: path, required: true, type: string }
+      - { name: dataFilters, in: body, required: true, type: array }
+
+  - id: batch_update_values
+    description: Update multiple ranges in one call.
+    expected_use: Apply a set of edits efficiently.
+    auto_execute: false
+    required_scopes: [https://www.googleapis.com/auth/spreadsheets]
+    risk: { category: write, sensitivity: medium }
+    http:
+      method: POST
+      path: "/spreadsheets/{spreadsheetId}/values:batchUpdate"
+    params:
+      - { name: spreadsheetId, in: path, required: true, type: string }
+      - { name: data, in: body, required: true, type: array }
+      - { name: valueInputOption, in: body, type: string, default: USER_ENTERED }

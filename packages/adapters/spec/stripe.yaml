@@ -332,3 +332,40 @@ actions:
     params:
       - { name: type, in: query, type: string }
       - { name: limit, in: query, type: integer, default: 25 }
+
+  - id: get_balance
+    description: Retrieve the current account balance.
+    expected_use: Inspect available funds before initiating a payout.
+    auto_execute: true
+    required_scopes: []
+    risk: { category: read, sensitivity: medium }
+    http:
+      method: GET
+      path: "/balance"
+    params: []
+
+  - id: list_setup_intents
+    description: List recent SetupIntents.
+    expected_use: Audit saved payment methods.
+    auto_execute: true
+    required_scopes: []
+    risk: { category: read, sensitivity: medium }
+    http:
+      method: GET
+      path: "/setup_intents"
+    params:
+      - { name: limit, in: query, type: integer, default: 10 }
+
+  - id: list_refunds
+    description: List refunds for a charge or customer.
+    expected_use: Audit recent refunds.
+    auto_execute: true
+    required_scopes: []
+    risk: { category: read, sensitivity: medium }
+    http:
+      method: GET
+      path: "/refunds"
+    params:
+      - { name: charge, in: query, type: string }
+      - { name: customer, in: query, type: string }
+      - { name: limit, in: query, type: integer, default: 10 }
