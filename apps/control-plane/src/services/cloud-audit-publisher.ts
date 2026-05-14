@@ -26,6 +26,14 @@ export interface CloudAuditInput {
   jti?: string;
   retryable?: boolean;
   error?: string;
+  /**
+   * MAOS-A chain context — forwarded by PDP via /v1/internal/cloud/api-call,
+   * passed through to the PDP webhook so cloud audit rows correlate to the
+   * same swarm + parent receipt as the PDP-emitted cloud.call row.
+   */
+  parentReceiptId?: string;
+  swarmId?: string;
+  chainDepth?: number;
 }
 
 export interface CloudAuditPublisher {
@@ -57,6 +65,9 @@ export function createCloudAuditPublisher(opts: CloudAuditPublisherOptions): Clo
         ...(input.jti ? { jti: input.jti } : {}),
         ...(input.retryable !== undefined ? { retryable: input.retryable } : {}),
         ...(input.error ? { error: input.error } : {}),
+        ...(input.parentReceiptId ? { parent_receipt_id: input.parentReceiptId } : {}),
+        ...(input.swarmId ? { swarm_id: input.swarmId } : {}),
+        ...(typeof input.chainDepth === 'number' ? { chain_depth: input.chainDepth } : {}),
       });
       await Promise.all(opts.webhookUrls.map((url) => postOne(url, body)));
     },

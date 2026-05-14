@@ -103,6 +103,12 @@ export function createInternalRoutes(deps: InternalDeps): Hono {
       jti?: string;
       retryable?: boolean;
       error?: string;
+      // MAOS-A chain context forwarded by CP cloud-audit-publisher so cloud
+      // audit rows correlate to the same swarm + parent receipt as PDP's
+      // cloud.call row.
+      parent_receipt_id?: string;
+      swarm_id?: string;
+      chain_depth?: number;
     };
     const allowedKinds = new Set([
       'cloud.token.minted',
@@ -146,6 +152,9 @@ export function createInternalRoutes(deps: InternalDeps): Hono {
         },
         ts: Date.now(),
         agentDid: `agent:${b.agent_id}`,
+        ...(b.parent_receipt_id ? { parentReceiptId: b.parent_receipt_id } : {}),
+        ...(b.swarm_id ? { swarmId: b.swarm_id } : {}),
+        ...(typeof b.chain_depth === 'number' ? { chainDepth: b.chain_depth } : {}),
       });
     } catch (err) {
       deps.logger.error({ err, kind: b.kind }, 'cloud audit emit failed');

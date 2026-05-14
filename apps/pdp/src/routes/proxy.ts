@@ -601,6 +601,15 @@ export function createProxyRoutes(deps: ProxyRouteDeps): Hono {
         : undefined;
     if (cloudConnectionId) {
       if (!deps.cloud) {
+        fireSpan({
+          customerId,
+          agentDid: agentDidForSpan,
+          receiptId: decision.receiptId,
+          toolStatus: 'failed',
+          httpStatus: 501,
+          errorCode: 'cloud_proxy_disabled',
+          requestArgs,
+        });
         return c.json(
           {
             error: 'cloud_proxy_disabled',
@@ -629,6 +638,15 @@ export function createProxyRoutes(deps: ProxyRouteDeps): Hono {
       // /scale/rotate/redeploy/invoke) require cosigner=true even when
       // Cedar allowed. Defense-in-depth against over-permissive policies.
       if (shouldForceStepUp(decision, { request })) {
+        fireSpan({
+          customerId,
+          agentDid: agentDidForSpan,
+          receiptId: decision.receiptId,
+          toolStatus: 'denied',
+          httpStatus: 403,
+          errorCode: 'cosigner_required',
+          requestArgs,
+        });
         return c.json(
           {
             error: 'cosigner_required',
@@ -643,6 +661,21 @@ export function createProxyRoutes(deps: ProxyRouteDeps): Hono {
           403,
         );
       }
+      // Sprint MAOS-A — propagate causation + swarm metadata so cloud calls
+      // surface in the swarm detail view alongside OAuth proxy rows. Cloud
+      // audit rows share the same parent_receipt_id / swarm_id / chain_depth
+      // schema as the SaaS proxy path.
+      const chainDepthForCloud =
+        Array.isArray(request.delegated_chain) && request.delegated_chain.length > 0
+          ? request.delegated_chain.length - 1
+          : 0;
+      const cloudChainContext = {
+        ...(request.parent_receipt_id !== undefined
+          ? { parentReceiptId: request.parent_receipt_id }
+          : {}),
+        ...(request.swarm_id !== undefined ? { swarmId: request.swarm_id } : {}),
+        ...(chainDepthForCloud > 0 ? { chainDepth: chainDepthForCloud } : {}),
+      };
       try {
         const cloudUpstream = await cloudApiCall(
           deps.cloud,
@@ -651,6 +684,9 @@ export function createProxyRoutes(deps: ProxyRouteDeps): Hono {
             customerId,
             agentId,
             ...(ucanCid ? { ucanCid } : {}),
+            ...(request.parent_receipt_id ? { parentReceiptId: request.parent_receipt_id } : {}),
+            ...(request.swarm_id ? { swarmId: request.swarm_id } : {}),
+            ...(chainDepthForCloud > 0 ? { chainDepth: chainDepthForCloud } : {}),
           },
           {
             method: apiCall.method,
@@ -699,13 +735,25 @@ export function createProxyRoutes(deps: ProxyRouteDeps): Hono {
               reason:
                 cloudUpstream.status >= 200 && cloudUpstream.status < 400
                   ? 'cloud_call_allowed'
-                  : 'cloud_upstream_status_' + cloudUpstream.status,
+                  : `cloud_upstream_status_${cloudUpstream.status}`,
               receiptId: cloudReceiptId,
             },
             ts: Date.now(),
             agentDid: leafJwt ? extractAgentDid(leafJwt) : '',
+            apiCall: { method: apiCall.method, path: apiCall.path },
+            ...cloudChainContext,
           });
         }
+        fireSpan({
+          customerId,
+          agentDid: agentDidForSpan,
+          receiptId: decision.receiptId,
+          toolStatus:
+            cloudUpstream.status >= 200 && cloudUpstream.status < 400 ? 'allowed' : 'failed',
+          httpStatus: cloudUpstream.status,
+          requestArgs,
+          responseBody: sanitized,
+        });
         return c.json({
           allow: true,
           decision,
@@ -748,8 +796,20 @@ export function createProxyRoutes(deps: ProxyRouteDeps): Hono {
               },
               ts: Date.now(),
               agentDid: leafJwt ? extractAgentDid(leafJwt) : '',
+              apiCall: { method: apiCall.method, path: apiCall.path },
+              ...cloudChainContext,
             });
           }
+          fireSpan({
+            customerId,
+            agentDid: agentDidForSpan,
+            receiptId: decision.receiptId,
+            toolStatus: 'failed',
+            httpStatus: err.providerStatus ?? 502,
+            errorCode: 'cloud_call_failed',
+            errorMessage: err.message,
+            requestArgs,
+          });
           return c.json(
             {
               error: 'cloud_call_failed',
@@ -764,6 +824,16 @@ export function createProxyRoutes(deps: ProxyRouteDeps): Hono {
           );
         }
         log.error({ err, connectionId: cloudConnectionId }, 'cloud proxy call failed');
+        fireSpan({
+          customerId,
+          agentDid: agentDidForSpan,
+          receiptId: decision.receiptId,
+          toolStatus: 'failed',
+          httpStatus: 502,
+          errorCode: 'cloud_call_failed',
+          errorMessage: (err as Error)?.message,
+          requestArgs,
+        });
         return c.json(
           { error: 'cloud_call_failed', error_code: 'cloud_call_failed', decision },
           502,

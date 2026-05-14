@@ -73,6 +73,17 @@ export async function cloudApiCall(
     agentId: string;
     intentId?: string;
     ucanCid?: string;
+    /**
+     * Sprint MAOS-A — chain context forwarded so CP-emitted audit rows
+     * (cloud.token.minted, cloud.federation.exchanged) carry the same
+     * parent_receipt_id / swarm_id / chain_depth as the PDP-emitted
+     * cloud.call.allowed row. Without this, mint/exchange rows land in
+     * audit_events with swarm_id=null and the swarm detail page misses
+     * them in the chain walk.
+     */
+    parentReceiptId?: string;
+    swarmId?: string;
+    chainDepth?: number;
   },
   request: CloudProxyRequest,
 ): Promise<CloudProxyResponse> {
@@ -83,6 +94,11 @@ export async function cloudApiCall(
     agent_id: agentContext.agentId,
     ...(agentContext.intentId ? { intent_id: agentContext.intentId } : {}),
     ...(agentContext.ucanCid ? { ucan_cid: agentContext.ucanCid } : {}),
+    ...(agentContext.parentReceiptId ? { parent_receipt_id: agentContext.parentReceiptId } : {}),
+    ...(agentContext.swarmId ? { swarm_id: agentContext.swarmId } : {}),
+    ...(typeof agentContext.chainDepth === 'number'
+      ? { chain_depth: agentContext.chainDepth }
+      : {}),
     request,
   };
   const res = await f(url, {

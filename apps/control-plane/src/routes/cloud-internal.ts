@@ -56,6 +56,12 @@ const baseBody = z.object({
   agent_id: z.string().min(1),
   intent_id: z.string().optional(),
   ucan_cid: z.string().optional(),
+  // MAOS-A chain context — PDP forwards so CP-emitted audit rows
+  // (cloud.token.minted, cloud.federation.exchanged) carry the same
+  // parent_receipt_id / swarm_id / chain_depth as the PDP cloud.call row.
+  parent_receipt_id: z.string().optional(),
+  swarm_id: z.string().uuid().optional(),
+  chain_depth: z.number().int().min(0).optional(),
 });
 
 const apiCallBody = baseBody.extend({
@@ -79,6 +85,7 @@ export function createCloudInternalRoutes(deps: CloudInternalDeps): Hono {
     if ('error' in parsed) return parsed.response;
     const ctx = await resolve(deps, connectionId, parsed.value);
     if ('error' in ctx) return ctx.response;
+    const chain = chainContextFromBody(parsed.value);
     void audit.publish({
       kind: 'cloud.token.minted',
       customerId: parsed.value.customer_id,
@@ -86,6 +93,7 @@ export function createCloudInternalRoutes(deps: CloudInternalDeps): Hono {
       connectionId: ctx.connection.id,
       connector: ctx.connection.connector,
       jti: ctx.idToken.jti,
+      ...chain,
     });
     try {
       const creds = await ctx.provider.acquireSessionCreds(ctx.connection, ctx.idToken.token);
@@ -96,6 +104,7 @@ export function createCloudInternalRoutes(deps: CloudInternalDeps): Hono {
         connectionId: ctx.connection.id,
         connector: ctx.connection.connector,
         jti: ctx.idToken.jti,
+        ...chain,
       });
       return c.json({
         connection_id: ctx.connection.id,
@@ -113,6 +122,7 @@ export function createCloudInternalRoutes(deps: CloudInternalDeps): Hono {
         jti: ctx.idToken.jti,
         retryable: err instanceof CloudFederationError ? err.retryable : false,
         error: err instanceof Error ? err.message : String(err),
+        ...chain,
       });
       return federationErrorToResponse(c, err);
     }
@@ -142,6 +152,7 @@ export function createCloudInternalRoutes(deps: CloudInternalDeps): Hono {
       creds = deps.credsCache.get(connectionId, probeScope);
       cacheHit = creds !== undefined;
     }
+    const chain = chainContextFromBody(parsed.value);
     if (!creds) {
       const ctx = await resolve(deps, connectionId, parsed.value);
       if ('error' in ctx) return ctx.response;
@@ -154,6 +165,7 @@ export function createCloudInternalRoutes(deps: CloudInternalDeps): Hono {
         connector: ctx.connection.connector,
         command: parsed.value.request.url,
         jti: idTokenJti,
+        ...chain,
       });
       try {
         creds = await ctx.provider.acquireSessionCreds(ctx.connection, ctx.idToken.token);
@@ -165,6 +177,7 @@ export function createCloudInternalRoutes(deps: CloudInternalDeps): Hono {
           connector: ctx.connection.connector,
           command: parsed.value.request.url,
           jti: idTokenJti,
+          ...chain,
         });
       } catch (err) {
         void audit.publish({
@@ -177,6 +190,7 @@ export function createCloudInternalRoutes(deps: CloudInternalDeps): Hono {
           jti: idTokenJti,
           retryable: err instanceof CloudFederationError ? err.retryable : false,
           error: err instanceof Error ? err.message : String(err),
+          ...chain,
         });
         return federationErrorToResponse(c, err);
       }
@@ -199,6 +213,18 @@ export function createCloudInternalRoutes(deps: CloudInternalDeps): Hono {
   });
 
   return app;
+}
+
+function chainContextFromBody(body: {
+  parent_receipt_id?: string;
+  swarm_id?: string;
+  chain_depth?: number;
+}): { parentReceiptId?: string; swarmId?: string; chainDepth?: number } {
+  return {
+    ...(body.parent_receipt_id ? { parentReceiptId: body.parent_receipt_id } : {}),
+    ...(body.swarm_id ? { swarmId: body.swarm_id } : {}),
+    ...(typeof body.chain_depth === 'number' ? { chainDepth: body.chain_depth } : {}),
+  };
 }
 
 interface ResolveOk {
