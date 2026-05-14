@@ -107,6 +107,12 @@ describe.skipIf(!RUN)('spans ingestion + observability v2 (requires postgres)', 
     overrides: Partial<typeof schema.auditEvents.$inferInsert> = {},
   ): Promise<string> {
     const hash = `h-${Date.now()}-${Math.random()}`;
+    // Mimic real PDP: decision.receiptId is sha256 hex (64 chars). The
+    // returned identifier is what callers should pass as span.receiptId.
+    const receiptId =
+      `${Date.now().toString(16)}${Math.random().toString(16).slice(2).padStart(16, '0')}`
+        .padEnd(64, 'a')
+        .slice(0, 64);
     const [row] = await db.drizzle
       .insert(schema.auditEvents)
       .values({
@@ -118,11 +124,12 @@ describe.skipIf(!RUN)('spans ingestion + observability v2 (requires postgres)', 
         context: {},
         prevHash: '0'.repeat(64),
         hash,
-        payload: { command: '/github/repo/list' },
+        payload: { command: '/github/repo/list', decision: { receiptId } },
+        receiptId,
         ...overrides,
       })
-      .returning({ eventId: schema.auditEvents.eventId });
-    return row!.eventId;
+      .returning({ receiptId: schema.auditEvents.receiptId });
+    return row!.receiptId!;
   }
 
   function spanBody(receiptId: string, overrides: Record<string, unknown> = {}) {

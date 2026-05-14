@@ -357,6 +357,12 @@ export const auditEvents = pgTable(
     parentReceiptId: text('parent_receipt_id'),
     swarmId: uuid('swarm_id'),
     chainDepth: integer('chain_depth'),
+    /**
+     * PDP `decision.receiptId` (sha256 hex). Distinct from `event_id` (uuid
+     * primary key). Indexed so observability span ingestion can correlate a
+     * span to its authorize-receipt in O(1).
+     */
+    receiptId: text('receipt_id'),
   },
   (t) => ({
     customerTsIdx: index('audit_events_customer_ts_idx').on(t.customerId, t.ts),
@@ -364,6 +370,10 @@ export const auditEvents = pgTable(
     hashIdx: uniqueIndex('audit_events_hash_idx').on(t.hash),
     parentReceiptIdx: index('audit_events_parent_receipt_idx').on(t.parentReceiptId),
     swarmIdx: index('audit_events_swarm_idx').on(t.swarmId),
+    customerReceiptIdIdx: index('audit_events_customer_receipt_id_idx').on(
+      t.customerId,
+      t.receiptId,
+    ),
   }),
 );
 

@@ -47,9 +47,11 @@ export async function ingestSpan(
   { customerId, agentId, input }: IngestSpanArgs,
   db: Db,
 ): Promise<IngestSpanResult> {
+  // decision.receiptId is sha256 hex (not the row's event_id uuid). Look up
+  // by the dedicated text column added in migration 0026.
   const receipt = await db.drizzle.query.auditEvents.findFirst({
     where: and(
-      eq(schema.auditEvents.eventId, input.receiptId),
+      eq(schema.auditEvents.receiptId, input.receiptId),
       eq(schema.auditEvents.customerId, customerId),
     ),
     columns: { eventId: true, agent: true, swarmId: true, customerId: true },
@@ -57,7 +59,7 @@ export async function ingestSpan(
 
   if (!receipt) {
     const wrongTenant = await db.drizzle.query.auditEvents.findFirst({
-      where: eq(schema.auditEvents.eventId, input.receiptId),
+      where: eq(schema.auditEvents.receiptId, input.receiptId),
       columns: { customerId: true },
     });
     if (wrongTenant) {

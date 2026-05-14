@@ -23,9 +23,10 @@ export function createPgAuditWriter(pool: pg.Pool): PostgresAuditWriter {
       for (const row of rows) {
         // Columns: event_id, customer_id, ts, agent, decision, command,
         //          resource, context, prev_hash, hash, payload,
-        //          parent_receipt_id, swarm_id, chain_depth (Sprint MAOS-A).
+        //          parent_receipt_id, swarm_id, chain_depth (Sprint MAOS-A),
+        //          receipt_id (Sprint obs-v2 — sha256 hex; nullable).
         placeholders.push(
-          `($${i++}, $${i++}, to_timestamp($${i++}::bigint / 1000.0), $${i++}, $${i++}::audit_decision, $${i++}, $${i++}::jsonb, $${i++}::jsonb, $${i++}, $${i++}, $${i++}::jsonb, $${i++}, $${i++}, $${i++})`,
+          `($${i++}, $${i++}, to_timestamp($${i++}::bigint / 1000.0), $${i++}, $${i++}::audit_decision, $${i++}, $${i++}::jsonb, $${i++}::jsonb, $${i++}, $${i++}, $${i++}::jsonb, $${i++}, $${i++}, $${i++}, $${i++})`,
         );
         params.push(
           row.event_id,
@@ -42,11 +43,12 @@ export function createPgAuditWriter(pool: pg.Pool): PostgresAuditWriter {
           row.parent_receipt_id ?? null,
           row.swarm_id ?? null,
           row.chain_depth ?? null,
+          row.receipt_id ?? null,
         );
       }
       await pool.query(
         `INSERT INTO audit_events
-          (event_id, customer_id, ts, agent, decision, command, resource, context, prev_hash, hash, payload, parent_receipt_id, swarm_id, chain_depth)
+          (event_id, customer_id, ts, agent, decision, command, resource, context, prev_hash, hash, payload, parent_receipt_id, swarm_id, chain_depth, receipt_id)
          VALUES ${placeholders.join(', ')}`,
         params,
       );

@@ -183,6 +183,13 @@
       "when": 1779900000000,
       "tag": "0025_agent_spans_intent",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1780000000000,
+      "tag": "0026_audit_events_receipt_id",
+      "breakpoints": true
     }
   ]
 }

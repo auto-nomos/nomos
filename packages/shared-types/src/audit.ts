@@ -22,6 +22,12 @@ export const AuditEvent = z.object({
   parent_receipt_id: z.string().optional(),
   swarm_id: z.string().optional(),
   chain_depth: z.number().int().nonnegative().optional(),
+  /**
+   * PDP decision.receiptId (sha256 hex). Distinct from event_id (uuid PK).
+   * Optional for back-compat with legacy rows; new audit emits should
+   * always populate this so spans can correlate without jsonb scans.
+   */
+  receipt_id: z.string().optional(),
 });
 
 export const AuditProof = z.object({

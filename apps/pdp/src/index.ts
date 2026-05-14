@@ -157,6 +157,7 @@ async function main(): Promise<void> {
         ...(ev.parentReceiptId !== undefined ? { parent_receipt_id: ev.parentReceiptId } : {}),
         ...(ev.swarmId !== undefined ? { swarm_id: ev.swarmId } : {}),
         ...(ev.chainDepth !== undefined ? { chain_depth: ev.chainDepth } : {}),
+        receipt_id: ev.decision.receiptId,
       });
     },
     emitReceipt: async (ev) => {
