@@ -166,6 +166,7 @@ async function main(): Promise<void> {
     oauthProxy: {
       fetchOAuthToken: cpClient.fetchOAuthToken,
       refreshOAuthToken: cpClient.refreshOAuthToken,
+      emitSpan: cpClient.emitSpan,
     },
     stepup: {
       create: async (args) => {

@@ -1,3 +1,4 @@
+import type { EmitSpanInput } from '@auto-nomos/shared-types';
 import { Hono } from 'hono';
 import { secureHeaders } from 'hono/secure-headers';
 import type { PolicyCache } from './cache/policies.js';
@@ -44,6 +45,15 @@ export interface ServerDeps {
     refreshOAuthToken?: (customerId: string, connectionId: string) => Promise<OAuthTokenResponse>;
     /** Injectable upstream fetch — defaults to global fetch. */
     upstreamFetch?: typeof fetch;
+    /**
+     * Observability v2 — per-tool-call span emit. Best-effort, fire-and-forget.
+     * Bound to control-plane's POST /v1/internal/spans/emit at boot.
+     */
+    emitSpan?: (args: {
+      customerId: string;
+      agentDid: string;
+      input: EmitSpanInput;
+    }) => Promise<void> | void;
   };
   /**
    * Sprint 9 step-up. When supplied, authorize denies that would allow with
@@ -130,6 +140,7 @@ export function createServer(deps: ServerDeps): Hono {
         ...(deps.oauthProxy.upstreamFetch !== undefined
           ? { upstreamFetch: deps.oauthProxy.upstreamFetch }
           : {}),
+        ...(deps.oauthProxy.emitSpan !== undefined ? { emitSpan: deps.oauthProxy.emitSpan } : {}),
       }),
     );
   }

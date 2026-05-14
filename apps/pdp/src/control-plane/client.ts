@@ -6,6 +6,7 @@
  * surfaced via logger + Sentry.
  */
 import { verifyDetached } from '@auto-nomos/crypto';
+import type { EmitSpanInput } from '@auto-nomos/shared-types';
 import { base64urlToBytes, canonicalize } from '@auto-nomos/ucan';
 import { hexToBytes } from '@noble/hashes/utils';
 import type { AgentMeta, BundleEntry } from '../cache/policies.js';
@@ -111,6 +112,13 @@ export interface ControlPlaneClient {
     originalUcanCid?: string;
   }): Promise<StepUpCreateResponse>;
   getStepUp(id: string): Promise<StepUpStateResponse | undefined>;
+  /**
+   * Best-effort span emit. PDP calls this fire-and-forget after every
+   * /v1/proxy invocation completes so the control-plane records what the
+   * upstream call actually did (status, latency, payload hashes). Never
+   * throws to callers — errors are logged and swallowed.
+   */
+  emitSpan(args: { customerId: string; agentDid: string; input: EmitSpanInput }): Promise<void>;
 }
 
 export class OAuthTokenFetchError extends Error {
@@ -285,6 +293,36 @@ export function createControlPlaneClient(opts: ControlPlaneClientOptions): Contr
     };
   }
 
+  async function emitSpan(args: {
+    customerId: string;
+    agentDid: string;
+    input: EmitSpanInput;
+  }): Promise<void> {
+    try {
+      const res = await fetchImpl(`${opts.baseUrl}/v1/internal/spans/emit`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          authorization: `Bearer ${opts.serviceToken}`,
+        },
+        body: JSON.stringify({
+          customerId: args.customerId,
+          agentDid: args.agentDid,
+          ...args.input,
+        }),
+      });
+      if (!res.ok) {
+        const body = await res.text().catch(() => '');
+        opts.logger.warn(
+          { status: res.status, body, receiptId: args.input.receiptId },
+          'pdp span emit non-ok',
+        );
+      }
+    } catch (err) {
+      opts.logger.warn({ err, receiptId: args.input.receiptId }, 'pdp span emit failed');
+    }
+  }
+
   async function fetchCustomerIds(): Promise<string[]> {
     const res = await fetchImpl(`${opts.baseUrl}/v1/internal/customers`, {
       headers: { authorization: `Bearer ${opts.serviceToken}` },
@@ -304,5 +342,6 @@ export function createControlPlaneClient(opts: ControlPlaneClientOptions): Contr
     refreshOAuthToken,
     createStepUp,
     getStepUp,
+    emitSpan,
   };
 }

@@ -17,6 +17,11 @@ import {
   type AuthorizeDecision,
   AuthorizeRequest as AuthorizeRequestSchema,
   type DenyReason,
+  type EmitSpanInput,
+  redactRequest,
+  redactResponse,
+  sha256Of,
+  statusFromOutcome,
 } from '@auto-nomos/shared-types';
 import { canonicalize, computeCid, parseUcanJwt } from '@auto-nomos/ucan';
 import { Hono } from 'hono';
@@ -57,6 +62,16 @@ const ProxyRequestSchema = z.object({
     query: z.record(z.string(), z.string()).optional(),
     body: z.unknown().optional(),
     headers: z.record(z.string(), z.string()).optional(),
+    /**
+     * Optional narrative layer — agent declares why this call is happening.
+     * Surfaced in the action graph drawer; never affects PDP decision logic.
+     */
+    intent: z.string().max(256).optional(),
+    /**
+     * Agent self-declared follow-up. Free-form (e.g. "researcher will summarize
+     * to writer"). Plain hint; PDP does not validate or use it for routing.
+     */
+    nextAgentHint: z.string().max(256).optional(),
   }),
 });
 
@@ -73,6 +88,16 @@ export interface ProxyRouteDeps {
    */
   refreshOAuthToken?: (customerId: string, connectionId: string) => Promise<OAuthTokenResponse>;
   emitAudit?: (event: AuditEmitInput) => Promise<void> | void;
+  /**
+   * Fire-and-forget span emitter. Defined separately from emitAudit so a
+   * deployment can disable spans without affecting audit. When undefined,
+   * proxy still functions; spans just don't land.
+   */
+  emitSpan?: (args: {
+    customerId: string;
+    agentDid: string;
+    input: EmitSpanInput;
+  }) => Promise<void> | void;
   /**
    * Step-up support on the proxy path (parity with /v1/authorize). When a
    * policy_denied result would allow with cosigner=true, the route synthesizes
@@ -102,12 +127,69 @@ export function createProxyRoutes(deps: ProxyRouteDeps): Hono {
     const log = getLog(c);
     const headerCustomerId = c.req.header(CUSTOMER_HEADER);
     const command = `/${c.req.param('command')}`;
+    const startedAtMs = Date.now();
 
     const raw = await c.req.json().catch(() => null);
     if (!raw) return c.json({ error: 'invalid JSON body' }, 400);
     const parsed = ProxyRequestSchema.safeParse(raw);
     if (!parsed.success) {
       return c.json({ error: 'invalid request shape', issues: parsed.error.issues }, 400);
+    }
+    const parsedData = parsed.data;
+    const intentField =
+      typeof parsedData.apiCall.intent === 'string'
+        ? parsedData.apiCall.intent.slice(0, 256)
+        : null;
+    const nextAgentHintField =
+      typeof parsedData.apiCall.nextAgentHint === 'string'
+        ? parsedData.apiCall.nextAgentHint.slice(0, 256)
+        : null;
+
+    /**
+     * Build EmitSpanInput from the request + outcome. Receipts come from
+     * decision.receiptId; the agent DID comes from the leaf UCAN. The helper
+     * never throws — span emit is a fire-and-forget side channel. Caller
+     * passes the request body as a plain object so redactRequest can pull
+     * connector-specific allowlisted fields.
+     */
+    function fireSpan(args: {
+      customerId: string;
+      agentDid: string | undefined;
+      receiptId: string;
+      toolStatus: 'allowed' | 'denied' | 'failed';
+      httpStatus?: number;
+      errorMessage?: string;
+      errorCode?: string;
+      requestArgs?: Record<string, unknown>;
+      responseBody?: unknown;
+    }): void {
+      if (!deps.emitSpan || !args.agentDid) return;
+      const endedAtMs = Date.now();
+      const input: EmitSpanInput = {
+        receiptId: args.receiptId,
+        toolName: command,
+        status: statusFromOutcome(args.toolStatus, args.httpStatus),
+        startedAt: new Date(startedAtMs).toISOString(),
+        endedAt: new Date(endedAtMs).toISOString(),
+        latencyMs: Math.max(0, endedAtMs - startedAtMs),
+        httpStatus: args.httpStatus ?? null,
+        errorCode: args.errorCode ?? (args.toolStatus === 'denied' ? 'denied' : null),
+        errorMessage: args.errorMessage ? args.errorMessage.slice(0, 1024) : null,
+        requestArgsHash: sha256Of(args.requestArgs ?? null),
+        requestSummary: redactRequest(command, args.requestArgs),
+        responseHash: args.responseBody !== undefined ? sha256Of(args.responseBody) : null,
+        responseSummary: redactResponse(args.responseBody),
+        parentSpanId: null,
+        nextAgentHint: nextAgentHintField,
+        intent: intentField,
+      };
+      try {
+        void Promise.resolve(
+          deps.emitSpan({ customerId: args.customerId, agentDid: args.agentDid, input }),
+        ).catch((err) => log.warn({ err, receiptId: args.receiptId }, 'pdp emitSpan failed'));
+      } catch (err) {
+        log.warn({ err, receiptId: args.receiptId }, 'pdp emitSpan threw');
+      }
     }
 
     const requestParse = AuthorizeRequestSchema.safeParse(parsed.data.request);
@@ -135,6 +217,13 @@ export function createProxyRoutes(deps: ProxyRouteDeps): Hono {
       return c.json({ error: derive.message, error_code: 'missing_customer_id' }, 400);
     }
     const customerId = derive.customerId;
+    // Best-effort fields for span emission. agentDid may be empty for
+    // malformed UCANs; fireSpan treats undefined as "skip emit".
+    const agentDidForSpan = extractAgentDid(firstUcan) || undefined;
+    const requestArgs: Record<string, unknown> = {
+      ...(parsed.data.apiCall.query ?? {}),
+      ...((parsed.data.apiCall.body as Record<string, unknown> | undefined) ?? {}),
+    };
     if (derive.source === 'header') {
       log.warn(
         { customerId },
@@ -291,6 +380,14 @@ export function createProxyRoutes(deps: ProxyRouteDeps): Hono {
           { customerId, command: request.command, allow: false, reason: denyReason },
           'proxy cosigner-deny',
         );
+        fireSpan({
+          customerId,
+          agentDid: agentDidForSpan,
+          receiptId: denyDecision.receiptId,
+          toolStatus: 'denied',
+          errorCode: denyReason,
+          requestArgs,
+        });
         return c.json({ allow: false, decision: denyDecision, error_code: denyReason }, 200);
       }
       effectiveRequest = {
@@ -393,6 +490,14 @@ export function createProxyRoutes(deps: ProxyRouteDeps): Hono {
       // intact and can call waitForApproval. Other denies stay 403 for
       // backwards compat with existing callers.
       const status = decision.requiresStepUp ? 200 : 403;
+      fireSpan({
+        customerId,
+        agentDid: agentDidForSpan,
+        receiptId: decision.receiptId,
+        toolStatus: 'denied',
+        errorCode: decision.reason ?? 'denied',
+        requestArgs,
+      });
       return c.json({ allow: false, decision, error_code: 'denied' }, status);
     }
 
@@ -418,6 +523,16 @@ export function createProxyRoutes(deps: ProxyRouteDeps): Hono {
       token = await deps.fetchOAuthToken(customerId, connectionId);
     } catch (err) {
       log.error({ err, connectionId }, 'control-plane oauth token fetch failed');
+      fireSpan({
+        customerId,
+        agentDid: agentDidForSpan,
+        receiptId: decision.receiptId,
+        toolStatus: 'failed',
+        httpStatus: 502,
+        errorCode: 'oauth_token_fetch_failed',
+        errorMessage: (err as Error)?.message,
+        requestArgs,
+      });
       return c.json(
         {
           error: 'oauth_token_fetch_failed',
@@ -429,6 +544,15 @@ export function createProxyRoutes(deps: ProxyRouteDeps): Hono {
       );
     }
     if (!isKnownProvider(token.connector)) {
+      fireSpan({
+        customerId,
+        agentDid: agentDidForSpan,
+        receiptId: decision.receiptId,
+        toolStatus: 'failed',
+        httpStatus: 501,
+        errorCode: 'connector_not_supported',
+        requestArgs,
+      });
       return c.json(
         {
           error: 'connector_not_supported_by_proxy',
@@ -459,15 +583,24 @@ export function createProxyRoutes(deps: ProxyRouteDeps): Hono {
         apiCall.query,
       );
       if (!ghCheck.ok) {
+        const oosReceiptId = sha256Hex(
+          `proxy-out-of-scope|${request.command}|${canonicalize(request as unknown as Record<string, unknown>)}`,
+        );
+        fireSpan({
+          customerId,
+          agentDid: agentDidForSpan,
+          receiptId: oosReceiptId,
+          toolStatus: 'denied',
+          errorCode: 'resource_out_of_scope',
+          requestArgs,
+        });
         return c.json(
           {
             allow: false,
             decision: {
               allow: false,
               reason: 'resource_out_of_scope',
-              receiptId: sha256Hex(
-                `proxy-out-of-scope|${request.command}|${canonicalize(request as unknown as Record<string, unknown>)}`,
-              ),
+              receiptId: oosReceiptId,
             },
             error_code: 'resource_out_of_scope',
             adapter_reason: ghCheck.reason,
@@ -484,6 +617,16 @@ export function createProxyRoutes(deps: ProxyRouteDeps): Hono {
       });
     } catch (err) {
       log.error({ err, connectionId, provider }, 'upstream proxy call failed');
+      fireSpan({
+        customerId,
+        agentDid: agentDidForSpan,
+        receiptId: decision.receiptId,
+        toolStatus: 'failed',
+        httpStatus: 502,
+        errorCode: 'upstream_call_failed',
+        errorMessage: (err as Error)?.message,
+        requestArgs,
+      });
       return c.json(
         { error: 'upstream_call_failed', error_code: 'upstream_call_failed', decision },
         502,
@@ -506,6 +649,16 @@ export function createProxyRoutes(deps: ProxyRouteDeps): Hono {
           { err, customerId, connectionId, provider },
           'proxy: refresh after 401 failed — denying with oauth_token_invalid',
         );
+        fireSpan({
+          customerId,
+          agentDid: agentDidForSpan,
+          receiptId: decision.receiptId,
+          toolStatus: 'failed',
+          httpStatus: 502,
+          errorCode: 'oauth_token_invalid',
+          errorMessage: (err as Error)?.message,
+          requestArgs,
+        });
         return c.json(
           {
             error: 'oauth_token_invalid',
@@ -532,6 +685,16 @@ export function createProxyRoutes(deps: ProxyRouteDeps): Hono {
       },
       'proxy',
     );
+
+    fireSpan({
+      customerId,
+      agentDid: agentDidForSpan,
+      receiptId: decision.receiptId,
+      toolStatus: upstream.status >= 400 ? 'failed' : 'allowed',
+      httpStatus: upstream.status,
+      requestArgs,
+      responseBody: sanitized.body,
+    });
 
     return c.json(
       {
