@@ -23,6 +23,7 @@ export type IntegrationId =
   | 'google_tasks'
   | 'google_contacts'
   | 'swarm'
+  | 'ssh'
   // M1+ — cloud IAM. One pack per cloud; per-service surfaces (compute,
   // storage, observability) live as namespaced action prefixes inside
   // each pack (e.g. /azure/vm/list, /azure/storage/blob_read).

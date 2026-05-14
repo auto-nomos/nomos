@@ -7,6 +7,7 @@ import {
   Cpu,
   FileLock2,
   GitBranch,
+  HardDrive,
   Hash,
   KeyRound,
   Layers,
@@ -44,6 +45,7 @@ const SECTIONS: Section[] = [
   { id: 'connections', label: 'Connections', group: 'Build', icon: Plug },
   { id: 'apps', label: 'Apps & API keys', group: 'Build', icon: Boxes },
   { id: 'policies', label: 'Policies', group: 'Build', icon: FileLock2 },
+  { id: 'filesystem-ssh', label: 'Filesystem & SSH', group: 'Build', icon: HardDrive },
   { id: 'dynamic-intent', label: 'Dynamic intent', group: 'Runtime', icon: Workflow },
   { id: 'step-up', label: 'Step-up & passkeys', group: 'Runtime', icon: ShieldAlert },
   { id: 'standing-grants', label: 'Standing grants', group: 'Runtime', icon: Layers },
@@ -91,6 +93,7 @@ export function GuideContent() {
           <Connections />
           <Apps />
           <Policies />
+          <FilesystemSsh />
           <DynamicIntent />
           <StepUp />
           <StandingGrants />
@@ -122,9 +125,9 @@ function Header() {
         ready.
       </p>
       <div className="mt-6 flex flex-wrap items-center gap-2 font-mono text-[11px] uppercase tracking-[0.16em] text-aegis-faint">
-        <span>~18 min read</span>
+        <span>~20 min read</span>
         <span aria-hidden>·</span>
-        <span>last updated 2026-05-15 · MAOS beta · Cloud IAM beta</span>
+        <span>last updated 2026-05-15 · MAOS beta · filesystem + SSH GA · Cloud IAM beta</span>
         <span aria-hidden>·</span>
         <a href="#quickstart" className="text-aegis-signal hover:underline">
           Skip to 5-min quickstart →
@@ -419,8 +422,13 @@ function Connections() {
     <Section id="connections" eyebrow="04 · build" title="Connections.">
       <P>
         A Connection is an OAuth binding to one SaaS provider. Nomos ships connectors for GitHub,
-        Slack, Google (Drive + Calendar), Notion, Linear, and Stripe Connect. Filesystem and
-        additional providers plug in via the same adapter contract.
+        Slack, Google (Drive · Calendar · Gmail · Docs · Sheets · Tasks · Contacts), Notion, Linear,
+        and Stripe Connect. Non-OAuth providers (<K>filesystem</K> and <K>ssh</K>) are configured
+        per-PDP from environment — see{' '}
+        <a href="#filesystem-ssh" className="text-aegis-signal hover:underline">
+          Filesystem &amp; SSH
+        </a>
+        .
       </P>
       <P>
         Connections live in{' '}
@@ -503,9 +511,238 @@ when { context.cosigner == true };  // step-up to close`}</Code>
   );
 }
 
+function FilesystemSsh() {
+  return (
+    <Section id="filesystem-ssh" eyebrow="07 · build · GA" title="Filesystem & SSH.">
+      <P>
+        Two providers without OAuth: <K>filesystem</K> (the PDP&rsquo;s local disk) and <K>ssh</K>{' '}
+        (remote SFTP + shell over SSH). Same Cedar gate, same UCAN constraint, same audit chain as
+        the SaaS connectors — the auth model is the only thing that differs (host-local rather than
+        OAuth refresh tokens).
+      </P>
+      <table className="w-full border-collapse text-[13px]">
+        <thead>
+          <tr className="border-b border-aegis-line text-left font-mono text-[10px] uppercase tracking-[0.18em] text-aegis-faint">
+            <th className="py-2 pr-4">Provider</th>
+            <th className="py-2 pr-4">Auth</th>
+            <th className="py-2 pr-4">Ops</th>
+            <th className="py-2">Templates</th>
+          </tr>
+        </thead>
+        <tbody className="text-aegis-paper">
+          <tr className="border-b border-aegis-line/60">
+            <td className="py-2 pr-4 font-mono">filesystem</td>
+            <td className="py-2 pr-4">PDP host (no token)</td>
+            <td className="py-2 pr-4">11 (file + dir CRUD)</td>
+            <td className="py-2">8</td>
+          </tr>
+          <tr>
+            <td className="py-2 pr-4 font-mono">ssh</td>
+            <td className="py-2 pr-4">SSH private key (env)</td>
+            <td className="py-2 pr-4">12 (incl. /ssh/exec)</td>
+            <td className="py-2">6</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3 className="mt-8 font-display text-[22px] text-aegis-paper">Connecting</h3>
+      <P>
+        Neither provider has an OAuth round-trip. The PDP reads credentials from environment at
+        boot:
+      </P>
+      <Code lang="shell">{`# Filesystem — runs as the PDP process. No env needed.
+#   All scoping is enforced from the UCAN resource_constraint.path_prefix.
+
+# SSH — one keypair per PDP instance (v1.0; multi-tenant key isolation deferred).
+SSH_PRIVATE_KEY="-----BEGIN OPENSSH PRIVATE KEY-----..."
+SSH_PASSPHRASE="optional"
+SSH_KNOWN_HOSTS="github.com ssh-rsa AAAA..."   # defined but not yet wired (v1.1)`}</Code>
+      <P>
+        After boot, mint a UCAN with a <K>resource_constraint</K> carrying the path prefix and (for
+        SSH) the host. The PDP refuses anything outside the constraint.
+      </P>
+      <Code lang="json">{`// filesystem constraint
+{
+  "provider": "filesystem",
+  "path_prefix": "/srv/workspaces/agent-42"
+}
+
+// ssh constraint
+{
+  "provider": "ssh",
+  "host": "ops-01.example.com",
+  "username": "deploy",
+  "path_prefix": "/var/www/app"
+}`}</Code>
+
+      <h3 className="mt-8 font-display text-[22px] text-aegis-paper">Cedar templates</h3>
+      <P>
+        Both packs ship pre-built templates pickable from{' '}
+        <Link href="/app/policies" className="text-aegis-signal hover:underline">
+          /app/policies → Templates
+        </Link>
+        . Names match the schema-pack ids.
+      </P>
+      <ul className="ml-6 list-disc space-y-1 marker:text-aegis-signal">
+        <li>
+          <K>filesystem:read-only</K> — read + list, no path constraint required.
+        </li>
+        <li>
+          <K>filesystem:subdir-read</K> · <K>filesystem:write-subdir</K> — gated by{' '}
+          <K>path_prefix</K>.
+        </li>
+        <li>
+          <K>filesystem:business-hours-write</K> — write only 09:00–18:00.
+        </li>
+        <li>
+          <K>filesystem:extension-filter</K> — limit to <K>.py</K> / <K>.ts</K> / etc.
+        </li>
+        <li>
+          <K>filesystem:delete-step-up</K> · <K>filesystem:audit-only-delete</K> — passkey required
+          to <K>unlink</K>.
+        </li>
+        <li>
+          <K>filesystem:developer-sandbox</K> — full CRUD inside a single sandbox dir.
+        </li>
+        <li>
+          <K>ssh:host-pinned-read</K> · <K>ssh:sftp-upload</K> · <K>ssh:host-subdir-full</K> — host-
+          and path-pinned SFTP.
+        </li>
+        <li>
+          <K>ssh:exec-step-up</K> · <K>ssh:delete-step-up</K> — step-up gates on shell exec and
+          remote delete.
+        </li>
+        <li>
+          <K>ssh:read-write-no-exec</K> — SFTP only; <K>/ssh/exec</K> explicitly forbidden.
+        </li>
+      </ul>
+
+      <h3 className="mt-8 font-display text-[22px] text-aegis-paper">Five common use cases</h3>
+      <ol className="ml-6 list-decimal space-y-2 marker:text-aegis-signal">
+        <li>
+          <strong className="text-aegis-paper">Researcher reads a code tree.</strong>{' '}
+          <K>filesystem:subdir-read</K> + <K>path_prefix=/repos/acme</K>. Read + tree, no writes.
+        </li>
+        <li>
+          <strong className="text-aegis-paper">Codegen agent rewrites files.</strong>{' '}
+          <K>filesystem:write-subdir</K> + <K>filesystem:extension-filter</K> pinned to <K>.ts</K> /{' '}
+          <K>.tsx</K>. Deletes require passkey.
+        </li>
+        <li>
+          <strong className="text-aegis-paper">Deploy bot pushes a build.</strong>{' '}
+          <K>ssh:sftp-upload</K> to <K>/var/www/app</K> on a pinned host. No shell exec — uploads
+          only.
+        </li>
+        <li>
+          <strong className="text-aegis-paper">Incident recovery agent.</strong>{' '}
+          <K>ssh:host-subdir-full</K> on the broken box. Any <K>/ssh/exec</K> hits{' '}
+          <K>ssh:exec-step-up</K> and pings the on-call passkey.
+        </li>
+        <li>
+          <strong className="text-aegis-paper">Throwaway sandbox.</strong>{' '}
+          <K>filesystem:developer-sandbox</K> + <K>path_prefix=/tmp/agent-{`{id}`}</K>. Full CRUD,
+          no leakage outside the sandbox.
+        </li>
+      </ol>
+
+      <h3 className="mt-8 font-display text-[22px] text-aegis-paper">Defenses in depth</h3>
+      <P>The PDP enforces five overlapping checks on every filesystem/ssh request:</P>
+      <ul className="ml-6 list-disc space-y-1 marker:text-aegis-signal">
+        <li>
+          <strong className="text-aegis-paper">Path-prefix boundary</strong> — strict{' '}
+          <K>prefix + &lsquo;/&rsquo;</K> match. <K>/foobar</K> never matches prefix <K>/foo</K>.
+        </li>
+        <li>
+          <strong className="text-aegis-paper">Symlink escape</strong> — <K>fs.realpath()</K> on
+          both source and destination; refuses if resolved path leaves the prefix.
+        </li>
+        <li>
+          <strong className="text-aegis-paper">Shell metachar reject</strong> — paths containing{' '}
+          <K>$</K>, backtick, <K>${`{`}</K>, <K>$(</K>, newline, or backslash are denied
+          pre-dispatch.
+        </li>
+        <li>
+          <strong className="text-aegis-paper">Shell quoting</strong> — every <K>mkdir -p</K> /{' '}
+          <K>rm -rf</K> path is POSIX single-quote escaped via <K>shQuote()</K>.
+        </li>
+        <li>
+          <strong className="text-aegis-paper">Timeouts + caps</strong> — SSH connect 10 s, op 30 s,
+          exec 120 s ceiling. <K>/ssh/exec</K> output capped at 1 MB per stream (
+          <K>truncated: true</K> in the response).
+        </li>
+      </ul>
+
+      <h3 className="mt-8 font-display text-[22px] text-aegis-paper">MCP tools</h3>
+      <P>
+        The MCP server (<K>@auto-nomos/mcp-server</K> 0.0.18+) registers tools per provider — your
+        agent sees them under their provider namespace and the PDP gates each call identically to a
+        REST call:
+      </P>
+      <Code lang="text">{`filesystem_file_read           ssh_file_read           ssh_dir_create
+filesystem_file_write          ssh_file_write          ssh_dir_delete
+filesystem_file_create         ssh_file_create         ssh_dir_delete_recursive
+filesystem_file_delete         ssh_file_delete         ssh_exec     (step-up)
+filesystem_file_move           ssh_file_move
+filesystem_file_copy           ssh_file_copy
+filesystem_dir_list            ssh_dir_list
+filesystem_dir_tree            ssh_dir_tree
+filesystem_dir_create
+filesystem_dir_delete
+filesystem_dir_delete_recursive`}</Code>
+      <Callout tone="signal">
+        Cursor / Claude Desktop config: pin <K>@auto-nomos/mcp-server@0.0.18</K>. The integration
+        label shows up as <K>Filesystem</K> and <K>SSH / SFTP</K> in the MCP picker.
+      </Callout>
+
+      <h3 className="mt-8 font-display text-[22px] text-aegis-paper">Observability</h3>
+      <P>
+        Filesystem and SSH events use the same{' '}
+        <Link href="/app/audit" className="text-aegis-signal hover:underline">
+          audit
+        </Link>{' '}
+        +{' '}
+        <Link href="/app/swarms" className="text-aegis-signal hover:underline">
+          swarms
+        </Link>{' '}
+        infrastructure as every other provider — no provider-specific viewer. Filter on{' '}
+        <K>provider:filesystem</K> or <K>provider:ssh</K>; each row carries:
+      </P>
+      <ul className="ml-6 list-disc space-y-1 marker:text-aegis-signal">
+        <li>
+          <K>command</K> (e.g. <K>/ssh/exec</K>), <K>decision</K>, <K>resource.path</K>,{' '}
+          <K>resource.host</K>
+        </li>
+        <li>
+          For <K>/ssh/exec</K>: <K>context.exec.exitCode</K>, <K>context.exec.truncated</K>,{' '}
+          <K>context.exec.durationMs</K>
+        </li>
+        <li>
+          Constraint snapshot (<K>path_prefix</K>, <K>host</K>) at decision time
+        </li>
+        <li>
+          <K>hash</K> / <K>prevHash</K> for tamper-evident chain, same as SaaS receipts
+        </li>
+      </ul>
+      <P>
+        The action graph at <K>/app/swarms/{`{id}`}</K> renders filesystem / SSH calls as nodes
+        alongside SaaS calls — the ActionGraph is provider-agnostic. A swarm that reads from GitHub,
+        writes to <K>filesystem</K>, then runs <K>/ssh/exec</K> shows up as one chained DAG with
+        per-edge latencies and decisions.
+      </P>
+
+      <Callout tone="warn">
+        <strong className="text-aegis-paper">Operational gotchas:</strong> one SSH key per PDP
+        process (multi-tenant key isolation lands in v1.1); <K>SSH_KNOWN_HOSTS</K> is parsed but not
+        yet enforced by node-ssh; <K>/ssh/exec</K> is opt-in per policy — the default ssh templates
+        do not allow it.
+      </Callout>
+    </Section>
+  );
+}
+
 function DynamicIntent() {
   return (
-    <Section id="dynamic-intent" eyebrow="07 · runtime" title="Dynamic intent.">
+    <Section id="dynamic-intent" eyebrow="08 · runtime" title="Dynamic intent.">
       <P>
         For dynamic agents, every call begins with an <K>Intent</K> — a structured declaration of{' '}
         <em className="not-italic">where</em> (resource constraint),{' '}
@@ -531,7 +768,7 @@ function DynamicIntent() {
 
 function StepUp() {
   return (
-    <Section id="step-up" eyebrow="08 · runtime" title="Step-up & passkeys.">
+    <Section id="step-up" eyebrow="09 · runtime" title="Step-up & passkeys.">
       <P>
         When any gate denies, Nomos writes an approval row, sends a deep link to your phone (web
         push, email, or Telegram — your choice in Notification settings), and waits. You open the
@@ -549,7 +786,7 @@ function StepUp() {
 
 function StandingGrants() {
   return (
-    <Section id="standing-grants" eyebrow="09 · runtime" title="Standing grants.">
+    <Section id="standing-grants" eyebrow="10 · runtime" title="Standing grants.">
       <P>
         Some grants are durable. &ldquo;This agent can always read my Linear issues&rdquo; should
         not require a passkey every session. On the approve page, choose <K>Standing</K> instead of{' '}
@@ -570,7 +807,7 @@ function StandingGrants() {
 
 function AuditChain() {
   return (
-    <Section id="audit" eyebrow="10 · runtime" title="Audit chain.">
+    <Section id="audit" eyebrow="11 · runtime" title="Audit chain.">
       <P>
         Every authorize, every step-up, every revocation lands in <K>audit_events</K>. Each row
         hashes the previous row&rsquo;s hash plus its own canonicalized payload — a Merkle list
@@ -590,7 +827,7 @@ function AuditChain() {
 
 function Swarms() {
   return (
-    <Section id="swarms" eyebrow="11 · runtime · beta" title="Swarms (delegation chains).">
+    <Section id="swarms" eyebrow="12 · runtime · beta" title="Swarms (delegation chains).">
       <P>
         Most agents do one thing. The next era is <em className="not-italic">swarms</em> — a planner
         agent forks a researcher, the researcher forks a writer, each step calls a different SaaS.
@@ -1154,7 +1391,7 @@ when {
 
 function Sdk() {
   return (
-    <Section id="sdk" eyebrow="12 · integrate" title="SDK & MCP.">
+    <Section id="sdk" eyebrow="13 · integrate" title="SDK & MCP.">
       <P>
         The TypeScript SDK ships as <K>@auto-nomos/sdk</K>. Three primary surfaces:{' '}
         <K>createIntentClient()</K> for dynamic-mode agents, <K>createAuthorize()</K> for
@@ -1178,7 +1415,7 @@ function Sdk() {
 
 function TelegramSetup() {
   return (
-    <Section id="telegram" eyebrow="13 · integrate" title="Telegram notifications.">
+    <Section id="telegram" eyebrow="14 · integrate" title="Telegram notifications.">
       <P>
         Nomos can push step-up approval prompts to your Telegram account. When an agent triggers a
         high-risk action you&rsquo;ll get a message with{' '}
@@ -1234,7 +1471,7 @@ nomos status`}</Code>
 
 function Faq() {
   return (
-    <Section id="faq" eyebrow="14 · reference" title="FAQ.">
+    <Section id="faq" eyebrow="15 · reference" title="FAQ.">
       <Faqs
         items={[
           [
@@ -1321,6 +1558,7 @@ export type TopicId =
   | 'connections'
   | 'apps'
   | 'policies'
+  | 'filesystem-ssh'
   | 'dynamic-intent'
   | 'step-up'
   | 'standing-grants'
@@ -1338,6 +1576,7 @@ const TOPIC_COMPONENTS: Record<TopicId, React.ComponentType> = {
   connections: Connections,
   apps: Apps,
   policies: Policies,
+  'filesystem-ssh': FilesystemSsh,
   'dynamic-intent': DynamicIntent,
   'step-up': StepUp,
   'standing-grants': StandingGrants,

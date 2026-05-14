@@ -40,6 +40,8 @@ import { actionToCommand as googleDocsMap } from '@auto-nomos/schema-packs/googl
 import { actionToCommand as googleSheetsMap } from '@auto-nomos/schema-packs/google_sheets';
 import { actionToCommand as googleTasksMap } from '@auto-nomos/schema-packs/google_tasks';
 import { actionToCommand as googleContactsMap } from '@auto-nomos/schema-packs/google_contacts';
+import { actionToCommand as filesystemMap } from '@auto-nomos/schema-packs/filesystem';
+import { actionToCommand as sshMap } from '@auto-nomos/schema-packs/ssh';
 import pg from 'pg';
 
 const PACK_TO_ADAPTER: Array<[string, Record<string, string>]> = [
@@ -55,6 +57,8 @@ const PACK_TO_ADAPTER: Array<[string, Record<string, string>]> = [
   ['google_sheets', googleSheetsMap],
   ['google_tasks', googleTasksMap],
   ['google_contacts', googleContactsMap],
+  ['filesystem', filesystemMap],
+  ['ssh', sshMap],
 ];
 
 /**

@@ -96,11 +96,21 @@ actions:
       'salesforce',
       'postgres',
       'imessage',
+      'filesystem',
+      'ssh',
     ];
     for (const id of expected) {
       expect(all.has(id), `missing adapter: ${id}`).toBe(true);
     }
     expect(all.size).toBe(expected.length);
+  });
+
+  it('local + ssh_key auth kinds load', () => {
+    const all = loadAllAdapters(SPEC_DIR);
+    const fs = all.get('filesystem');
+    const ssh = all.get('ssh');
+    expect(fs?.auth.kind).toBe('local');
+    expect(ssh?.auth.kind).toBe('ssh_key');
   });
 
   it('every adapter declares at least one action with valid risk', () => {

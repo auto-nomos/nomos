@@ -25,14 +25,20 @@ const ANCHORS = [
     body: 'UCAN, PDP, Cedar, audit chain, step-up. The five primitives that make the rest make sense.',
   },
   {
+    href: '/docs#filesystem-ssh',
+    eyebrow: '03 · GA · providers',
+    title: 'Filesystem & SSH',
+    body: 'Local disk + remote SFTP/exec under the same Cedar gate. Path-prefix scoping, step-up on destructive ops, 14 templates.',
+  },
+  {
     href: '/docs#swarms',
-    eyebrow: '03 · beta · maos',
+    eyebrow: '04 · beta · maos',
     title: 'Swarms (delegation chains)',
     body: 'Multi-agent orchestration security: parent → child UCAN propagation, scope containment, swarm-scoped approval.',
   },
   {
     href: '/docs#cloud',
-    eyebrow: '04 · beta · cloud',
+    eyebrow: '05 · beta · cloud',
     title: 'Cloud IAM (Azure / AWS / GCP)',
     body: 'Federated cloud access via id.auto-nomos.com. No stored secrets — STS / AAD / WIF token exchange per request.',
   },

@@ -10,6 +10,7 @@ const VALID_TOPICS = new Set<string>([
   'connections',
   'apps',
   'policies',
+  'filesystem-ssh',
   'dynamic-intent',
   'step-up',
   'standing-grants',

@@ -27,6 +27,7 @@ import { canonicalize, computeCid, parseUcanJwt } from '@auto-nomos/ucan';
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { type CloudAdapterDeps, CloudCallError, cloudApiCall } from '../adapters/cloud.js';
+import { executeFilesystemCommand } from '../adapters/filesystem-dispatch.js';
 import { validateGithubProxyCall } from '../adapters/github.js';
 import { validateGoogleCalendarProxyCall } from '../adapters/google_calendar.js';
 import { validateGoogleContactsProxyCall } from '../adapters/google_contacts.js';
@@ -44,6 +45,7 @@ import {
   proxyApiCall,
 } from '../adapters/oauth.js';
 import { validateSlackProxyCall } from '../adapters/slack.js';
+import { executeSshCommand } from '../adapters/ssh-dispatch.js';
 import { validateStripeProxyCall } from '../adapters/stripe.js';
 import { decisionToAudit } from '../audit/emit.js';
 import type { PolicyCache } from '../cache/policies.js';
@@ -591,6 +593,8 @@ export function createProxyRoutes(deps: ProxyRouteDeps): Hono {
     }
 
     const leaf = leafUcan(parsed.data.ucan);
+    const leafMeta2 = leaf?.payload.meta as Record<string, unknown> | undefined;
+    const rConstraint = leafMeta2?.resource_constraint as { provider?: string } | undefined;
 
     // M1 — cloud federation branch. UCAN may carry meta.cloud_connection_id
     // instead of meta.oauth_connection_id; control-plane handles credential
@@ -839,6 +843,65 @@ export function createProxyRoutes(deps: ProxyRouteDeps): Hono {
           502,
         );
       }
+    }
+
+    // ── Local filesystem: no OAuth token needed, executed directly by the PDP ──
+    if (command.startsWith('/filesystem/')) {
+      let fsResult: unknown;
+      try {
+        fsResult = await executeFilesystemCommand(command, parsed.data.apiCall, rConstraint);
+      } catch (err) {
+        fireSpan({
+          customerId,
+          agentDid: agentDidForSpan,
+          receiptId: decision.receiptId,
+          toolStatus: 'failed',
+          errorCode: 'filesystem_exec_failed',
+          errorMessage: (err as Error).message,
+          requestArgs,
+        });
+        return c.json(
+          { error: 'filesystem_exec_failed', error_code: 'filesystem_exec_failed', decision },
+          502,
+        );
+      }
+      fireSpan({
+        customerId,
+        agentDid: agentDidForSpan,
+        receiptId: decision.receiptId,
+        toolStatus: 'allowed',
+        requestArgs,
+        responseBody: fsResult,
+      });
+      return c.json({ allow: true, decision, upstream: { status: 200, body: fsResult } }, 200);
+    }
+
+    // ── SSH/SFTP: execute on remote host using env-supplied SSH key ──
+    if (command.startsWith('/ssh/')) {
+      let sshResult: unknown;
+      try {
+        sshResult = await executeSshCommand(command, parsed.data.apiCall, rConstraint);
+      } catch (err) {
+        fireSpan({
+          customerId,
+          agentDid: agentDidForSpan,
+          receiptId: decision.receiptId,
+          toolStatus: 'failed',
+          errorCode: 'ssh_exec_failed',
+          errorMessage: (err as Error).message,
+          requestArgs,
+        });
+        return c.json({ error: 'ssh_exec_failed', error_code: 'ssh_exec_failed', decision }, 502);
+      }
+      fireSpan({
+        customerId,
+        agentDid: agentDidForSpan,
+        receiptId: decision.receiptId,
+        toolStatus: 'allowed',
+        requestArgs,
+        responseBody: sshResult,
+      });
+      return c.json({ allow: true, decision, upstream: { status: 200, body: sshResult } }, 200);
     }
 
     const connectionId =

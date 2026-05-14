@@ -13,6 +13,8 @@ export const SUPPORTED_INTEGRATIONS = [
   'google_docs',
   'google_sheets',
   'google_tasks',
+  'filesystem',
+  'ssh',
 ] as const;
 export type IntegrationId = (typeof SUPPORTED_INTEGRATIONS)[number];
 

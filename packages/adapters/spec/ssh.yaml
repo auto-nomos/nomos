@@ -1,0 +1,188 @@
+id: ssh
+name: SSH / SFTP
+version: 1.0.0
+description: Remote filesystem operations over SSH/SFTP — read, write, create, delete, move, copy files and directories on a remote host. Also supports arbitrary command execution (exec) which requires step-up approval.
+
+auth:
+  kind: ssh_key
+  key_env_var: SSH_PRIVATE_KEY
+  passphrase_env_var: SSH_PASSPHRASE
+  known_hosts_env_var: SSH_KNOWN_HOSTS
+
+actions:
+  - id: read_file
+    description: Read the contents of a remote file over SFTP.
+    expected_use: Read a config or log file from a remote server.
+    auto_execute: true
+    risk: { category: read, sensitivity: low }
+    http:
+      method: GET
+      path: /file/read
+    params:
+      - { name: host, in: query, required: true, type: string, description: Remote hostname or IP }
+      - { name: port, in: query, type: integer, default: 22 }
+      - { name: username, in: query, required: true, type: string }
+      - { name: path, in: query, required: true, type: string, description: Absolute path on the remote host }
+      - { name: encoding, in: query, type: string, default: utf-8, enum: [utf-8, base64] }
+
+  - id: write_file
+    description: Write or overwrite a remote file over SFTP.
+    expected_use: Deploy a config or update a remote file.
+    auto_execute: false
+    risk: { category: write, sensitivity: high }
+    http:
+      method: POST
+      path: /file/write
+    params:
+      - { name: host, in: body, required: true, type: string }
+      - { name: port, in: body, type: integer, default: 22 }
+      - { name: username, in: body, required: true, type: string }
+      - { name: path, in: body, required: true, type: string, description: Absolute path on the remote host }
+      - { name: content, in: body, required: true, type: string }
+      - { name: encoding, in: body, type: string, default: utf-8, enum: [utf-8, base64] }
+
+  - id: create_file
+    description: Create a new file on a remote host; fails if it already exists.
+    expected_use: Initialise a remote config without overwriting.
+    auto_execute: false
+    risk: { category: write, sensitivity: medium }
+    http:
+      method: POST
+      path: /file/create
+    params:
+      - { name: host, in: body, required: true, type: string }
+      - { name: port, in: body, type: integer, default: 22 }
+      - { name: username, in: body, required: true, type: string }
+      - { name: path, in: body, required: true, type: string }
+      - { name: content, in: body, type: string }
+      - { name: encoding, in: body, type: string, default: utf-8, enum: [utf-8, base64] }
+
+  - id: delete_file
+    description: Permanently delete a file on a remote host over SFTP.
+    expected_use: Remove an obsolete remote file.
+    auto_execute: false
+    risk: { category: delete, sensitivity: high }
+    http:
+      method: DELETE
+      path: /file/delete
+    params:
+      - { name: host, in: body, required: true, type: string }
+      - { name: port, in: body, type: integer, default: 22 }
+      - { name: username, in: body, required: true, type: string }
+      - { name: path, in: body, required: true, type: string }
+
+  - id: move_file
+    description: Move or rename a file on a remote host.
+    expected_use: Rename or relocate a file within the allowed path prefix on the remote host.
+    auto_execute: false
+    risk: { category: write, sensitivity: high }
+    http:
+      method: POST
+      path: /file/move
+    params:
+      - { name: host, in: body, required: true, type: string }
+      - { name: port, in: body, type: integer, default: 22 }
+      - { name: username, in: body, required: true, type: string }
+      - { name: path, in: body, required: true, type: string }
+      - { name: destination, in: body, required: true, type: string }
+
+  - id: copy_file
+    description: Copy a file to a new path on the same remote host.
+    expected_use: Duplicate a remote file for backup.
+    auto_execute: false
+    risk: { category: write, sensitivity: medium }
+    http:
+      method: POST
+      path: /file/copy
+    params:
+      - { name: host, in: body, required: true, type: string }
+      - { name: port, in: body, type: integer, default: 22 }
+      - { name: username, in: body, required: true, type: string }
+      - { name: path, in: body, required: true, type: string }
+      - { name: destination, in: body, required: true, type: string }
+
+  - id: list_dir
+    description: List the contents of a remote directory (one level deep).
+    expected_use: Discover remote files and subdirectories.
+    auto_execute: true
+    risk: { category: read, sensitivity: low }
+    http:
+      method: GET
+      path: /dir/list
+    params:
+      - { name: host, in: query, required: true, type: string }
+      - { name: port, in: query, type: integer, default: 22 }
+      - { name: username, in: query, required: true, type: string }
+      - { name: path, in: query, required: true, type: string }
+
+  - id: tree_dir
+    description: Recursively list a remote directory tree up to a depth limit.
+    expected_use: Understand the structure of a remote project directory.
+    auto_execute: true
+    risk: { category: read, sensitivity: medium }
+    http:
+      method: GET
+      path: /dir/tree
+    params:
+      - { name: host, in: query, required: true, type: string }
+      - { name: port, in: query, type: integer, default: 22 }
+      - { name: username, in: query, required: true, type: string }
+      - { name: path, in: query, required: true, type: string }
+      - { name: depth, in: query, type: integer, default: 5 }
+
+  - id: create_dir
+    description: Create a remote directory and any missing parents.
+    expected_use: Set up a deployment or scratch directory on a remote host.
+    auto_execute: false
+    risk: { category: write, sensitivity: low }
+    http:
+      method: POST
+      path: /dir/create
+    params:
+      - { name: host, in: body, required: true, type: string }
+      - { name: port, in: body, type: integer, default: 22 }
+      - { name: username, in: body, required: true, type: string }
+      - { name: path, in: body, required: true, type: string }
+
+  - id: delete_dir
+    description: Delete an empty remote directory.
+    expected_use: Remove an empty directory from a remote server.
+    auto_execute: false
+    risk: { category: delete, sensitivity: high }
+    http:
+      method: DELETE
+      path: /dir/delete
+    params:
+      - { name: host, in: body, required: true, type: string }
+      - { name: port, in: body, type: integer, default: 22 }
+      - { name: username, in: body, required: true, type: string }
+      - { name: path, in: body, required: true, type: string }
+
+  - id: delete_dir_recursive
+    description: Recursively delete a remote directory and all its contents.
+    expected_use: Remove a remote temporary or build directory.
+    auto_execute: false
+    risk: { category: delete, sensitivity: high }
+    http:
+      method: DELETE
+      path: /dir/delete_recursive
+    params:
+      - { name: host, in: body, required: true, type: string }
+      - { name: port, in: body, type: integer, default: 22 }
+      - { name: username, in: body, required: true, type: string }
+      - { name: path, in: body, required: true, type: string }
+
+  - id: exec
+    description: Execute a shell command on the remote host via SSH.
+    expected_use: Run a script, restart a service, or query system state on a remote server. Requires step-up approval.
+    auto_execute: false
+    risk: { category: write, sensitivity: high }
+    http:
+      method: POST
+      path: /exec
+    params:
+      - { name: host, in: body, required: true, type: string }
+      - { name: port, in: body, type: integer, default: 22 }
+      - { name: username, in: body, required: true, type: string }
+      - { name: command, in: body, required: true, type: string, description: Shell command to execute on the remote host }
+      - { name: timeout_ms, in: body, type: integer, default: 30000 }

@@ -1,4 +1,5 @@
 import type { IntegrationId } from '../config.js';
+import { filesystemTools } from './filesystem.js';
 import { githubTools } from './github.js';
 import { googleTools } from './google.js';
 import { googleCalendarTools } from './google_calendar.js';
@@ -9,12 +10,13 @@ import { googleTasksTools } from './google_tasks.js';
 import { linearTools } from './linear.js';
 import { notionTools } from './notion.js';
 import { slackTools } from './slack.js';
+import { sshTools } from './ssh.js';
 import { stripeTools } from './stripe.js';
 import type { ToolDefinition } from './types.js';
 
 export type { ToolDefinition } from './types.js';
 
-const REGISTRY: Record<IntegrationId, ToolDefinition[]> = {
+const REGISTRY: Partial<Record<IntegrationId, ToolDefinition[]>> = {
   github: githubTools,
   slack: slackTools,
   google: googleTools,
@@ -26,8 +28,10 @@ const REGISTRY: Record<IntegrationId, ToolDefinition[]> = {
   google_docs: googleDocsTools,
   google_sheets: googleSheetsTools,
   google_tasks: googleTasksTools,
+  filesystem: filesystemTools,
+  ssh: sshTools,
 };
 
 export function toolsFor(integrations: readonly IntegrationId[]): ToolDefinition[] {
-  return integrations.flatMap((id) => REGISTRY[id]);
+  return integrations.flatMap((id) => REGISTRY[id] ?? []);
 }

@@ -2,22 +2,22 @@ import type { IntegrationPack } from '../types.js';
 import { mergeActionSchemas } from '../types.js';
 import { actionToCommand, resourceFor } from './actions.js';
 import { extractResourceFromApiCall } from './extract.js';
-import { filesystemActionSchemas } from './schemas.js';
+import { sshActionSchemas } from './schemas.js';
 import { actions, templates } from './templates.js';
 
-export const filesystemPack: IntegrationPack = {
-  id: 'filesystem',
-  name: 'Filesystem',
+export const sshPack: IntegrationPack = {
+  id: 'ssh',
+  name: 'SSH / SFTP',
   templates,
   actions: [...actions],
-  actionSchemas: mergeActionSchemas({}, filesystemActionSchemas),
+  actionSchemas: mergeActionSchemas({}, sshActionSchemas),
   extractResourceFromApiCall,
 };
 export {
   actions,
   actionToCommand,
   extractResourceFromApiCall,
-  filesystemActionSchemas,
   resourceFor,
+  sshActionSchemas,
   templates,
 };
