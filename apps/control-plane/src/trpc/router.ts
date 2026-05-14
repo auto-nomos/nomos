@@ -10,6 +10,7 @@ import { envelopesRouter } from './routers/envelopes.js';
 import { grantsRouter } from './routers/grants.js';
 import { notificationPreferencesRouter } from './routers/notification-preferences.js';
 import { oauthRouter } from './routers/oauth.js';
+import { observabilityRouter } from './routers/observability.js';
 import { policiesRouter } from './routers/policies.js';
 import { schemasRouter } from './routers/schemas.js';
 import { stepupRouter } from './routers/stepup.js';
@@ -33,6 +34,7 @@ export const appRouter = router({
   notificationPreferences: notificationPreferencesRouter,
   swarms: swarmsRouter,
   chainApprovals: chainApprovalsRouter,
+  observability: observabilityRouter,
 });
 
 export type AppRouter = typeof appRouter;

@@ -20,11 +20,13 @@ import {
   TableHeader,
   TableRow,
 } from '../../../../components/ui/table';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../../../components/ui/tabs';
 import { trpc } from '../../../../lib/trpc';
 import { formatDate, shortId } from '../../../../lib/utils';
 import { AgentTree } from './components/AgentTree';
 import { AttachChildCard } from './components/AttachChildCard';
 import { ChainApprovalCard } from './components/ChainApprovalCard';
+import { ObservabilityTab } from './components/ObservabilityTab';
 import { ScopeContainment } from './components/ScopeContainment';
 
 interface FlatAgent {
@@ -77,100 +79,113 @@ export default function SwarmDetailPage({ params }: { params: Promise<{ id: stri
         </Button>
       </header>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Agent tree</CardTitle>
-          <CardDescription>
-            Trust propagates root → leaf via UCAN delegation chain. Use{' '}
-            <Link href={`/app/swarms/${id}/connect`} className="underline">
-              Connect agents
-            </Link>{' '}
-            to wire a new child process; use the card below to record the tree shape after.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <AgentTree roots={tree.data?.roots ?? []} />
-        </CardContent>
-      </Card>
+      <Tabs defaultValue="tree" className="space-y-6">
+        <TabsList>
+          <TabsTrigger value="tree">Tree</TabsTrigger>
+          <TabsTrigger value="observability">Observability</TabsTrigger>
+        </TabsList>
 
-      <AttachChildCard swarmId={id} swarmAgents={swarmAgents} />
+        <TabsContent value="tree" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Agent tree</CardTitle>
+              <CardDescription>
+                Trust propagates root → leaf via UCAN delegation chain. Use{' '}
+                <Link href={`/app/swarms/${id}/connect`} className="underline">
+                  Connect agents
+                </Link>{' '}
+                to wire a new child process; use the card below to record the tree shape after.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <AgentTree roots={tree.data?.roots ?? []} />
+            </CardContent>
+          </Card>
 
-      <ChainApprovalCard
-        swarmId={id}
-        rootAgents={(tree.data?.roots ?? []).map((r) => ({ id: r.id, name: r.name }))}
-      />
+          <AttachChildCard swarmId={id} swarmAgents={swarmAgents} />
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Scope containment</CardTitle>
-          <CardDescription>
-            Each child's effective scope versus the root. Snapshot from each agent's most recent
-            authorize receipt.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <ScopeContainment data={containment.data} />
-        </CardContent>
-      </Card>
+          <ChainApprovalCard
+            swarmId={id}
+            rootAgents={(tree.data?.roots ?? []).map((r) => ({ id: r.id, name: r.name }))}
+          />
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Recent receipts</CardTitle>
-          <CardDescription>
-            Last {receipts.data?.length ?? 0} authorize calls in this swarm.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {!receipts.data || receipts.data.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No receipts yet.</p>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>When</TableHead>
-                  <TableHead>Decision</TableHead>
-                  <TableHead>Command</TableHead>
-                  <TableHead>Agent</TableHead>
-                  <TableHead>Depth</TableHead>
-                  <TableHead>Receipt</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {receipts.data.map((r) => (
-                  <TableRow key={r.eventId}>
-                    <TableCell>{formatDate(r.ts)}</TableCell>
-                    <TableCell>
-                      <Badge
-                        variant={
-                          r.decision === 'allow'
-                            ? 'default'
-                            : r.decision === 'stepup'
-                              ? 'secondary'
-                              : 'destructive'
-                        }
-                      >
-                        {r.decision}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="font-mono text-xs">{r.command}</TableCell>
-                    <TableCell title={r.agent}>
-                      {r.agentName ? (
-                        <span className="font-medium">{r.agentName}</span>
-                      ) : (
-                        <span className="font-mono text-xs">{shortId(r.agent)}</span>
-                      )}
-                    </TableCell>
-                    <TableCell>{r.chainDepth ?? 0}</TableCell>
-                    <TableCell className="font-mono text-xs" title={r.eventId}>
-                      {shortId(r.eventId)}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Scope containment</CardTitle>
+              <CardDescription>
+                Each child&apos;s effective scope versus the root. Snapshot from each agent&apos;s
+                most recent authorize receipt.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ScopeContainment data={containment.data} />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Recent receipts</CardTitle>
+              <CardDescription>
+                Last {receipts.data?.length ?? 0} authorize calls in this swarm.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {!receipts.data || receipts.data.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No receipts yet.</p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>When</TableHead>
+                      <TableHead>Decision</TableHead>
+                      <TableHead>Command</TableHead>
+                      <TableHead>Agent</TableHead>
+                      <TableHead>Depth</TableHead>
+                      <TableHead>Receipt</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {receipts.data.map((r) => (
+                      <TableRow key={r.eventId}>
+                        <TableCell>{formatDate(r.ts)}</TableCell>
+                        <TableCell>
+                          <Badge
+                            variant={
+                              r.decision === 'allow'
+                                ? 'default'
+                                : r.decision === 'stepup'
+                                  ? 'secondary'
+                                  : 'destructive'
+                            }
+                          >
+                            {r.decision}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="font-mono text-xs">{r.command}</TableCell>
+                        <TableCell title={r.agent}>
+                          {r.agentName ? (
+                            <span className="font-medium">{r.agentName}</span>
+                          ) : (
+                            <span className="font-mono text-xs">{shortId(r.agent)}</span>
+                          )}
+                        </TableCell>
+                        <TableCell>{r.chainDepth ?? 0}</TableCell>
+                        <TableCell className="font-mono text-xs" title={r.eventId}>
+                          {shortId(r.eventId)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="observability">
+          <ObservabilityTab swarmId={id} />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
