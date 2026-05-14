@@ -14,6 +14,7 @@ const NAV_ITEMS: { href: string; label: string; badge?: string }[] = [
   { href: '/app/connections', label: 'Connections' },
   { href: '/app/policies', label: 'Policies' },
   { href: '/app/audit', label: 'Audit' },
+  { href: '/app/monitoring', label: 'Monitoring', badge: 'new' },
   { href: '/app/billing', label: 'Billing' },
 ];
 

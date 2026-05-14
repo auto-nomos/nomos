@@ -14,6 +14,8 @@ import {
   Sparkles,
 } from 'lucide-react';
 import Link from 'next/link';
+import { fmtCount as fmt, MetricTile } from '../../components/metric-tile';
+import { TallyBadge } from '../../components/tally-badge';
 import { trpc } from '../../lib/trpc';
 import { cn } from '../../lib/utils';
 
@@ -39,7 +41,7 @@ export default function AppHomePage() {
         data-stagger
         className="grid grid-cols-12 gap-px overflow-hidden rounded-sm border border-aegis-line bg-aegis-line"
       >
-        <Metric
+        <MetricTile
           icon={Boxes}
           label="Apps"
           value={fmt(agents.data?.length)}
@@ -47,7 +49,7 @@ export default function AppHomePage() {
           href="/app/agents"
           accent="paper"
         />
-        <Metric
+        <MetricTile
           icon={Plug}
           label="Connections"
           value={fmt(connections.data?.length)}
@@ -55,7 +57,7 @@ export default function AppHomePage() {
           href="/app/connections"
           accent="iris"
         />
-        <Metric
+        <MetricTile
           icon={FileLock2}
           label="Policies"
           value={fmt(policies.data?.length)}
@@ -63,7 +65,7 @@ export default function AppHomePage() {
           href="/app/policies"
           accent="paper"
         />
-        <Metric
+        <MetricTile
           icon={ShieldCheck}
           label="Allow rate"
           value={allowRate === null ? '—' : `${allowRate}%`}
@@ -128,53 +130,6 @@ function Hero({ workspaceName }: { workspaceName: string }) {
   );
 }
 
-/* ─── Metric tiles ────────────────────────────────────────────────────── */
-
-function Metric({
-  icon: Icon,
-  label,
-  value,
-  unit,
-  href,
-  accent,
-}: {
-  icon: React.ComponentType<{ className?: string }>;
-  label: string;
-  value: string;
-  unit: string;
-  href: string;
-  accent: 'paper' | 'signal' | 'iris' | 'coral';
-}) {
-  const accentClass = {
-    paper: 'text-aegis-paper',
-    signal: 'text-aegis-signal',
-    iris: 'text-aegis-iris',
-    coral: 'text-aegis-coral',
-  }[accent];
-  return (
-    <Link
-      href={href}
-      className="col-span-12 flex flex-col justify-between bg-aegis-surface p-6 transition-colors hover:bg-aegis-surface-2 sm:col-span-6 lg:col-span-3"
-    >
-      <div className="flex items-center justify-between">
-        <span className="eyebrow">{label}</span>
-        <Icon className="h-4 w-4 text-aegis-faint" />
-      </div>
-      <div className="mt-7">
-        <div className={cn('font-display text-[48px] leading-none', accentClass)}>{value}</div>
-        <div className="mt-2 font-mono text-[11px] uppercase tracking-wider text-aegis-mute">
-          {unit}
-        </div>
-      </div>
-    </Link>
-  );
-}
-
-function fmt(n: number | undefined): string {
-  if (n === undefined || n === null) return '—';
-  return n.toString().padStart(2, '0');
-}
-
 /* ─── Recent decisions strip ──────────────────────────────────────────── */
 
 interface AuditRow {
@@ -206,9 +161,9 @@ function RecentDecisions({
           <h2 className="mt-1 font-display text-2xl text-aegis-paper">Audit chain</h2>
         </div>
         <div className="tickrow font-mono text-[11px] uppercase tracking-wider">
-          <Tally icon={CheckCircle2} label="allow" value={allows} tone="text-aegis-signal" />
-          <Tally icon={ShieldAlert} label="step-up" value={stepups} tone="text-aegis-amber" />
-          <Tally icon={CircleSlash} label="deny" value={denies} tone="text-aegis-coral" />
+          <TallyBadge icon={CheckCircle2} label="allow" value={allows} tone="text-aegis-signal" />
+          <TallyBadge icon={ShieldAlert} label="step-up" value={stepups} tone="text-aegis-amber" />
+          <TallyBadge icon={CircleSlash} label="deny" value={denies} tone="text-aegis-coral" />
         </div>
       </div>
 
@@ -237,26 +192,6 @@ function RecentDecisions({
         </Link>
       </div>
     </article>
-  );
-}
-
-function Tally({
-  icon: Icon,
-  label,
-  value,
-  tone,
-}: {
-  icon: React.ComponentType<{ className?: string }>;
-  label: string;
-  value: number;
-  tone: string;
-}) {
-  return (
-    <div className="flex items-center gap-1.5 px-1.5">
-      <Icon className={cn('h-3.5 w-3.5', tone)} />
-      <span className="text-aegis-mute">{label}</span>
-      <span className={cn('tabular-nums', tone)}>{value.toString().padStart(2, '0')}</span>
-    </div>
   );
 }
 
