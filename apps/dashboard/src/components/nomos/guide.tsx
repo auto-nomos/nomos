@@ -602,6 +602,159 @@ function Swarms() {
         leaf&rsquo;s effective capability sits relative to the root.
       </P>
 
+      <h3 className="mt-8 font-display text-[22px] text-aegis-paper">
+        Walkthrough — planner → researcher → writer
+      </h3>
+      <P>
+        Concrete recipe for a 3-deep swarm hitting GitHub. Same shape we ship in{' '}
+        <K>examples/swarm-orchestrator/</K> and validated against prod.
+      </P>
+      <ol className="ml-6 list-decimal space-y-2 marker:text-aegis-signal">
+        <li>
+          <Link href="/app/agents" className="text-aegis-signal hover:underline">
+            /app/agents
+          </Link>{' '}
+          → create three apps: <K>planner</K>, <K>researcher</K>, <K>writer</K>. Each gets an
+          Ed25519 keypair (private key sealed at rest) and an API key (visible once — copy now).
+        </li>
+        <li>
+          <Link href="/app/connections" className="text-aegis-signal hover:underline">
+            /app/connections
+          </Link>{' '}
+          → bind GitHub OAuth. Note the connection UUID; the planner&rsquo;s root UCAN will carry it
+          as <K>oauth_connection_id</K>.
+        </li>
+        <li>
+          <Link href="/app/policies" className="text-aegis-signal hover:underline">
+            /app/policies
+          </Link>{' '}
+          → assign <K>Safe default github</K> to all three. The PDP enforces the same Cedar bundle
+          on every hop, not just the leaf.
+        </li>
+        <li>
+          <Link href="/app/swarms" className="text-aegis-signal hover:underline">
+            /app/swarms
+          </Link>{' '}
+          → <K>+ Create swarm</K>, name it, pick <K>planner</K> as root, leave maxDepth=8.
+        </li>
+        <li>
+          Open the swarm. Use <K>Attach child agent</K> twice: <K>researcher</K> under{' '}
+          <K>planner</K>, then <K>writer</K> under <K>researcher</K>. (DB metadata only — the actual
+          chain enforcement still requires that each child UCAN&rsquo;s <K>iss</K> equals its
+          parent&rsquo;s <K>aud</K>.)
+        </li>
+      </ol>
+
+      <h3 className="mt-8 font-display text-[22px] text-aegis-paper">
+        What each swarm-view card does
+      </h3>
+      <Code lang="text">{`┌─ /app/swarms/{id} ──────────────────────────────────────────────────┐
+│  prod-test-swarm                              [⏵ Connect agents]    │
+│  3 agents · max depth 8                                             │
+├─────────────────────────────────────────────────────────────────────┤
+│ ● Agent tree                                                        │
+│   ├── ● planner       did:…GNK2  depth 0  (root)                    │
+│   │   └── ● researcher did:…WgkP  depth 1                           │
+│   │       └── ● writer did:…dfLb  depth 2                           │
+├─────────────────────────────────────────────────────────────────────┤
+│ ● Attach child agent                                                │
+│   Parent [ planner ▾ ]  Child [ researcher ▾ ]  [ Attach ]          │
+├─────────────────────────────────────────────────────────────────────┤
+│ ● Approve for chain                                                 │
+│   Root [ planner ▾ ]  TTL [ 1h ▾ ]                                  │
+│   Snapshot covers: planner, researcher, writer (3 agents @ now)     │
+│   [ Approve & mint cosigner ]                                       │
+├─────────────────────────────────────────────────────────────────────┤
+│ ● Scope containment (per agent: last decision + chain depth)        │
+├─────────────────────────────────────────────────────────────────────┤
+│ ● Recent receipts (Agent column = name; hover for full DID)         │
+│   When           Decision  Command            Agent      Depth      │
+│   11:57:17 AM    allow     /github/issue/list writer     2          │
+│   11:57:14 AM    allow     /github/issue/list researcher 1          │
+│   11:57:12 AM    allow     /github/issue/list planner    0          │
+└─────────────────────────────────────────────────────────────────────┘`}</Code>
+      <ul className="ml-6 list-disc space-y-1.5 marker:text-aegis-signal">
+        <li>
+          <strong className="text-aegis-paper">Agent tree</strong> — pure visual; built from{' '}
+          <K>agents.parentAgentId</K>. Collapses past depth 3.
+        </li>
+        <li>
+          <strong className="text-aegis-paper">Attach child agent</strong> — metadata only. Teaches
+          the dashboard the tree shape so containment + snapshots render correctly. The PDP
+          doesn&rsquo;t care about this row — it only cares that the runtime UCAN chain actually
+          validates.
+        </li>
+        <li>
+          <strong className="text-aegis-paper">Approve for chain</strong> — operator preempts. The
+          snapshot is materialized at click time (<K>approvedAgentIds = [...]</K>). A child forked{' '}
+          <em className="not-italic">after</em> approval is <em className="not-italic">not</em>{' '}
+          covered.
+        </li>
+        <li>
+          <strong className="text-aegis-paper">Scope containment</strong> — per-agent quick check
+          (last decision, chain depth, last command).
+        </li>
+        <li>
+          <strong className="text-aegis-paper">Recent receipts</strong> — last 100 authorize calls
+          scoped to this swarm. Agent column shows the friendly name; hover the cell to reveal the
+          full <K>did:key:…</K>.
+        </li>
+      </ul>
+
+      <h3 className="mt-8 font-display text-[22px] text-aegis-paper">
+        Approval flows — when each one fires
+      </h3>
+      <ul className="ml-6 list-disc space-y-1.5 marker:text-aegis-signal">
+        <li>
+          <strong className="text-aegis-paper">One-shot push</strong> — Cedar returns step-up on one
+          call; surfaces in{' '}
+          <Link href="/app/approvals" className="text-aegis-signal hover:underline">
+            /app/approvals
+          </Link>{' '}
+          (per-app). Day-1 default.
+        </li>
+        <li>
+          <strong className="text-aegis-paper">Snapshot chain approval</strong> — preempts a
+          tree-shaped wave of step-ups. Approves the materialized agent set; new children excluded.
+          Lives in the swarm view.
+        </li>
+        <li>
+          <strong className="text-aegis-paper">Mid-chain step-up</strong> — fires when a deeper
+          agent (e.g. <K>writer</K> on <K>POST /repos/.../issues</K>) hits a write-protected command
+          and there&rsquo;s no covering snapshot. Surfaces via mobile push / email /{' '}
+          <K>/approve/{`{envelopeId}`}</K>.
+        </li>
+      </ul>
+
+      <h3 className="mt-8 font-display text-[22px] text-aegis-paper">
+        How calls show up in /app/audit
+      </h3>
+      <P>
+        Same rows, cross-swarm. The <strong>App</strong> column shows the app name; hover for the
+        full DID. Click any row to open the proof drawer:
+      </P>
+      <ul className="ml-6 list-disc space-y-1.5 marker:text-aegis-signal">
+        <li>
+          <K>event_id</K>, <K>prevHash</K>, <K>hash</K> (tamper chain)
+        </li>
+        <li>
+          <K>parent_receipt_id</K>, <K>chainDepth</K>, <K>swarmId</K> (causation chain)
+        </li>
+        <li>
+          full <K>resource</K> + <K>context</K> (collapsible JSON)
+        </li>
+        <li>
+          <K>Download proof</K> → JSON bundle; verify offline with{' '}
+          <K>npx @auto-nomos/audit-verify audit-proof-{`{eventId}`}.json</K>.
+        </li>
+      </ul>
+      <P>
+        The CSV / JSON exports at the top of <K>/app/audit</K> now include the whole row —{' '}
+        <K>agentName</K>, <K>agentDid</K>, <K>command</K>, <K>decision</K>, <K>eventId</K>,{' '}
+        <K>prevHash</K>, <K>hash</K>, <K>chainDepth</K>, <K>swarmId</K>, <K>parentReceiptId</K>,{' '}
+        <K>resource</K>, <K>context</K>. Pipe straight into Splunk / Datadog / your warehouse.
+      </P>
+
       <h3 className="mt-8 font-display text-[22px] text-aegis-paper">Wire format</h3>
       <P>
         The chain is propagated through three environment variables — orchestrator-agnostic so

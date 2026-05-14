@@ -83,7 +83,18 @@ export const swarmsRouter = router({
         )
         .orderBy(desc(schema.auditEvents.ts))
         .limit(input.limit);
-      return rows;
+      const dids = Array.from(new Set(rows.map((r) => r.agent)));
+      const nameByDid = new Map<string, string>();
+      if (dids.length > 0) {
+        const matches = await ctx.db.drizzle
+          .select({ did: schema.agents.did, name: schema.agents.name })
+          .from(schema.agents)
+          .where(
+            and(eq(schema.agents.customerId, ctx.customerId), inArray(schema.agents.did, dids)),
+          );
+        for (const m of matches) nameByDid.set(m.did, m.name);
+      }
+      return rows.map((r) => ({ ...r, agentName: nameByDid.get(r.agent) ?? null }));
     }),
 
   /**

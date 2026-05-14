@@ -1,5 +1,5 @@
 import { TRPCError } from '@trpc/server';
-import { and, asc, desc, eq, gte, lte } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, inArray, lte } from 'drizzle-orm';
 import { z } from 'zod';
 import * as schema from '../../db/schema.js';
 import { router, tenantProcedure } from '../index.js';
@@ -30,7 +30,20 @@ export const auditRouter = router({
         orderBy: [desc(schema.auditEvents.ts)],
         limit: input.limit,
       });
-      return rows;
+      // Resolve DID → human agent name in one extra query (events.agent is the
+      // app DID; the dashboard wants the friendly name with DID on hover).
+      const dids = Array.from(new Set(rows.map((r) => r.agent)));
+      const nameByDid = new Map<string, string>();
+      if (dids.length > 0) {
+        const matches = await ctx.db.drizzle
+          .select({ did: schema.agents.did, name: schema.agents.name })
+          .from(schema.agents)
+          .where(
+            and(eq(schema.agents.customerId, ctx.customerId), inArray(schema.agents.did, dids)),
+          );
+        for (const m of matches) nameByDid.set(m.did, m.name);
+      }
+      return rows.map((r) => ({ ...r, agentName: nameByDid.get(r.agent) ?? null }));
     }),
 
   /**

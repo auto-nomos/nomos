@@ -153,9 +153,17 @@ export default function SwarmDetailPage({ params }: { params: Promise<{ id: stri
                       </Badge>
                     </TableCell>
                     <TableCell className="font-mono text-xs">{r.command}</TableCell>
-                    <TableCell className="font-mono text-xs">{shortId(r.agent)}</TableCell>
+                    <TableCell title={r.agent}>
+                      {r.agentName ? (
+                        <span className="font-medium">{r.agentName}</span>
+                      ) : (
+                        <span className="font-mono text-xs">{shortId(r.agent)}</span>
+                      )}
+                    </TableCell>
                     <TableCell>{r.chainDepth ?? 0}</TableCell>
-                    <TableCell className="font-mono text-xs">{shortId(r.eventId)}</TableCell>
+                    <TableCell className="font-mono text-xs" title={r.eventId}>
+                      {shortId(r.eventId)}
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>

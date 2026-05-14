@@ -319,14 +319,136 @@ when { principal.invokedBy.contains("<tainted-did>") };
 forbid (principal, action, resource) when { principal.delegationDepth > 0 };
 ```
 
-### Dashboard
+### Dashboard — full walkthrough
 
-`/app/swarms` lists every swarm in your workspace. Open one to see:
+We'll trace the actual prod swarm we ship with: **`prod-test-swarm`** =
+`planner → researcher → writer`, all hitting `GET /repos/{owner}/{repo}/issues`.
 
-- **Agent tree** — root → children, collapsed past depth 3 (click to expand).
-- **Approve for chain** — pick a root agent + TTL; preview shows the snapshot of current children that the approval covers; click Approve to mint a swarm-scoped step-up. Children forked later need a fresh approval.
-- **Scope containment** — each agent's last decision and chain depth at a glance.
-- **Recent receipts** — last 100 authorize calls in this swarm, colored allow / deny / step-up.
+#### 1. `/app/agents` — register the three apps
+
+Each app gets:
+- a **name** (planner/researcher/writer)
+- an Ed25519 keypair (server-side; private key sealed with XChaCha20-Poly1305 in `agents.encrypted_signing_key`)
+- a `did:key:…` identity (printed once on creation; visible in audit forever)
+- an **API key** (also visible once — copy now or rotate later from the row's `…` menu)
+
+```
+┌─ /app/agents ────────────────────────────────────────────────────────┐
+│  Apps                                              [ + Create app ]  │
+│ ──────────────────────────────────────────────────────────────────── │
+│  Name        DID                  API key       Created              │
+│  planner     did:key:z6Mkn4yNxX…GNK2  ●●●● [copy]  May 14, 11:30 AM  │
+│  researcher  did:key:z6Mkv17c99…WgkP  ●●●● [copy]  May 14, 11:31 AM  │
+│  writer      did:key:z6MkonEga5…dfLb  ●●●● [copy]  May 14, 11:32 AM  │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+#### 2. `/app/connections` — bind the upstream OAuth
+
+Click **+ Connect GitHub**, finish the OAuth dance, copy the connection UUID
+from the row. The OAuth refresh token is sealed at rest; the planner's UCAN
+later carries this connection ID inside its capability.
+
+#### 3. `/app/policies` → assign **Safe default github** to all three apps
+
+The same Cedar bundle drives every hop. Want the writer to need approval on
+`/github/issue/create`? Add a `forbid` rule when `principal.delegationDepth > 0`
+or `action == /github/issue/create` (cosigner required). PDP enforces on
+**every link**, not just the leaf.
+
+#### 4. `/app/swarms` → create the swarm
+
+Pick a name, pick the **root agent** (`planner`), set max depth (default 8).
+The swarm row appears immediately. Open it.
+
+#### 5. `/app/swarms/{id}` — the swarm view
+
+```
+┌─ prod-test-swarm                                  [⏵ Connect agents]┐
+│  3 agents · max depth 8                                              │
+├──────────────────────────────────────────────────────────────────────┤
+│ ● Agent tree                                                         │
+│   ├── ● planner       did:…GNK2  depth 0  (root)                     │
+│   │   └── ● researcher did:…WgkP  depth 1                            │
+│   │       └── ● writer did:…dfLb  depth 2                            │
+├──────────────────────────────────────────────────────────────────────┤
+│ ● Attach child agent                                                 │
+│   Parent  [ planner ▾ ]   Child  [ researcher ▾ ]   [ Attach ]      │
+│   "Child UCAN must be minted by parent — DB attach is metadata only" │
+├──────────────────────────────────────────────────────────────────────┤
+│ ● Approve for chain                                                  │
+│   Root agent [ planner ▾ ]   TTL [ 1 h ▾ ]                          │
+│   Snapshot covers: planner, researcher, writer (3 agents @ now)      │
+│   [ Approve & mint cosigner ]                                        │
+├──────────────────────────────────────────────────────────────────────┤
+│ ● Scope containment                                                  │
+│   planner    last allow  /github/issue/list  depth 0  11:57 AM       │
+│   researcher last allow  /github/issue/list  depth 1  11:57 AM       │
+│   writer     last allow  /github/issue/list  depth 2  11:57 AM       │
+├──────────────────────────────────────────────────────────────────────┤
+│ ● Recent receipts                                                    │
+│   When                  Decision  Command            Agent  Depth Receipt │
+│   May 14, 11:57:17 AM   allow     /github/issue/list writer  2  a6719553… │
+│   May 14, 11:57:14 AM   allow     /github/issue/list resrch  1  051e8a28… │
+│   May 14, 11:57:12 AM   allow     /github/issue/list planr   0  e1cf6267… │
+│   (Agent column shows the friendly name; hover for full DID)         │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+What each card does:
+
+- **Agent tree** — pure visual; tree comes from `agents.parentAgentId`.
+  Collapses past depth 3.
+- **Attach child agent** — metadata only. The PDP still requires that the
+  child UCAN's `iss == parent.aud`; this card just teaches the dashboard the
+  shape so trees and snapshots render correctly.
+- **Approve for chain** — pick a root + TTL. The snapshot is materialized
+  at click time: `approvedAgentIds = [planner.id, researcher.id, writer.id]`.
+  A child forked **after** approval is **not** covered. Approval issues a
+  cosigner UCAN whose `aud` is the snapshot set; the PDP three-layer check
+  (Cedar → step-up → cosigner) sees it on every hop and waives the step-up
+  for any agent in the snapshot.
+- **Scope containment** — quick sanity check. For each agent: most recent
+  allow + chain depth. If a child shows `depth=4` against a `maxDepth=3`
+  swarm, you'll see it here before audit even loads.
+- **Recent receipts** — last 100 authorize calls scoped to the swarm. Same
+  Cedar decision rows you'd see in `/app/audit`, filtered to this swarm.
+  Hover any agent to reveal the full DID; click any receipt → opens
+  `/app/audit?event=<id>` for the proof drawer.
+
+#### 6. `/app/audit` — causation walking
+
+Same rows; cross-swarm view. The **App** column shows the app's friendly
+name; hover for the full DID. Click any row → drawer opens with:
+
+- `event_id`, `prevHash`, `hash` (tamper chain)
+- `parent_receipt_id`, `chainDepth`, `swarmId` (causation chain)
+- full `resource` + `context` (collapsible JSON)
+- **Download proof** — JSON bundle with the event + every event after it up
+  to the latest signed root. Verify offline:
+
+  ```
+  npx @auto-nomos/audit-verify audit-proof-<eventId>.json
+  ```
+
+- **CSV / JSON export** (top-right) now ships the whole row — `agentName`,
+  `agentDid`, `command`, `decision`, `eventId`, `prevHash`, `hash`,
+  `chainDepth`, `swarmId`, `parentReceiptId`, `resource`, `context`. Pipe it
+  straight into Splunk / Datadog / your data warehouse.
+
+#### 7. Approval flows — where each one fires
+
+| Approval surface | Trigger | Scope | Where to find |
+|---|---|---|---|
+| **One-shot push approval** | Cedar → step-up on a single call | one (agent, command, resource) tuple | `/app/approvals` (per-app) |
+| **Snapshot chain approval** | Operator preempts; covers a tree at a moment | the materialized agent set; new children excluded | `/app/swarms/{id}` → Approve for chain |
+| **Mid-chain step-up** | Writer hits a write-protected command mid-flow | that single call; resolves via `/approve/{envelopeId}` | mobile push / email / `/app/approvals` |
+
+The first one is the day-1 default. The second is the swarm-aware shortcut
+for "I trust this whole tree for the next hour, stop pinging me." The third
+is what fires when a deeper agent unexpectedly needs a privileged op.
+
+
 
 ### Audit walking
 
