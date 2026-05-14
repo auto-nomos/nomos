@@ -50,7 +50,7 @@ describe.skipIf(!RUN)('policies.dryRun (requires postgres)', () => {
     } catch (err) {
       throw new Error(`Postgres not reachable: ${(err as Error).message}`);
     }
-    const config = loadConfig({ DATABASE_URL: TEST_URL });
+    const config = loadConfig({ DATABASE_URL: TEST_URL, NODE_ENV: 'test' });
     auth = createAuth({ db: db.drizzle, config, logger });
     app = createServer({ logger, db, auth, signing });
     await db.drizzle

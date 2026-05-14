@@ -15,7 +15,7 @@ import type { IntegrationPack, PolicyTemplate } from '../types.js';
 export const SWARM_SAFE_TEMPLATES: PolicyTemplate[] = [
   {
     id: 'swarm:forbid-deep-delegation',
-    integrationId: 'github',
+    integrationId: 'swarm',
     name: 'Cap delegation depth',
     description:
       'Forbid any call where the chain depth exceeds 3 — guards against runaway sub-agent fan-out.',
@@ -29,11 +29,11 @@ when {
   principal.delegationDepth > 3
 };
 `,
-    visualReady: false,
+    visualReady: true,
   },
   {
     id: 'swarm:pin-root-agent',
-    integrationId: 'github',
+    integrationId: 'swarm',
     name: 'Pin root agent',
     description:
       'Allow the action only when the chain is rooted at a specific agent. Replace <ROOT_AGENT_DID>.',
@@ -47,11 +47,11 @@ when {
   principal.rootAgent == "<ROOT_AGENT_DID>"
 };
 `,
-    visualReady: false,
+    visualReady: true,
   },
   {
     id: 'swarm:block-tainted-ancestor',
-    integrationId: 'github',
+    integrationId: 'swarm',
     name: 'Block tainted-ancestor chain',
     description:
       'Forbid the action when any ancestor agent in the chain is on the deny-list. Replace <TAINTED_AGENT_DID>.',
@@ -69,7 +69,7 @@ when {
   },
   {
     id: 'swarm:require-direct-call',
-    integrationId: 'github',
+    integrationId: 'swarm',
     name: 'Require direct (non-delegated) call',
     description:
       'Allow the action only when there is no delegation chain (root-only). Useful for sensitive ops.',
@@ -83,12 +83,12 @@ when {
   principal.delegationDepth > 0
 };
 `,
-    visualReady: false,
+    visualReady: true,
   },
 ];
 
 export const swarmSafePack: IntegrationPack = {
-  id: 'github',
+  id: 'swarm',
   name: 'Swarm-Safe (cross-integration)',
   templates: SWARM_SAFE_TEMPLATES,
   actions: [],

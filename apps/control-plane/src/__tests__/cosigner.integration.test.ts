@@ -76,13 +76,17 @@ describe.skipIf(!RUN)('cosigner mint (requires postgres)', () => {
   });
 
   async function createApproval(originalUcanCid?: string): Promise<string> {
+    // Vary resource per call so the (customer, agent, command, resourceHash)
+    // unique-while-pending index doesn't collide across tests in this file.
+    const nonce = `${Date.now()}-${Math.random()}`;
     const [row] = await db.drizzle
       .insert(schema.pushApprovals)
       .values({
         customerId,
         agentId,
         command: '/stripe/charge',
-        resource: { amount: 250 },
+        resource: { amount: 250, nonce },
+        resourceHash: nonce,
         state: 'pending',
         expiresAt: new Date(Date.now() + 60_000),
         ...(originalUcanCid ? { originalUcanCid } : {}),

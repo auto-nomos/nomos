@@ -21,7 +21,8 @@ export type IntegrationId =
   | 'google_docs'
   | 'google_sheets'
   | 'google_tasks'
-  | 'google_contacts';
+  | 'google_contacts'
+  | 'swarm';
 
 export interface PolicyTemplate {
   /** Stable id, namespaced on integration: `github:read-only`. */

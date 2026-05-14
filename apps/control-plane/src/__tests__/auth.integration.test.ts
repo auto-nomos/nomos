@@ -31,7 +31,7 @@ describe.skipIf(!RUN)('better-auth sign-up + sign-in (requires postgres)', () =>
         `Postgres not reachable at ${TEST_URL}. Run pnpm db:up first. (${(err as Error).message})`,
       );
     }
-    const config = loadConfig({ DATABASE_URL: TEST_URL });
+    const config = loadConfig({ DATABASE_URL: TEST_URL, NODE_ENV: 'test' });
     auth = createAuth({ db: db.drizzle, config, logger });
     app = createServer({ logger, db, auth });
   });
