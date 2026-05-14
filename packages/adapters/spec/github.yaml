@@ -496,6 +496,38 @@ actions:
         in: body
         type: string
 
+  - id: create_branch
+    description: Create a new branch (git ref) pointing at an existing commit.
+    expected_use: Cut a feature branch before pushing changes. High-risk because branch creation can shadow protected refs.
+    auto_execute: false
+    required_scopes:
+      - repo
+    risk:
+      category: write
+      sensitivity: high
+    http:
+      method: POST
+      path: "/repos/{owner}/{repo}/git/refs"
+    params:
+      - name: owner
+        in: path
+        required: true
+        type: string
+      - name: repo
+        in: path
+        required: true
+        type: string
+      - name: ref
+        in: body
+        required: true
+        type: string
+        description: "Full ref name, must start with refs/heads/."
+      - name: sha
+        in: body
+        required: true
+        type: string
+        description: "Commit SHA the new ref will point at."
+
   - id: update_file
     description: Create or update a file at a path; commits to the named branch.
     expected_use: Commit a generated or edited file as part of an automation.

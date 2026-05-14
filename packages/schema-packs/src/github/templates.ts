@@ -25,6 +25,7 @@ export const WRITES = [
   '/github/issue/close',
   '/github/pr/create',
   '/github/pr/merge',
+  '/github/branch/create',
   '/github/content/update',
   '/github/issue/label',
   '/github/release/create',
@@ -81,6 +82,15 @@ export const templates: PolicyTemplate[] = [
     description: 'Reads always; writes only when a co-signer has approved.',
     cedarText: `permit (\n  principal,\n  action in [${READ_LIST}],\n  resource\n);\n\npermit (\n  principal,\n  action in [${WRITE_LIST}],\n  resource\n)\nwhen { context.cosigner == true };`,
     visualReady: true,
+  },
+  {
+    id: 'github:branch-create-step-up',
+    integrationId: 'github',
+    name: 'Branch creation requires step-up',
+    description:
+      'All reads/writes as usual; creating new git refs (branches) requires a co-signer approval to block ref smuggling.',
+    cedarText: `permit (\n  principal,\n  action in [${READ_LIST}],\n  resource\n);\n\npermit (\n  principal,\n  action in [${WRITE_LIST}],\n  resource\n)\nunless { action == Action::"/github/branch/create" };\n\npermit (\n  principal,\n  action == Action::"/github/branch/create",\n  resource\n)\nwhen { context.cosigner == true };`,
+    visualReady: false,
   },
   {
     id: 'github:read-public-write-private',
