@@ -362,6 +362,14 @@ export function createProxyRoutes(deps: ProxyRouteDeps): Hono {
 
     if (deps.emitAudit) {
       const leafForAudit = leafUcan(parsed.data.ucan);
+      // Sprint MAOS-A — propagate causation + swarm metadata so the swarm
+      // view (/app/swarms/:id) can list receipts and walk the chain. Without
+      // these the row lands in audit_events with swarm_id=null and the swarm
+      // detail page shows an empty receipts table even though the chain ran.
+      const chainDepthForAudit =
+        Array.isArray(request.delegated_chain) && request.delegated_chain.length > 0
+          ? request.delegated_chain.length - 1
+          : 0;
       await deps.emitAudit({
         customerId,
         request,
@@ -372,6 +380,11 @@ export function createProxyRoutes(deps: ProxyRouteDeps): Hono {
         },
         ts: Date.now(),
         agentDid: leafForAudit?.payload.aud ?? 'unknown',
+        ...(request.parent_receipt_id !== undefined
+          ? { parentReceiptId: request.parent_receipt_id }
+          : {}),
+        ...(request.swarm_id !== undefined ? { swarmId: request.swarm_id } : {}),
+        ...(chainDepthForAudit > 0 ? { chainDepth: chainDepthForAudit } : {}),
       });
     }
 
