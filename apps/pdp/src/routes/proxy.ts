@@ -292,17 +292,21 @@ export function createProxyRoutes(deps: ProxyRouteDeps): Hono {
 
     // D3: schema-pack enforcement. Runs after policy cache so a tenant the
     // PDP doesn't recognize gets a 404 (operability) before paying for two
-    // zod parses. Packs without per-action schemas pass through unchanged.
+    // zod parses. As of the 2026-05-14 apiCall-smuggle fix, an in-tree
+    // command without an apiCallSchema fails closed (`schema_missing`)
+    // instead of passing through.
     const apiCallCheck = validateApiCall(request.command, parsed.data.apiCall);
     if (!apiCallCheck.ok) {
+      const reason =
+        apiCallCheck.reason === 'schema_missing' ? 'schema_missing' : 'schema_violation';
       log.info(
-        { command: request.command, customerId, issues: apiCallCheck.issues },
+        { command: request.command, customerId, reason, issues: apiCallCheck.issues },
         'schema-pack apiCall validation failed',
       );
       const denyDecision: AuthorizeDecision = {
         allow: false,
-        reason: 'schema_violation',
-        receiptId: sha256Hex(`schema-violation|${request.command}|apiCall`),
+        reason,
+        receiptId: sha256Hex(`${reason}|${request.command}|apiCall`),
       };
       recordAuthorize(decisionToAudit(denyDecision), denyDecision.reason);
       if (deps.emitAudit) {
@@ -314,7 +318,7 @@ export function createProxyRoutes(deps: ProxyRouteDeps): Hono {
           agentDid: extractAgentDid(firstUcan),
         });
       }
-      return c.json({ allow: false, decision: denyDecision, error_code: 'schema_violation' }, 403);
+      return c.json({ allow: false, decision: denyDecision, error_code: reason }, 403);
     }
     const resourceCheck = validateResource(request.command, request.resource);
     if (!resourceCheck.ok) {
