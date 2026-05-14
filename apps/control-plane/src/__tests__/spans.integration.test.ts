@@ -159,7 +159,12 @@ describe.skipIf(!RUN)('spans ingestion + observability v2 (requires postgres)', 
     await db.pool.query('SELECT 1');
     const config = loadConfig({ DATABASE_URL: TEST_URL });
     auth = createAuth({ db: db.drizzle, config, logger });
-    app = createServer({ logger, db, auth });
+    app = createServer({
+      logger,
+      db,
+      auth,
+      internal: { serviceToken: 'test-service-token' },
+    });
     alice = await signUp('alice-spans');
     bob = await signUp('bob-spans');
   });
@@ -282,5 +287,96 @@ describe.skipIf(!RUN)('spans ingestion + observability v2 (requires postgres)', 
     await expect(
       trpcClient(alice.cookie).observability.spanDetail.query({ spanId }),
     ).rejects.toThrow();
+  });
+
+  // PDP-side emission path. Verifies the internal endpoint authed by service
+  // token resolves agent_id from did + customer, persists the intent column,
+  // and dedupes if PDP and mcp-server both fire spans for the same receipt.
+  describe('/v1/internal/spans/emit (PDP path)', () => {
+    async function postInternal(body: unknown) {
+      return app.request('/v1/internal/spans/emit', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          authorization: 'Bearer test-service-token',
+        },
+        body: JSON.stringify(body),
+      });
+    }
+
+    it('happy-path inserts with intent + nextAgentHint persisted', async () => {
+      const agent = await makeAgent(alice.customerId, `int-${Math.random()}`);
+      const receiptId = await emitAudit(alice.customerId, agent.did);
+      const res = await postInternal({
+        customerId: alice.customerId,
+        agentDid: agent.did,
+        ...spanBody(receiptId, {
+          intent: 'create release branch',
+          nextAgentHint: 'writer will draft notes',
+        }),
+      });
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as { spanId: string; inserted: boolean };
+      expect(body.inserted).toBe(true);
+
+      const row = await db.drizzle.query.agentSpans.findFirst({
+        where: eq(schema.agentSpans.id, body.spanId),
+        columns: { intent: true, nextAgentHint: true, customerId: true },
+      });
+      expect(row?.intent).toBe('create release branch');
+      expect(row?.nextAgentHint).toBe('writer will draft notes');
+      expect(row?.customerId).toBe(alice.customerId);
+    });
+
+    it('rejects with 401 without service token', async () => {
+      const res = await app.request('/v1/internal/spans/emit', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      expect(res.status).toBe(401);
+    });
+
+    it('returns 404 when agentDid does not exist for the customer', async () => {
+      const receiptId = await emitAudit(alice.customerId, `did:key:zNOTAGENT-${Math.random()}`);
+      const res = await postInternal({
+        customerId: alice.customerId,
+        agentDid: 'did:key:zNOTEXIST',
+        ...spanBody(receiptId),
+      });
+      expect(res.status).toBe(404);
+      const body = (await res.json()) as { error_code: string };
+      expect(body.error_code).toBe('agent_not_found');
+    });
+
+    it('idempotent across PDP + mcp-server (both emit same receiptId)', async () => {
+      const agent = await makeAgent(alice.customerId, `dedupe-${Math.random()}`);
+      const key = await newApiKey(alice.customerId, agent.id);
+      const receiptId = await emitAudit(alice.customerId, agent.did);
+
+      // PDP fires first.
+      const pdpRes = await postInternal({
+        customerId: alice.customerId,
+        agentDid: agent.did,
+        ...spanBody(receiptId, { intent: 'pdp-first' }),
+      });
+      expect(pdpRes.status).toBe(200);
+      const pdpBody = (await pdpRes.json()) as { spanId: string; inserted: boolean };
+      expect(pdpBody.inserted).toBe(true);
+
+      // mcp-server retries the same receipt via /v1/spans.
+      const mcpRes = await postSpan(key, spanBody(receiptId, { intent: 'mcp-retry' }));
+      expect(mcpRes.status).toBe(200);
+      const mcpBody = (await mcpRes.json()) as { spanId: string; inserted: boolean };
+      expect(mcpBody.inserted).toBe(false);
+      expect(mcpBody.spanId).toBe(pdpBody.spanId);
+
+      // First emit wins — intent stays 'pdp-first'.
+      const row = await db.drizzle.query.agentSpans.findFirst({
+        where: eq(schema.agentSpans.id, pdpBody.spanId),
+        columns: { intent: true },
+      });
+      expect(row?.intent).toBe('pdp-first');
+    });
   });
 });
