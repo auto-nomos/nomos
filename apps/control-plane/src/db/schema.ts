@@ -354,7 +354,7 @@ export const auditEvents = pgTable(
      * authorize-receipt that triggered this call (orthogonal to prevHash,
      * which links the tamper-evidence chain). Nullable for root receipts.
      */
-    parentReceiptId: uuid('parent_receipt_id'),
+    parentReceiptId: text('parent_receipt_id'),
     swarmId: uuid('swarm_id'),
     chainDepth: integer('chain_depth'),
   },

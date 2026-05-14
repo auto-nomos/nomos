@@ -162,6 +162,13 @@
       "when": 1779600000000,
       "tag": "0022_agent_signing_keys",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1779700000000,
+      "tag": "0023_parent_receipt_text",
+      "breakpoints": true
     }
   ]
 }
