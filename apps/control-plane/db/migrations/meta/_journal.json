@@ -169,6 +169,13 @@
       "when": 1779700000000,
       "tag": "0023_parent_receipt_text",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1779800000000,
+      "tag": "0024_agent_spans",
+      "breakpoints": true
     }
   ]
 }

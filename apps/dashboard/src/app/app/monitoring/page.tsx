@@ -3,6 +3,8 @@
 import { Activity, CheckCircle2, CircleSlash, ShieldAlert } from 'lucide-react';
 import { fmtCount, MetricTile } from '../../../components/metric-tile';
 import { trpc } from '../../../lib/trpc';
+import { ActionGraph } from '../swarms/[id]/components/ActionGraph';
+import { ActionTimeline } from '../swarms/[id]/components/ActionTimeline';
 import { AgentInventory } from '../swarms/[id]/components/AgentInventory';
 import { AnomalyBadges } from '../swarms/[id]/components/AnomalyBadges';
 import { LiveFeed } from '../swarms/[id]/components/LiveFeed';
@@ -66,7 +68,11 @@ export default function MonitoringPage() {
         />
       </section>
 
+      <ActionGraph />
+
       <AnomalyBadges showAgent />
+
+      <ActionTimeline />
 
       <LiveFeed limit={50} />
 

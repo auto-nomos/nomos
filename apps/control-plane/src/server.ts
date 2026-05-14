@@ -16,6 +16,7 @@ import { createMintChildUcanRoutes } from './routes/mint-child-ucan.js';
 import { createMintUcanRoutes } from './routes/mint-ucan.js';
 import { createOAuthRoutes } from './routes/oauth.js';
 import { createSkillRoutes } from './routes/skill.js';
+import { createSpansRoutes } from './routes/spans.js';
 import type { CoherenceVerifier } from './services/intent-coherence.js';
 import type { TelegramBot } from './services/notify/telegram-bot.js';
 import type { PolicyInvalidator } from './services/policy-invalidator.js';
@@ -137,6 +138,11 @@ export function createServer(deps: ServerDeps): Hono {
   // available to this API key? Derived from the customer's policy set so
   // the platform stays single-source-of-truth (no CB_INTEGRATIONS drift).
   app.route('/', createAgentMeRoutes({ db: deps.db }));
+
+  // Observability v2 — MCP emits one span per tool call after the upstream
+  // returns. Records outcome/latency/hashes + tiny redacted summary; never
+  // raw bodies. Idempotent on (customer_id, receipt_id).
+  app.route('/', createSpansRoutes({ db: deps.db }));
 
   // SDK ↔ control-plane: dynamic per-request scope narrowing via the
   // Approval Envelope model. Mounted only when step-up is configured —

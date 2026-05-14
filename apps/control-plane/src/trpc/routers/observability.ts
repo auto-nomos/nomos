@@ -10,6 +10,12 @@
  * `@auto-nomos/policy-builder` on the fly.
  */
 import { parseToIr } from '@auto-nomos/policy-builder';
+import type {
+  ActionGraph,
+  ActionGraphEdge,
+  ActionGraphNode,
+  SpanStatus,
+} from '@auto-nomos/shared-types';
 import { TRPCError } from '@trpc/server';
 import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import { z } from 'zod';
@@ -616,6 +622,232 @@ export const observabilityRouter = router({
         stepup: row.stepup,
         distinctAgents: row.distinct_agents,
         distinctSwarms: row.distinct_swarms,
+      };
+    }),
+
+  /**
+   * Action graph — answer "what did each agent actually do, and what did
+   * that trigger next?" Returns one node per participating agent + one node
+   * per span. Edges connect agents to their spans (kind=invokes) and chain
+   * span → next-agent's first span when delegation occurred (kind=handoff).
+   *
+   * Window defaults to 60 minutes; capped at 24h so the React Flow canvas
+   * stays usable.
+   */
+  actionGraph: tenantProcedure
+    .input(
+      z.object({
+        swarmId: z.string().uuid().optional(),
+        sinceMinutes: z.number().int().min(1).max(1440).default(60),
+      }),
+    )
+    .query(async ({ ctx, input }): Promise<ActionGraph> => {
+      const since = sql`now() - (${input.sinceMinutes} || ' minutes')::interval`;
+      const swarmFilter = input.swarmId ? sql`AND s.swarm_id = ${input.swarmId}` : sql``;
+
+      const spanRows = await ctx.db.drizzle.execute<{
+        id: string;
+        agent_id: string;
+        parent_span_id: string | null;
+        receipt_id: string;
+        tool_name: string;
+        status: string;
+        http_status: number | null;
+        latency_ms: number;
+        started_at: Date | string;
+        parent_receipt_id: string | null;
+      }>(sql`
+        SELECT
+          s.id,
+          s.agent_id,
+          s.parent_span_id,
+          s.receipt_id,
+          s.tool_name,
+          s.status,
+          s.http_status,
+          s.latency_ms,
+          s.started_at,
+          ae.parent_receipt_id
+        FROM agent_spans s
+        LEFT JOIN audit_events ae ON ae.event_id::text = s.receipt_id
+        WHERE s.customer_id = ${ctx.customerId}
+          AND s.created_at >= ${since}
+          ${swarmFilter}
+        ORDER BY s.started_at ASC
+        LIMIT 500
+      `);
+
+      const spans = spanRows.rows;
+      const agentIds = Array.from(new Set(spans.map((s) => s.agent_id)));
+
+      const agentRows =
+        agentIds.length === 0
+          ? []
+          : await ctx.db.drizzle
+              .select({
+                id: schema.agents.id,
+                name: schema.agents.name,
+                did: schema.agents.did,
+                depth: schema.agents.depth,
+              })
+              .from(schema.agents)
+              .where(
+                and(
+                  eq(schema.agents.customerId, ctx.customerId),
+                  inArray(schema.agents.id, agentIds),
+                ),
+              );
+
+      const spansPerAgent = new Map<string, number>();
+      for (const s of spans) {
+        spansPerAgent.set(s.agent_id, (spansPerAgent.get(s.agent_id) ?? 0) + 1);
+      }
+
+      const nodes: ActionGraphNode[] = [];
+      for (const a of agentRows) {
+        nodes.push({
+          kind: 'agent',
+          id: a.id,
+          label: a.name,
+          did: a.did,
+          depth: a.depth ?? null,
+          spanCount: spansPerAgent.get(a.id) ?? 0,
+        });
+      }
+      for (const s of spans) {
+        nodes.push({
+          kind: 'span',
+          id: s.id,
+          agentId: s.agent_id,
+          toolName: s.tool_name,
+          status: s.status as SpanStatus,
+          latencyMs: s.latency_ms,
+          httpStatus: s.http_status,
+          startedAt:
+            s.started_at instanceof Date ? s.started_at.toISOString() : String(s.started_at),
+        });
+      }
+
+      // Build receipt→span lookup for handoff edges. A span's
+      // audit_events.parent_receipt_id points at the receipt that triggered
+      // *this* authorize; we resolve that to a previous span if it exists in
+      // the window.
+      const spanByReceipt = new Map<string, string>();
+      for (const s of spans) {
+        spanByReceipt.set(s.receipt_id, s.id);
+      }
+
+      const edges: ActionGraphEdge[] = [];
+      for (const s of spans) {
+        edges.push({
+          id: `${s.agent_id}->${s.id}`,
+          from: s.agent_id,
+          to: s.id,
+          kind: 'invokes',
+        });
+        // Handoff: parent receipt's span → this span (cross-agent only;
+        // same-agent re-invokes are not handoffs, just sequential calls).
+        if (s.parent_receipt_id) {
+          const parentSpan = spanByReceipt.get(s.parent_receipt_id);
+          if (parentSpan) {
+            edges.push({
+              id: `${parentSpan}=>${s.id}`,
+              from: parentSpan,
+              to: s.id,
+              kind: 'handoff',
+            });
+          }
+        }
+        // Explicit parent_span_id from MCP emitter (preferred when present
+        // and the parent is in-window).
+        if (s.parent_span_id) {
+          edges.push({
+            id: `${s.parent_span_id}~>${s.id}`,
+            from: s.parent_span_id,
+            to: s.id,
+            kind: 'handoff',
+          });
+        }
+      }
+
+      return {
+        nodes,
+        edges,
+        windowMinutes: input.sinceMinutes,
+        spanCount: spans.length,
+      };
+    }),
+
+  /**
+   * Flat list of recent spans, newest first. Cheap fallback when the graph
+   * is too dense to read.
+   */
+  actionTimeline: tenantProcedure
+    .input(
+      z.object({
+        swarmId: z.string().uuid().optional(),
+        limit: z.number().int().min(1).max(200).default(50),
+      }),
+    )
+    .query(async ({ ctx, input }) => {
+      const rows = await ctx.db.drizzle
+        .select({
+          id: schema.agentSpans.id,
+          agentId: schema.agentSpans.agentId,
+          swarmId: schema.agentSpans.swarmId,
+          receiptId: schema.agentSpans.receiptId,
+          toolName: schema.agentSpans.toolName,
+          status: schema.agentSpans.status,
+          httpStatus: schema.agentSpans.httpStatus,
+          latencyMs: schema.agentSpans.latencyMs,
+          startedAt: schema.agentSpans.startedAt,
+          endedAt: schema.agentSpans.endedAt,
+          errorCode: schema.agentSpans.errorCode,
+        })
+        .from(schema.agentSpans)
+        .where(
+          input.swarmId
+            ? and(
+                eq(schema.agentSpans.customerId, ctx.customerId),
+                eq(schema.agentSpans.swarmId, input.swarmId),
+              )
+            : eq(schema.agentSpans.customerId, ctx.customerId),
+        )
+        .orderBy(desc(schema.agentSpans.startedAt))
+        .limit(input.limit);
+
+      return rows.map((r) => ({
+        ...r,
+        startedAt: r.startedAt.toISOString(),
+        endedAt: r.endedAt.toISOString(),
+      }));
+    }),
+
+  /**
+   * Full detail for one span — opened in the drawer when a node is clicked.
+   */
+  spanDetail: tenantProcedure
+    .input(z.object({ spanId: z.string().uuid() }))
+    .query(async ({ ctx, input }) => {
+      const row = await ctx.db.drizzle.query.agentSpans.findFirst({
+        where: and(
+          eq(schema.agentSpans.id, input.spanId),
+          eq(schema.agentSpans.customerId, ctx.customerId),
+        ),
+      });
+      if (!row) throw new TRPCError({ code: 'NOT_FOUND' });
+
+      const agent = await ctx.db.drizzle.query.agents.findFirst({
+        where: eq(schema.agents.id, row.agentId),
+        columns: { id: true, name: true, did: true, depth: true },
+      });
+
+      return {
+        ...row,
+        startedAt: row.startedAt.toISOString(),
+        endedAt: row.endedAt.toISOString(),
+        createdAt: row.createdAt.toISOString(),
+        agent: agent ?? null,
       };
     }),
 });
