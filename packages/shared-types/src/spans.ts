@@ -31,6 +31,7 @@ export const EmitSpanInputSchema = z.object({
   responseSummary: SpanSummarySchema.nullable(),
   parentSpanId: z.string().uuid().optional().nullable(),
   nextAgentHint: z.string().max(256).optional().nullable(),
+  intent: z.string().max(256).optional().nullable(),
 });
 export type EmitSpanInput = z.infer<typeof EmitSpanInputSchema>;
 
@@ -51,6 +52,7 @@ export interface Span {
   responseHash: string | null;
   responseSummary: Record<string, unknown> | null;
   nextAgentHint: string | null;
+  intent: string | null;
   startedAt: string;
   endedAt: string;
   latencyMs: number;

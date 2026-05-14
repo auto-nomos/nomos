@@ -35,6 +35,7 @@
     "@auto-nomos/adapters": "workspace:*",
     "@auto-nomos/schema-packs": "workspace:*",
     "@auto-nomos/sdk": "workspace:*",
+    "@auto-nomos/shared-types": "workspace:*",
     "@modelcontextprotocol/sdk": "1.18.1",
     "zod": "3.25.76"
   },

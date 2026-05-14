@@ -646,6 +646,9 @@ importers:
       '@auto-nomos/sdk':
         specifier: workspace:*
         version: link:../sdk-typescript
+      '@auto-nomos/shared-types':
+        specifier: workspace:*
+        version: link:../shared-types
       '@modelcontextprotocol/sdk':
         specifier: 1.18.1
         version: 1.18.1
