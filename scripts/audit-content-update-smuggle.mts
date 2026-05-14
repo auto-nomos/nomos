@@ -1,6 +1,15 @@
 #!/usr/bin/env tsx
 /**
- * One-shot historical scan for the 2026-05-14 apiCall-smuggle vector.
+ * Historical scan for the apiCall-smuggle vector, generalised to every
+ * shipping schema-pack.
+ *
+ * Originally landed 2026-05-14 as a one-shot github-only scan after the
+ * apiCall-smuggle gap was closed; broadened 2026-05-14 (P-CV3 follow-up)
+ * to cover slack/stripe/linear/notion + 7 google sub-services. The PDP
+ * now refuses every cross-provider mismatch at request time
+ * (validateResourceConsistency + per-provider validators), but this
+ * script lets ops sweep historical `audit_events` rows for the same
+ * pattern across all providers.
  *
  * For every write command in `packages/adapters/spec/*.yaml`, derives the
  * expected upstream path prefix from the action's HTTP template, then
@@ -30,6 +39,7 @@ import { actionToCommand as googleGmailMap } from '@auto-nomos/schema-packs/goog
 import { actionToCommand as googleDocsMap } from '@auto-nomos/schema-packs/google_docs';
 import { actionToCommand as googleSheetsMap } from '@auto-nomos/schema-packs/google_sheets';
 import { actionToCommand as googleTasksMap } from '@auto-nomos/schema-packs/google_tasks';
+import { actionToCommand as googleContactsMap } from '@auto-nomos/schema-packs/google_contacts';
 import pg from 'pg';
 
 const PACK_TO_ADAPTER: Array<[string, Record<string, string>]> = [
@@ -44,6 +54,7 @@ const PACK_TO_ADAPTER: Array<[string, Record<string, string>]> = [
   ['google_docs', googleDocsMap],
   ['google_sheets', googleSheetsMap],
   ['google_tasks', googleTasksMap],
+  ['google_contacts', googleContactsMap],
 ];
 
 /**
