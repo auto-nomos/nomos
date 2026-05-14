@@ -13,9 +13,13 @@ import { formatDate, shortId } from '../../../../../lib/utils';
 
 const POLL_MS = 5_000;
 
-export function ActionTimeline({ swarmId }: { swarmId?: string }) {
+export function ActionTimeline({ swarmId, agentId }: { swarmId?: string; agentId?: string }) {
   const q = trpc.observability.actionTimeline.useQuery(
-    swarmId ? { swarmId, limit: 50 } : { limit: 50 },
+    {
+      limit: 50,
+      ...(swarmId ? { swarmId } : {}),
+      ...(agentId ? { agentId } : {}),
+    },
     { refetchInterval: POLL_MS },
   );
 

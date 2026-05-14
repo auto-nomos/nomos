@@ -60,10 +60,14 @@ const nodeTypes = {
   span: SpanNode,
 };
 
-export function ActionGraph({ swarmId }: { swarmId?: string }) {
+export function ActionGraph({ swarmId, agentId }: { swarmId?: string; agentId?: string }) {
   const [openSpan, setOpenSpan] = useState<string | null>(null);
   const q = trpc.observability.actionGraph.useQuery(
-    swarmId ? { swarmId, sinceMinutes: 60 } : { sinceMinutes: 60 },
+    {
+      sinceMinutes: 60,
+      ...(swarmId ? { swarmId } : {}),
+      ...(agentId ? { agentId } : {}),
+    },
     { refetchInterval: POLL_MS },
   );
 

@@ -638,12 +638,14 @@ export const observabilityRouter = router({
     .input(
       z.object({
         swarmId: z.string().uuid().optional(),
+        agentId: z.string().uuid().optional(),
         sinceMinutes: z.number().int().min(1).max(1440).default(60),
       }),
     )
     .query(async ({ ctx, input }): Promise<ActionGraph> => {
       const since = sql`now() - (${input.sinceMinutes} || ' minutes')::interval`;
       const swarmFilter = input.swarmId ? sql`AND s.swarm_id = ${input.swarmId}` : sql``;
+      const agentFilter = input.agentId ? sql`AND s.agent_id = ${input.agentId}` : sql``;
 
       const spanRows = await ctx.db.drizzle.execute<{
         id: string;
@@ -673,6 +675,7 @@ export const observabilityRouter = router({
         WHERE s.customer_id = ${ctx.customerId}
           AND s.created_at >= ${since}
           ${swarmFilter}
+          ${agentFilter}
         ORDER BY s.started_at ASC
         LIMIT 500
       `);
@@ -786,10 +789,15 @@ export const observabilityRouter = router({
     .input(
       z.object({
         swarmId: z.string().uuid().optional(),
+        agentId: z.string().uuid().optional(),
         limit: z.number().int().min(1).max(200).default(50),
       }),
     )
     .query(async ({ ctx, input }) => {
+      const conds = [eq(schema.agentSpans.customerId, ctx.customerId)];
+      if (input.swarmId) conds.push(eq(schema.agentSpans.swarmId, input.swarmId));
+      if (input.agentId) conds.push(eq(schema.agentSpans.agentId, input.agentId));
+
       const rows = await ctx.db.drizzle
         .select({
           id: schema.agentSpans.id,
@@ -805,14 +813,7 @@ export const observabilityRouter = router({
           errorCode: schema.agentSpans.errorCode,
         })
         .from(schema.agentSpans)
-        .where(
-          input.swarmId
-            ? and(
-                eq(schema.agentSpans.customerId, ctx.customerId),
-                eq(schema.agentSpans.swarmId, input.swarmId),
-              )
-            : eq(schema.agentSpans.customerId, ctx.customerId),
-        )
+        .where(and(...conds))
         .orderBy(desc(schema.agentSpans.startedAt))
         .limit(input.limit);
 
