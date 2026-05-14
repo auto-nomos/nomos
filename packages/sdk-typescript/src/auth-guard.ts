@@ -140,6 +140,17 @@ export interface ProxyApiCall {
   query?: Record<string, string>;
   body?: unknown;
   headers?: Record<string, string>;
+  /**
+   * Optional narrative layer — agent-declared "why I am making this call".
+   * Surfaced verbatim in the action graph drawer. PDP never uses this for
+   * routing or authz; truncated to 256 chars.
+   */
+  intent?: string;
+  /**
+   * Optional agent-declared follow-up hint (e.g. "writer will summarize
+   * results to slack"). Free-form, never consulted by the broker.
+   */
+  nextAgentHint?: string;
 }
 
 export interface ProxyResult {

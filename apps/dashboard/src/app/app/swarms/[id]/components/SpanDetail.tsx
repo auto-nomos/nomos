@@ -39,6 +39,27 @@ export function SpanDetail({ spanId }: { spanId: string }) {
         <Field label="Ended" value={formatDate(s.endedAt)} mono />
       </div>
 
+      {s.intent || s.nextAgentHint ? (
+        <div className="space-y-1.5 rounded-md border border-aegis-iris/30 bg-aegis-iris/5 p-3">
+          {s.intent ? (
+            <div className="text-xs">
+              <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                intent
+              </span>
+              <p className="mt-0.5">{s.intent}</p>
+            </div>
+          ) : null}
+          {s.nextAgentHint ? (
+            <div className="text-xs">
+              <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                next step
+              </span>
+              <p className="mt-0.5">{s.nextAgentHint}</p>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
       {s.errorCode || s.errorMessage ? (
         <div className="rounded-md border border-aegis-coral/40 bg-aegis-coral/5 p-3">
           <div className="text-xs font-semibold text-aegis-coral">Error</div>
