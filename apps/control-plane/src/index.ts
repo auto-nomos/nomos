@@ -2,11 +2,18 @@ import { generateKeypair, keypairFromPrivate, loadSecretboxKey } from '@auto-nom
 import { serve } from '@hono/node-server';
 import { hexToBytes } from '@noble/hashes/utils';
 import { createAuth } from './auth/index.js';
+import { createCredsCache } from './cloud/creds-cache.js';
+import { createCloudProviderRegistry } from './cloud/registry.js';
 import { type Config, loadConfig } from './config.js';
+import type { Db } from './db/index.js';
 import { createDb, seedSchemas } from './db/index.js';
 import { createLogger, type Logger } from './logger.js';
+import { DbKeyStore, StaticKeyStore, withDevFallback } from './oidc/key-store.js';
+import { createTokenBucketRateLimiter } from './oidc/rate-limit.js';
+import { buildSignerFromConfig } from './oidc/signer.js';
 import { createServer } from './server.js';
 import { createRecoveryNotifier } from './services/auth/recovery-notify.js';
+import { createCloudAuditPublisher } from './services/cloud-audit-publisher.js';
 import { createRiskSummarizer } from './services/grants/llm-risk-summary.js';
 import { createCoherenceVerifier } from './services/intent-coherence.js';
 import { createTelegramBot, type TelegramBot } from './services/notify/telegram-bot.js';
@@ -17,6 +24,7 @@ import { createStepUpNotifier } from './services/stepup/notify.js';
 import { deriveWebAuthnConfig } from './services/stepup/webauthn.js';
 import { createAuditArchiveWorker, createR2Uploader } from './workers/audit-archive.js';
 import { createAuditRootSigner } from './workers/audit-root-signer.js';
+import { createCloudVerifyPoll } from './workers/cloud-verify-poll.js';
 
 function loadOAuthEncryptionKey(config: Config, logger: Logger): Uint8Array {
   const isDevPlaceholder = config.OAUTH_TOKEN_ENCRYPTION_KEY === '00'.repeat(32);
@@ -50,6 +58,55 @@ function loadAuditSigningKey(
   const signingKeyId = config.AUDIT_SIGNING_KEY_ID ?? kp.did;
   logger.info({ signingKeyId }, 'loaded audit root signing key from env');
   return { signKey: kp.privateKey, signingKeyId };
+}
+
+function loadOidcDeps(
+  config: Config,
+  logger: Logger,
+  db: Db,
+):
+  | {
+      issuer: string;
+      defaultTtlSeconds: number;
+      keyStore: import('./oidc/key-store.js').KeyStore;
+      signer: import('@auto-nomos/crypto').JwtSigner;
+      serviceToken: string;
+      rateLimiter: import('./oidc/rate-limit.js').RateLimiter;
+    }
+  | undefined {
+  const resolved = buildSignerFromConfig(config);
+  if (!resolved) {
+    if (config.NODE_ENV === 'production') {
+      throw new Error(
+        'OIDC issuer signing key is required in production (set OIDC_KMS_KEY_ARN or OIDC_DEV_RSA_PRIVATE_KEY_PEM + OIDC_DEV_KID).',
+      );
+    }
+    logger.warn(
+      'OIDC issuer signing key not configured — /oidc/* + /v1/internal/oidc/* disabled. Cloud federation (M1+) will fail until set.',
+    );
+    return undefined;
+  }
+  const devKey = {
+    kid: resolved.publicJwk.kid,
+    alg: 'RS256' as const,
+    status: 'active' as const,
+    publicJwk: resolved.publicJwk,
+    kmsKeyRef: 'local-dev',
+  };
+  const keyStore = withDevFallback(new DbKeyStore(db), devKey);
+  // For tests that don't touch the DB, fall through with StaticKeyStore.
+  void StaticKeyStore;
+  logger.info({ kid: resolved.publicJwk.kid }, 'oidc issuer signer loaded');
+  return {
+    issuer: config.OIDC_ISSUER_URL,
+    defaultTtlSeconds: config.OIDC_ID_TOKEN_TTL_SECONDS,
+    keyStore,
+    signer: resolved.signer,
+    serviceToken: config.CONTROL_PLANE_SERVICE_TOKEN,
+    rateLimiter: createTokenBucketRateLimiter({
+      ratePerMinute: config.OIDC_MINT_RATE_LIMIT_PER_MINUTE,
+    }),
+  };
 }
 
 function loadSigningKey(
@@ -179,6 +236,37 @@ async function main(): Promise<void> {
     );
   }
 
+  // M0/M1 — build OIDC + cloud deps once. Both server bring-up and the
+  // verify-poll worker share the same signer/keystore.
+  const oidcDeps = loadOidcDeps(config, logger, db);
+  const cloudDeps = oidcDeps
+    ? {
+        registry: createCloudProviderRegistry(),
+        credsCache: createCredsCache(),
+        auditPublisher: createCloudAuditPublisher({
+          // PDP owns the audit hash chain; CP echoes cloud.token.minted +
+          // cloud.federation.exchanged through `/v1/internal/audit/emit-cloud`.
+          webhookUrls: pdpWebhookUrls.map((u) =>
+            u.replace(/\/v1\/internal\/refresh-revocations$/, '/v1/internal/audit/emit-cloud'),
+          ),
+          serviceToken: config.CONTROL_PLANE_SERVICE_TOKEN,
+          logger,
+        }),
+      }
+    : undefined;
+  const verifyPoll =
+    oidcDeps && cloudDeps
+      ? createCloudVerifyPoll({
+          db: db.drizzle,
+          registry: cloudDeps.registry,
+          signer: oidcDeps.signer,
+          issuer: oidcDeps.issuer,
+          defaultTtlSeconds: oidcDeps.defaultTtlSeconds,
+          logger,
+          intervalMs: config.CLOUD_VERIFY_POLL_INTERVAL_MS,
+        })
+      : undefined;
+
   const app = createServer({
     logger,
     db,
@@ -202,6 +290,8 @@ async function main(): Promise<void> {
       pdpPublicUrl: process.env.PDP_PUBLIC_URL ?? 'http://localhost:8787',
       dashboardPublicUrl: config.DASHBOARD_PUBLIC_URL,
     },
+    ...(oidcDeps ? { oidc: oidcDeps } : {}),
+    ...(cloudDeps ? { cloud: { ...cloudDeps, ...(verifyPoll ? { verifyPoll } : {}) } } : {}),
   });
 
   const sweep = createOAuthSweep({
@@ -227,6 +317,13 @@ async function main(): Promise<void> {
   if (auditRootSigner) {
     auditRootSigner.start();
     logger.info({ intervalMs: config.AUDIT_ROOT_SIGN_INTERVAL_MS }, 'audit root signer started');
+  }
+
+  // M9 verify-poll — built above so the tRPC verifyNow mutation shares
+  // one instance. Daily by default; configurable via env.
+  if (verifyPoll) {
+    verifyPoll.start();
+    logger.info({ intervalMs: config.CLOUD_VERIFY_POLL_INTERVAL_MS }, 'cloud verify poll started');
   }
 
   const r2Configured =
@@ -270,6 +367,7 @@ async function main(): Promise<void> {
     sweep.stop();
     auditRootSigner?.stop();
     auditArchive?.stop();
+    verifyPoll?.stop();
     server.close();
     await db.pool.end();
     process.exit(0);
