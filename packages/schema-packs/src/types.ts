@@ -20,7 +20,13 @@ export type IntegrationId =
   | 'google_gmail'
   | 'google_docs'
   | 'google_sheets'
-  | 'google_tasks';
+  | 'google_tasks'
+  // M1+ — cloud IAM. One pack per cloud; per-service surfaces (compute,
+  // storage, observability) live as namespaced action prefixes inside
+  // each pack (e.g. /azure/vm/list, /azure/storage/blob_read).
+  | 'azure'
+  | 'aws'
+  | 'gcp';
 
 export interface PolicyTemplate {
   /** Stable id, namespaced on integration: `github:read-only`. */

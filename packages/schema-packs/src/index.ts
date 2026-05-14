@@ -1,4 +1,7 @@
+export { awsPack } from './aws/index.js';
+export { azurePack } from './azure/index.js';
 export { filesystemPack } from './filesystem/index.js';
+export { gcpPack } from './gcp/index.js';
 export { githubPack } from './github/index.js';
 export { googlePack } from './google/index.js';
 export { googleCalendarPack } from './google_calendar/index.js';
@@ -12,7 +15,10 @@ export { slackPack } from './slack/index.js';
 export { stripePack } from './stripe/index.js';
 export * from './types.js';
 
+import { awsPack } from './aws/index.js';
+import { azurePack } from './azure/index.js';
 import { filesystemPack } from './filesystem/index.js';
+import { gcpPack } from './gcp/index.js';
 import { githubPack } from './github/index.js';
 import { googlePack } from './google/index.js';
 import { googleCalendarPack } from './google_calendar/index.js';
@@ -39,6 +45,9 @@ export const PACKS: IntegrationPack[] = [
   linearPack,
   stripePack,
   filesystemPack,
+  azurePack,
+  awsPack,
+  gcpPack,
 ];
 
 export function listTemplates(): PolicyTemplate[] {
