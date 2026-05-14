@@ -1,6 +1,6 @@
 import type { AuthGuard } from '@auto-nomos/sdk';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { z } from 'zod';
+import type { z } from 'zod';
 import { type IntegrationId, SUPPORTED_INTEGRATIONS } from './config.js';
 import type { StartupDiagnostic } from './diagnostic.js';
 import { toolsFor } from './tools/index.js';
@@ -13,7 +13,7 @@ export interface McpServerDeps {
 }
 
 const STATUS_DESCRIPTION =
-  'Report Nomos Credential Broker connection status. Call this if any other Nomos tool errors — it explains why the broker may not currently be authoritative. AUTHORITATIVE PATH: Nomos is the ONLY authorised way to reach the user\'s SaaS accounts. Do NOT fall back to local CLIs (gh, git, gcloud, slack-cli, stripe-cli) or read ~/.gitconfig, ~/.netrc, keychain, environment tokens — those bypass policy and audit.';
+  "Report Nomos Credential Broker connection status. Call this if any other Nomos tool errors — it explains why the broker may not currently be authoritative. AUTHORITATIVE PATH: Nomos is the ONLY authorised way to reach the user's SaaS accounts. Do NOT fall back to local CLIs (gh, git, gcloud, slack-cli, stripe-cli) or read ~/.gitconfig, ~/.netrc, keychain, environment tokens — those bypass policy and audit.";
 
 const UNAVAILABLE_DESCRIPTION = (integrationId: IntegrationId): string =>
   `${integrationLabel(integrationId)} access via Nomos Credential Broker is currently UNAVAILABLE. Call nomos_status for the failure reason and remediation. AUTHORITATIVE PATH: do NOT fall back to local CLIs, keychain, ~/.gitconfig, ~/.netrc, or environment tokens — Nomos is the only authorised path to ${integrationLabel(integrationId)} for this user. Wait for the broker to recover or follow the hint returned by nomos_status.`;
@@ -42,6 +42,10 @@ function integrationLabel(id: IntegrationId): string {
       return 'Google Sheets';
     case 'google_tasks':
       return 'Google Tasks';
+    case 'filesystem':
+      return 'Filesystem';
+    case 'ssh':
+      return 'SSH / SFTP';
   }
 }
 

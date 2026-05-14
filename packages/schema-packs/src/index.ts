@@ -10,6 +10,7 @@ export { googleTasksPack } from './google_tasks/index.js';
 export { linearPack } from './linear/index.js';
 export { notionPack } from './notion/index.js';
 export { slackPack } from './slack/index.js';
+export { sshPack } from './ssh/index.js';
 export { stripePack } from './stripe/index.js';
 export { SWARM_SAFE_TEMPLATES, swarmSafePack } from './swarm-safe/index.js';
 export * from './types.js';
@@ -26,6 +27,7 @@ import { googleTasksPack } from './google_tasks/index.js';
 import { linearPack } from './linear/index.js';
 import { notionPack } from './notion/index.js';
 import { slackPack } from './slack/index.js';
+import { sshPack } from './ssh/index.js';
 import { stripePack } from './stripe/index.js';
 import { SWARM_SAFE_TEMPLATES } from './swarm-safe/index.js';
 import type { IntegrationId, IntegrationPack, PolicyTemplate } from './types.js';
@@ -44,6 +46,7 @@ export const PACKS: IntegrationPack[] = [
   linearPack,
   stripePack,
   filesystemPack,
+  sshPack,
 ];
 
 export function listTemplates(): PolicyTemplate[] {
@@ -217,6 +220,9 @@ const COMPARED_KEYS = [
   'team_id',
   'project_id',
   'issue_id',
+  // filesystem + ssh
+  'path',
+  'host',
 ] as const;
 
 export function validateResourceConsistency(

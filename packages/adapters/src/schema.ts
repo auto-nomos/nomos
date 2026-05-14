@@ -38,6 +38,12 @@ export const AuthSchema = z.discriminatedUnion('kind', [
   z.object({
     kind: z.literal('local'),
   }),
+  z.object({
+    kind: z.literal('ssh_key'),
+    key_env_var: z.string().default('SSH_PRIVATE_KEY'),
+    passphrase_env_var: z.string().optional(),
+    known_hosts_env_var: z.string().optional(),
+  }),
 ]);
 export type AuthConfig = z.infer<typeof AuthSchema>;
 

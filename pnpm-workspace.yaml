@@ -3,7 +3,9 @@ packages:
   - "packages/*"
   - "examples/*"
 allowBuilds:
+  cpu-features: true
   esbuild: true
   msw: false
   protobufjs: true
   sharp: true
+  ssh2: true

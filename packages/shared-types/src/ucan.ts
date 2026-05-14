@@ -174,6 +174,19 @@ export const GoogleContactsConstraint = z.object({
   resource_name: z.string().min(1).optional(),
 });
 
+/**
+ * SSH/SCP variant. `host` pins to a specific remote server; `path_prefix`
+ * scopes the remote filesystem subtree the agent may access; `username`
+ * narrows to a specific OS user on that host.
+ */
+export const SshConstraint = z.object({
+  provider: z.literal('ssh'),
+  host: z.string().min(1),
+  port: z.number().int().positive().default(22),
+  username: z.string().min(1).optional(),
+  path_prefix: z.string().min(1).optional(),
+});
+
 export const ResourceConstraint = z.discriminatedUnion('provider', [
   FilesystemConstraint,
   GithubConstraint,
@@ -188,9 +201,11 @@ export const ResourceConstraint = z.discriminatedUnion('provider', [
   GoogleSheetsConstraint,
   GoogleTasksConstraint,
   GoogleContactsConstraint,
+  SshConstraint,
 ]);
 
 export type FilesystemConstraint = z.infer<typeof FilesystemConstraint>;
+export type SshConstraint = z.infer<typeof SshConstraint>;
 export type GithubConstraint = z.infer<typeof GithubConstraint>;
 export type SlackConstraint = z.infer<typeof SlackConstraint>;
 export type StripeConstraint = z.infer<typeof StripeConstraint>;

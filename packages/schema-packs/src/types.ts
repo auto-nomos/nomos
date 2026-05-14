@@ -22,7 +22,8 @@ export type IntegrationId =
   | 'google_sheets'
   | 'google_tasks'
   | 'google_contacts'
-  | 'swarm';
+  | 'swarm'
+  | 'ssh';
 
 export interface PolicyTemplate {
   /** Stable id, namespaced on integration: `github:read-only`. */
