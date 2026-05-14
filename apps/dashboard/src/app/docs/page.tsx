@@ -31,8 +31,14 @@ const ANCHORS = [
     body: 'Cedar shape, visual builder rules, REST endpoints, tRPC procedures. The reference index.',
   },
   {
+    href: '/docs#filesystem-ssh',
+    eyebrow: '04 · GA · providers',
+    title: 'Filesystem & SSH',
+    body: 'Local disk + remote SFTP/exec under the same Cedar gate. Path-prefix scoping, step-up on destructive ops, 14 templates.',
+  },
+  {
     href: '/docs#swarms',
-    eyebrow: '04 · beta · maos',
+    eyebrow: '05 · beta · maos',
     title: 'Swarms (delegation chains)',
     body: 'Multi-agent orchestration security: parent → child UCAN propagation, scope containment, swarm-scoped approval.',
   },
