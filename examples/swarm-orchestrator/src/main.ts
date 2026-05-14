@@ -87,6 +87,8 @@ function orchestratorApp(): Hono {
     const proxy = await guard.proxy({
       ucan: root.jwt,
       command: '/github/issue/list',
+      resource: { provider: 'github', owner, repo },
+      context: {},
       swarm_id: swarmId,
       apiCall: { method: 'GET', path: `/repos/${owner}/${repo}/issues`, query: { per_page: '1' } },
     });
@@ -142,19 +144,21 @@ function agentApp(): Hono {
     const parent = body.parentChain ?? [];
     console.info(`[${ROLE}] /run depth=${parent.length} task="${body.task}"`);
 
+    if (parent.length === 0) {
+      return c.json({ error: 'no parentChain in body' }, 400);
+    }
+    // The leaf is whatever the parent (orchestrator or upstream agent)
+    // minted for us; we do NOT mint locally — that would issue a fresh
+    // CP-signed UCAN whose iss is signerDid, breaking the chain
+    // (parent.aud != child.iss).
+    const leafJwt = parent[parent.length - 1] as string;
+    const chain = parent;
     const guard = createAuthGuard({ pdpUrl: PDP, controlPlaneUrl: CP, apiKey });
-    const ucans = await guard.mintUcan({
-      commands: ['/github/issue/list'],
-      oauthConnectionId: oauthConn || undefined,
-    });
-    const root = ucans.get('/github/issue/list');
-    if (!root) return c.json({ error: 'mint failed' }, 500);
-
-    // Stitch our leaf onto the parent chain.
-    const chain = [...parent, root.jwt];
     const proxy = await guard.proxy({
-      ucan: root.jwt,
+      ucan: leafJwt,
       command: '/github/issue/list',
+      resource: { provider: 'github', owner, repo },
+      context: {},
       delegated_chain: chain,
       ...(body.parentReceiptId ? { parent_receipt_id: body.parentReceiptId } : {}),
       ...(body.swarmId ? { swarm_id: body.swarmId } : {}),

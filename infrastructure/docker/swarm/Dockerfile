@@ -2,7 +2,7 @@
 # Builds the workspace once, then runs `tsx src/main.ts` against
 # examples/swarm-orchestrator with NOMOS_ROLE switching the binary mode.
 
-FROM node:20-alpine AS deps
+FROM node:22-alpine AS deps
 WORKDIR /repo
 RUN corepack enable
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
@@ -21,5 +21,8 @@ COPY packages packages
 COPY examples/swarm-orchestrator examples/swarm-orchestrator
 WORKDIR /repo/examples/swarm-orchestrator
 ENV NODE_ENV=production
+# Skip pnpm's runtime workspace-deps check (it would try to re-install
+# and fail because we deliberately did not copy apps/ into the image).
+# tsx is invoked directly through the local node_modules bin.
 EXPOSE 3100 3101 3102 3103
-CMD ["pnpm", "start"]
+CMD ["sh", "-c", "/repo/node_modules/.bin/tsx src/main.ts"]
