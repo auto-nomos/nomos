@@ -3,6 +3,7 @@
 import {
   ArrowDownToLine,
   Boxes,
+  Cloud,
   Cpu,
   FileLock2,
   GitBranch,
@@ -48,6 +49,7 @@ const SECTIONS: Section[] = [
   { id: 'standing-grants', label: 'Standing grants', group: 'Runtime', icon: Layers },
   { id: 'audit', label: 'Audit chain', group: 'Runtime', icon: Hash },
   { id: 'swarms', label: 'Swarms (delegation chains)', group: 'Runtime', icon: GitBranch },
+  { id: 'cloud', label: 'Cloud IAM (Azure/AWS/GCP)', group: 'Runtime', icon: Cloud },
   { id: 'sdk', label: 'SDK & MCP', group: 'Integrate', icon: Terminal },
   { id: 'telegram', label: 'Telegram notifications', group: 'Integrate', icon: MessageCircle },
   { id: 'faq', label: 'FAQ', group: 'Reference', icon: KeyRound },
@@ -94,6 +96,7 @@ export function GuideContent() {
           <StandingGrants />
           <AuditChain />
           <Swarms />
+          <CloudIam />
           <Sdk />
           <TelegramSetup />
           <Faq />
@@ -119,9 +122,9 @@ function Header() {
         ready.
       </p>
       <div className="mt-6 flex flex-wrap items-center gap-2 font-mono text-[11px] uppercase tracking-[0.16em] text-aegis-faint">
-        <span>~14 min read</span>
+        <span>~18 min read</span>
         <span aria-hidden>·</span>
-        <span>last updated 2026-05-14 · MAOS beta</span>
+        <span>last updated 2026-05-15 · MAOS beta · Cloud IAM beta</span>
         <span aria-hidden>·</span>
         <a href="#quickstart" className="text-aegis-signal hover:underline">
           Skip to 5-min quickstart →
@@ -193,6 +196,8 @@ function RightRail() {
           { href: '/app/agents', label: 'Apps' },
           { href: '/app/policies', label: 'Policies' },
           { href: '/app/audit', label: 'Audit' },
+          { href: '/app/swarms', label: 'Swarms' },
+          { href: '/app/cloud', label: 'Cloud accounts' },
           { href: '/app/grants', label: 'Standing grants' },
           { href: '/app/settings/notifications', label: 'Notifications' },
         ].map((l) => (
@@ -874,6 +879,279 @@ subprocess.Popen(["python","./researcher.py"], env=env)`}</Code>
   );
 }
 
+function CloudIam() {
+  return (
+    <Section id="cloud" eyebrow="12 · runtime · beta" title="Cloud IAM — Azure, AWS, GCP.">
+      <P>
+        Nomos brokers cloud the same way it brokers SaaS — except there&rsquo;s no token to store.
+        We host an OIDC issuer at <K>id.auto-nomos.com</K>; your cloud trusts it via federation; we
+        mint a fresh OIDC ID token per request and exchange it for a short-lived cloud session
+        credential. <strong className="text-aegis-paper">Zero standing cloud secrets</strong> in
+        your workspace — disconnect a cloud account and the next call denies within a second.
+      </P>
+      <P>
+        Three connectors ship in beta: <K>azure</K> (AAD federated credential, JWT-bearer
+        assertion), <K>aws</K> (IAM OIDC provider + <K>sts:AssumeRoleWithWebIdentity</K> + SigV4),{' '}
+        <K>gcp</K> (Workload Identity Federation, STS exchange + SA impersonation). All three reuse
+        the same Cedar engine, the same UCAN audience, the same audit chain, the same step-up.
+      </P>
+
+      <h3 className="mt-8 font-display text-[22px] text-aegis-paper">Mental model</h3>
+      <Code lang="text">{`[ agent code ]
+     │  authorize + apiCall
+     ▼
+[ PDP /v1/proxy ]                 ── Cedar + step-up + cloud risk-rules
+     │  cloud_connection_id on UCAN meta
+     ▼
+[ CP /v1/internal/cloud/api-call/:id ]
+     │  1. mint OIDC ID token (RS256 via AWS KMS)   → cloud.token.minted
+     │  2. POST to AAD / STS / GCP-STS              → cloud.federation.exchanged
+     │  3. signAndCall(session-creds, request)
+     ▼  upstream cloud API call
+[ PDP emits cloud.call.allowed audit + agent_span ]
+[ swarm_id + parent_receipt_id + chain_depth carried end-to-end ]`}</Code>
+      <P>
+        The PDP owns the audit chain (single writer = no race). Mint + exchange events flow from CP
+        back to PDP via an internal webhook so the three audit kinds land in the same hash chain.
+        Every cloud call therefore appears in <K>/app/swarms/{`{id}`}</K> alongside SaaS calls —
+        same ActionGraph, same Timeline, same BlastRadius.
+      </P>
+
+      <h3 className="mt-8 font-display text-[22px] text-aegis-paper">
+        Onboarding (Terraform-only)
+      </h3>
+      <P>
+        Customer trust requirement: you read the IAM module before applying it. No SaaS-side
+        terraform-apply button. Each module lives in its own public repo so it shows up in your
+        Terraform tooling as third-party code, not a vendor blob.
+      </P>
+      <ul className="ml-6 list-disc space-y-1.5 marker:text-aegis-signal">
+        <li>
+          <strong className="text-aegis-paper">Azure</strong>{' '}
+          <K>github.com/auto-nomos/terraform-azurerm-nomos-bootstrap</K> — app registration +
+          federated identity credential (issuer=<K>id.auto-nomos.com</K>, audience=
+          <K>api://AzureADTokenExchange</K>, subject=
+          <K>
+            customer/{`{cid}`}/agent/{`{aid}`}
+          </K>
+          ) + Reader role assignment at sub scope (narrow to RG via variable).
+        </li>
+        <li>
+          <strong className="text-aegis-paper">AWS</strong>{' '}
+          <K>github.com/auto-nomos/terraform-aws-nomos-bootstrap</K> — IAM OIDC provider + IAM role
+          with <K>sts:AssumeRoleWithWebIdentity</K> trust (sub-matched) +<K>ReadOnlyAccess</K>{' '}
+          managed policy. Region defaults to <K>us-east-1</K>; GovCloud is a separate variant.
+        </li>
+        <li>
+          <strong className="text-aegis-paper">GCP</strong>{' '}
+          <K>github.com/auto-nomos/terraform-google-nomos-bootstrap</K> — Workload Identity Pool +
+          Provider (issuer URI + audience + attribute mapping) + service account with{' '}
+          <K>roles/iam.workloadIdentityUser</K> and <K>roles/iam.serviceAccountTokenCreator</K> +
+          <K>roles/viewer</K>.
+        </li>
+      </ul>
+      <P>
+        The <K>nomos</K> CLI ships a wrapper that scaffolds each TF module with a pinned version and
+        prints the <K>terraform init && terraform apply</K> commands. You run them — the CLI does
+        not <K>apply</K> on your behalf.
+      </P>
+      <Code lang="bash">{`# Bootstrap each cloud (interactive):
+nomos cloud-install azure
+nomos cloud-install aws  --role-name nomos-broker-readonly --region us-east-1
+nomos cloud-install gcp  --project my-proj --service-account nomos-broker`}</Code>
+
+      <h3 className="mt-8 font-display text-[22px] text-aegis-paper">Dashboard — /app/cloud</h3>
+      <P>
+        Top-level nav under <strong>Build → Cloud accounts</strong>. Lists every connection row with
+        status badge (<K>verified</K> / <K>pending</K> / <K>broken</K>), last-verified timestamp,
+        and per-row <K>Verify now</K> + <K>Disconnect</K> actions. The bottom card starts the three
+        connect wizards (Azure / AWS / GCP). Paste Terraform outputs → wizard calls{' '}
+        <K>cloudConnections.create</K> → polls <K>verifyNow</K> until status flips green.
+      </P>
+      <Callout tone="info">
+        Once <K>verified</K>, the agent flow is identical to OAuth: mint a UCAN carrying{' '}
+        <K>meta.cloud_connection_id</K>, call <K>/v1/proxy</K>, PDP routes through the cloud branch.
+      </Callout>
+
+      <h3 className="mt-8 font-display text-[22px] text-aegis-paper">
+        Permissions — three layers, in order
+      </h3>
+      <ol className="ml-6 list-decimal space-y-2 marker:text-aegis-signal">
+        <li>
+          <strong className="text-aegis-paper">Cloud-side IAM grant</strong> — the Terraform module
+          attaches a role/policy to the federated identity. Narrow it: Reader at RG scope (Azure),
+          <K>s3:GetObject</K> on one bucket (AWS), <K>roles/storage.objectViewer</K> on one project
+          (GCP). The federated identity can never do more than your cloud IAM allows.
+        </li>
+        <li>
+          <strong className="text-aegis-paper">Cedar policy</strong> — what the agent may ask the
+          PDP for. Strictly narrows the IAM grant; carries context-aware rules (time, depth,
+          resource attrs) that the cloud language can&rsquo;t express.
+        </li>
+        <li>
+          <strong className="text-aegis-paper">UCAN capability</strong> — the time-bound, App-bound
+          capability presented per call. Always a subset of policy. Revoke → next call denies.
+        </li>
+      </ol>
+      <P>
+        Effective permission = intersection of all three. Inside a swarm, add a fourth: chain
+        attenuation (each child ⊆ parent).
+      </P>
+
+      <h3 className="mt-8 font-display text-[22px] text-aegis-paper">Example Cedar policies</h3>
+      <Code lang="cedar">{`// Azure: allow VM reads, force cosigner on every destructive verb.
+permit (principal,
+        action in [Action::"/azure/vm/list", Action::"/azure/vm/get"],
+        resource)
+when { resource.subscription_id == "00000000-0000-0000-0000-000000000000" };
+
+forbid (principal,
+        action in [Action::"/azure/vm/delete", Action::"/azure/vm/stop"],
+        resource)
+unless { context.cosigner_present == true };
+
+// AWS: pin to one account, scope to one bucket.
+permit (principal,
+        action == Action::"/aws/s3/list_objects",
+        resource)
+when {
+  resource.account_id == "123456789012" &&
+  resource.bucket == "acme-reports"
+};
+
+// GCP: lock the whole pack to one project.
+permit (principal, action like "/gcp/*", resource)
+when { resource.project_id == "my-prod-proj" };`}</Code>
+      <Callout tone="warn">
+        <strong className="text-aegis-paper">Defense-in-depth.</strong> Even if Cedar would{' '}
+        <K>permit</K> without a cosigner clause, the PDP&rsquo;s <K>cloud-risk-rules</K> service
+        force-injects cosigner-required on every destructive verb (<K>delete</K>, <K>stop</K>,{' '}
+        <K>drain</K>, <K>scale_down</K>, <K>rotate</K>, <K>redeploy</K>, <K>run_command</K>,{' '}
+        <K>invoke</K>, <K>terminate</K>). You cannot accidentally deploy an over-permissive policy
+        that bypasses step-up on destruction.
+      </Callout>
+
+      <h3 className="mt-8 font-display text-[22px] text-aegis-paper">Action catalog</h3>
+      <P>
+        Each pack curates ~10–25 first-class actions plus a <K>raw_call</K> escape hatch for
+        anything the typed surface doesn&rsquo;t cover yet.
+      </P>
+      <ul className="ml-6 list-disc space-y-1.5 marker:text-aegis-signal">
+        <li>
+          <strong className="text-aegis-paper">azure</strong> — subscriptions / resource_groups /
+          resources / vm (list,get,start,stop,restart,delete,run_command) / vmss / aks / storage /
+          blob / key_vaults / app_services / acr / pipelines / metrics / cosmos / synapse /
+          log_analytics / cost_management / deployments. <K>/azure/raw_call</K> escape hatch.
+        </li>
+        <li>
+          <strong className="text-aegis-paper">aws</strong> — sts:get_caller_identity / ec2
+          (list,start,stop,terminate) / s3 (buckets,objects,delete) / lambda (list,invoke) / iam
+          (list_*) / rds (describe,reboot) / cloudwatch / cost_explorer / cloudformation.{' '}
+          <K>/aws/raw_call</K>.
+        </li>
+        <li>
+          <strong className="text-aegis-paper">gcp</strong> — cloudresourcemanager.projects.list /
+          compute.instances (list,get,start,stop,delete) / storage (buckets,objects) / bigquery /
+          cloudfunctions / iam.serviceaccounts / monitoring / logging. <K>/gcp/raw_call</K>.
+        </li>
+      </ul>
+
+      <h3 className="mt-8 font-display text-[22px] text-aegis-paper">raw_call escape hatch</h3>
+      <P>
+        First use of a new <K>(host, path_prefix)</K> tuple per customer always cosigns even if
+        Cedar would <K>permit</K> outright — the PDP keeps a seen-tuples sticky bit per workspace.
+        Add a tuple by approving it once via step-up.
+      </P>
+      <Code lang="cedar">{`permit (principal, action == Action::"/azure/raw_call", resource)
+when {
+  resource.method == "GET" &&
+  resource.host == "management.azure.com" &&
+  resource.path_prefix in ["/subscriptions", "/providers/Microsoft.Compute"] &&
+  context.cosigner_present == true
+};`}</Code>
+
+      <h3 className="mt-8 font-display text-[22px] text-aegis-paper">Audit + observability</h3>
+      <P>
+        Every cloud call lands as <strong>three</strong> audit rows (<K>cloud.token.minted</K>,{' '}
+        <K>cloud.federation.exchanged</K>, <K>cloud.call.allowed</K>) plus <strong>one</strong>{' '}
+        <K>agent_spans</K> row. All four carry <K>swarm_id</K>, <K>parent_receipt_id</K>,{' '}
+        <K>chain_depth</K>, and (on <K>cloud.call</K>) <K>api_call_method</K> + <K>api_call_path</K>{' '}
+        — so a delegated cloud call from a deep swarm node walks back to its root receipt the same
+        way a SaaS call would.
+      </P>
+      <P>
+        Visit <K>/app/swarms/{`{id}`}</K> after a cloud call: the ActionGraph + ActionTimeline
+        surface cloud spans alongside OAuth spans. The Audit drawer renders the cloud row with
+        method + path columns so resource_mismatch grep works without a jsonb scan.
+      </P>
+
+      <h3 className="mt-8 font-display text-[22px] text-aegis-paper">
+        Verify-poll worker (drift detection)
+      </h3>
+      <P>
+        A 24-hour timer probes every <K>verified</K> connection (Azure: <K>subscriptions.get</K>,
+        AWS: <K>sts:GetCallerIdentity</K>, GCP: <K>cloudresourcemanager:projects.get</K>).
+        Two-strike rule for retryable failures; non-retryable (role removed) flips to <K>broken</K>{' '}
+        immediately. Revert your Terraform-managed role by hand → the dashboard shows broken within
+        24 hours. The <K>Verify now</K> button runs the same probe on demand.
+      </P>
+
+      <h3 className="mt-8 font-display text-[22px] text-aegis-paper">Step-up + chain snapshots</h3>
+      <P>
+        Identical to SaaS. Cedar or <K>cloud-risk-rules</K> mark the call requiresStepUp → PDP
+        returns 403 <K>cosigner_required</K> → operator approves via push or <K>/app/approvals</K>→
+        agent retries with cosigner UCAN → allow. For multi-agent swarms, the snapshot approval from{' '}
+        <K>/app/swarms/{`{id}`}</K> covers every cloud call from any agent in the snapshot for the
+        TTL, no matter the depth.
+      </P>
+
+      <h3 className="mt-8 font-display text-[22px] text-aegis-paper">
+        Egress proxy — defense-in-depth gate
+      </h3>
+      <P>
+        Set <K>EGRESS_PROXY_REQUIRE_TOKEN_FOR_CLOUDS=1</K> and the egress proxy refuses CONNECTs to
+        <K>*.amazonaws.com</K> / <K>management.azure.com</K> / <K>*.googleapis.com</K> without a
+        PDP-issued proxy-authorization token. W3C <K>traceparent</K> passes through so egress
+        observations link back to the PDP audit row via trace ID.
+      </P>
+
+      <h3 className="mt-8 font-display text-[22px] text-aegis-paper">Operational checklist</h3>
+      <ul className="ml-6 list-disc space-y-1.5 marker:text-aegis-signal">
+        <li>
+          AWS KMS key created for the OIDC signing key (RS256), policy granting CP <K>kms:Sign</K>{' '}
+          only.
+        </li>
+        <li>
+          Cloudflare Worker for <K>id.auto-nomos.com</K> deployed (
+          <K>apps/oidc-issuer/wrangler.toml</K>); DNS pointed.
+        </li>
+        <li>
+          CP env: <K>OIDC_ISSUER_URL=https://id.auto-nomos.com</K>,{' '}
+          <K>OIDC_KMS_KEY_REF=arn:aws:kms:...</K>,{' '}
+          <K>PDP_WEBHOOK_URLS=https://pdp.auto-nomos.com/v1/internal/audit/emit-cloud</K>.
+        </li>
+        <li>
+          Migration <K>0028_cloud_iam_m0</K> applied (creates <K>oidc_issuer_keys</K> +{' '}
+          <K>cloud_connections</K>).
+        </li>
+        <li>
+          Customer runs <K>terraform apply</K> on the bootstrap module for their cloud, pastes
+          outputs into <K>/app/cloud/connect/{`{connector}`}</K>.
+        </li>
+        <li>
+          Dashboard shows <K>verified</K> → first agent call ready.
+        </li>
+      </ul>
+
+      <Callout tone="warn">
+        <strong className="text-aegis-paper">Beta:</strong> wire format + curated action surface
+        stable for one minor. <K>raw_call</K> seen-tuples table + cosigner-on-first-use semantics
+        will not change. Adding new typed actions never breaks existing ones.
+      </Callout>
+    </Section>
+  );
+}
+
 function Sdk() {
   return (
     <Section id="sdk" eyebrow="12 · integrate" title="SDK & MCP.">
@@ -1048,6 +1326,7 @@ export type TopicId =
   | 'standing-grants'
   | 'audit'
   | 'swarms'
+  | 'cloud'
   | 'sdk'
   | 'telegram'
   | 'faq';
@@ -1064,6 +1343,7 @@ const TOPIC_COMPONENTS: Record<TopicId, React.ComponentType> = {
   'standing-grants': StandingGrants,
   audit: AuditChain,
   swarms: Swarms,
+  cloud: CloudIam,
   sdk: Sdk,
   telegram: TelegramSetup,
   faq: Faq,

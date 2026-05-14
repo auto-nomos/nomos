@@ -15,6 +15,7 @@ const VALID_TOPICS = new Set<string>([
   'standing-grants',
   'audit',
   'swarms',
+  'cloud',
   'sdk',
   'telegram',
   'faq',
