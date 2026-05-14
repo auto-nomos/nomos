@@ -36,6 +36,8 @@ import {
 import { formatEnvelopeAsk } from '../../../../lib/format-envelope';
 import { trpc } from '../../../../lib/trpc';
 import { formatDate, shortId } from '../../../../lib/utils';
+import { ActionGraph } from '../../swarms/[id]/components/ActionGraph';
+import { ActionTimeline } from '../../swarms/[id]/components/ActionTimeline';
 
 export default function AgentDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -256,6 +258,9 @@ export default function AgentDetailPage({ params }: { params: Promise<{ id: stri
       </div>
 
       <AgentPoliciesCard agentId={id} />
+
+      <ActionGraph agentId={id} />
+      <ActionTimeline agentId={id} />
 
       <Card>
         <CardHeader>
