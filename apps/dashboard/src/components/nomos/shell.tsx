@@ -7,6 +7,7 @@ import {
   Boxes,
   ChevronsUpDown,
   CircleDot,
+  Cloud,
   Cog,
   FileLock2,
   Gauge,
@@ -48,6 +49,7 @@ const NAV_GROUPS: { id: string; label: string; items: NavItem[] }[] = [
       { href: '/app/agents', label: 'Apps', icon: Boxes, hint: 'agents + keys' },
       { href: '/app/policies', label: 'Policies', icon: FileLock2, hint: 'cedar + visual' },
       { href: '/app/connections', label: 'Connections', icon: Plug, hint: 'OAuth bridge' },
+      { href: '/app/cloud', label: 'Cloud accounts', icon: Cloud, hint: 'AWS / Azure / GCP' },
     ],
   },
   {
