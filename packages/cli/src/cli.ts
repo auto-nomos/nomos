@@ -1,3 +1,4 @@
+import { runCloudInstall } from './commands/cloud-install.js';
 import { type AgentClient, connectAgent } from './commands/connect-agent.js';
 import { runSetup } from './commands/setup.js';
 import { runStatus } from './commands/status.js';
@@ -17,6 +18,10 @@ Commands:
 
   cb tui
       Launch the terminal approval / audit UI.
+
+  cb cloud install --aws|--azure|--gcp --customer-id <id> [--in-cloud]
+      Print the Terraform snippet to bootstrap federated cloud IAM (M5/M1/M7),
+      or with --in-cloud, the Nomos sidecar variant (M10).
 
   cb help | --help | -h
       Show this help.
@@ -71,6 +76,15 @@ export async function run(argv: string[]): Promise<void> {
   }
   if (cmd === 'tui') {
     await runTui(argv.slice(1));
+    return;
+  }
+  if (cmd === 'cloud') {
+    const sub = argv[1];
+    if (sub !== 'install') {
+      process.stderr.write(`cb cloud: unknown subcommand '${sub ?? ''}' (expected: install)\n`);
+      process.exit(2);
+    }
+    await runCloudInstall(argv.slice(2));
     return;
   }
   process.stderr.write(`cb: unknown command '${cmd}'\n\n${HELP}`);

@@ -16,6 +16,12 @@ import {
   type ServerResponse,
 } from 'node:http';
 import { connect as netConnect, type Socket } from 'node:net';
+import {
+  type CloudEnforcementOptions,
+  checkCloudConnect,
+  type DetectedConnector,
+  detectCloudHost,
+} from './cloud-host.js';
 
 export interface EgressObservation {
   kind: 'connect' | 'http_request';
@@ -26,6 +32,8 @@ export interface EgressObservation {
   headers: Record<string, string>;
   /** Wall-clock timestamp. */
   ts: number;
+  /** M11 — populated when the target hostname matches a cloud API host. */
+  cloud?: { connector: DetectedConnector; service?: string; region?: string };
 }
 
 export type AuditFn = (obs: EgressObservation) => void;
@@ -35,6 +43,13 @@ export interface EgressProxyOptions {
   host?: string;
   audit: AuditFn;
   logger?: { info: (...a: unknown[]) => void; warn: (...a: unknown[]) => void };
+  /**
+   * M11 — recognize cloud API hosts (Azure ARM, *.amazonaws.com,
+   * *.googleapis.com). When `requireTokenForClouds` is set, CONNECTs
+   * to those hosts must carry the PDP-issued proxy-authorization token
+   * or are refused at the wire — defense-in-depth against a PDP bug.
+   */
+  cloud?: CloudEnforcementOptions;
 }
 
 const SENSITIVE_HEADERS = new Set([
@@ -117,11 +132,15 @@ export function createEgressProxy(opts: EgressProxyOptions): {
 
   server.on('connect', (req: IncomingMessage, clientSocket: Socket, head: Buffer) => {
     const target = req.url ?? '';
+    const [host, portStr] = target.split(':');
+    const port = Number(portStr ?? '443');
+    const cloudMatch = host ? detectCloudHost(host) : null;
     const obs: EgressObservation = {
       kind: 'connect',
       target,
       headers: sanitize(req.headers),
       ts: Date.now(),
+      ...(cloudMatch ? { cloud: cloudMatch } : {}),
     };
     try {
       opts.audit(obs);
@@ -129,11 +148,23 @@ export function createEgressProxy(opts: EgressProxyOptions): {
       log.warn('egress audit threw', err);
     }
 
-    const [host, portStr] = target.split(':');
-    const port = Number(portStr ?? '443');
     if (!host || !Number.isFinite(port)) {
       clientSocket.end('HTTP/1.1 400 Bad Request\r\n\r\n');
       return;
+    }
+
+    // M11 — cloud egress enforcement.
+    if (opts.cloud?.requireTokenForClouds) {
+      const verdict = checkCloudConnect(
+        host,
+        req.headers['proxy-authorization'] as string | undefined,
+        opts.cloud,
+      );
+      if (!verdict.allow) {
+        log.warn('cloud egress denied', { host, reason: verdict.reason });
+        clientSocket.end('HTTP/1.1 403 Forbidden\r\n\r\n');
+        return;
+      }
     }
 
     const upstream = netConnect(port, host, () => {
