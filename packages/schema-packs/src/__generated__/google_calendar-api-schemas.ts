@@ -5,7 +5,7 @@
 // This file is the apiCall floor for the PDP proxy. Hand-curated overrides
 // in <pack>/schemas.ts can tighten body shape further. See types.ts
 // `mergeActionSchemas` for how the two layers combine.
-// pack=google_calendar actions=13 mapped=13
+// pack=google_calendar actions=18 mapped=18
 
 import { z } from 'zod';
 import type { ActionSchemas } from '../types.js';
@@ -208,6 +208,71 @@ export const generated: Partial<Record<string, ActionSchemas>> = {
         })
         .passthrough()
         .optional(),
+      headers: z.record(z.string(), z.string()).optional(),
+    }),
+  },
+  '/google/calendar/meta/read': {
+    apiCallSchema: z.object({
+      method: z.literal('GET'),
+      path: safePath.refine(
+        (p) => /^\/users\/me\/calendarList\/.+$/.test(p),
+        'apiCall.path does not match action template /users/me/calendarList/{calendarId}',
+      ),
+      query: z.record(z.string(), z.string()).optional(),
+      body: z.unknown().optional(),
+      headers: z.record(z.string(), z.string()).optional(),
+    }),
+  },
+  '/google/calendar/acl/list': {
+    apiCallSchema: z.object({
+      method: z.literal('GET'),
+      path: safePath.refine(
+        (p) => /^\/calendars\/[^/]+\/acl$/.test(p),
+        'apiCall.path does not match action template /calendars/{calendarId}/acl',
+      ),
+      query: z.record(z.string(), z.string()).optional(),
+      body: z.unknown().optional(),
+      headers: z.record(z.string(), z.string()).optional(),
+    }),
+  },
+  '/google/calendar/settings/read': {
+    apiCallSchema: z.object({
+      method: z.literal('GET'),
+      path: safePath.refine(
+        (p) => /^\/users\/me\/settings$/.test(p),
+        'apiCall.path does not match action template /users/me/settings',
+      ),
+      query: z.record(z.string(), z.string()).optional(),
+      body: z.unknown().optional(),
+      headers: z.record(z.string(), z.string()).optional(),
+    }),
+  },
+  '/google/calendar/event/respond': {
+    apiCallSchema: z.object({
+      method: z.literal('PATCH'),
+      path: safePath.refine(
+        (p) => /^\/calendars\/[^/]+\/events\/.+$/.test(p),
+        'apiCall.path does not match action template /calendars/{calendarId}/events/{eventId}',
+      ),
+      query: z.record(z.string(), z.string()).optional(),
+      body: z
+        .object({
+          attendees: z.array(z.unknown()),
+        })
+        .passthrough()
+        .optional(),
+      headers: z.record(z.string(), z.string()).optional(),
+    }),
+  },
+  '/google/calendar/list/clear': {
+    apiCallSchema: z.object({
+      method: z.literal('POST'),
+      path: safePath.refine(
+        (p) => /^\/calendars\/[^/]+\/clear$/.test(p),
+        'apiCall.path does not match action template /calendars/{calendarId}/clear',
+      ),
+      query: z.record(z.string(), z.string()).optional(),
+      body: z.unknown().optional(),
       headers: z.record(z.string(), z.string()).optional(),
     }),
   },

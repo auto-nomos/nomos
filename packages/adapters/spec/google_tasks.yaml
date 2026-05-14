@@ -97,3 +97,54 @@ actions:
     params:
       - { name: tasklist, in: path, required: true, type: string }
       - { name: task, in: path, required: true, type: string }
+
+  - id: move_task
+    description: Move a task within its tasklist or to a new parent.
+    expected_use: Reorder tasks or nest a subtask under another.
+    auto_execute: false
+    required_scopes: [https://www.googleapis.com/auth/tasks]
+    risk: { category: write, sensitivity: low }
+    http:
+      method: POST
+      path: "/lists/{tasklist}/tasks/{task}/move"
+    params:
+      - { name: tasklist, in: path, required: true, type: string }
+      - { name: task, in: path, required: true, type: string }
+      - { name: parent, in: query, type: string }
+      - { name: previous, in: query, type: string }
+
+  - id: clear_completed
+    description: Clear all completed tasks from a tasklist.
+    expected_use: Tidy a list after a sprint.
+    auto_execute: false
+    required_scopes: [https://www.googleapis.com/auth/tasks]
+    risk: { category: delete, sensitivity: medium }
+    http:
+      method: POST
+      path: "/lists/{tasklist}/clear"
+    params:
+      - { name: tasklist, in: path, required: true, type: string }
+
+  - id: create_tasklist
+    description: Create a new tasklist.
+    expected_use: Organize tasks under a new project.
+    auto_execute: false
+    required_scopes: [https://www.googleapis.com/auth/tasks]
+    risk: { category: write, sensitivity: low }
+    http:
+      method: POST
+      path: "/users/@me/lists"
+    params:
+      - { name: title, in: body, required: true, type: string }
+
+  - id: delete_tasklist
+    description: Delete a tasklist (and all its tasks).
+    expected_use: Retire a tasklist after a project completes.
+    auto_execute: false
+    required_scopes: [https://www.googleapis.com/auth/tasks]
+    risk: { category: delete, sensitivity: high }
+    http:
+      method: DELETE
+      path: "/users/@me/lists/{tasklist}"
+    params:
+      - { name: tasklist, in: path, required: true, type: string }

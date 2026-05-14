@@ -5,7 +5,7 @@
 // This file is the apiCall floor for the PDP proxy. Hand-curated overrides
 // in <pack>/schemas.ts can tighten body shape further. See types.ts
 // `mergeActionSchemas` for how the two layers combine.
-// pack=slack actions=20 mapped=20
+// pack=slack actions=26 mapped=26
 
 import { z } from 'zod';
 import type { ActionSchemas } from '../types.js';
@@ -357,6 +357,103 @@ export const generated: Partial<Record<string, ActionSchemas>> = {
           channel: z.string().min(1),
           timestamp: z.string().min(1),
           name: z.string().min(1),
+        })
+        .passthrough()
+        .optional(),
+      headers: z.record(z.string(), z.string()).optional(),
+    }),
+  },
+  '/slack/channel/archive': {
+    apiCallSchema: z.object({
+      method: z.literal('POST'),
+      path: safePath.refine(
+        (p) => /^\/conversations\.archive$/.test(p),
+        'apiCall.path does not match action template /conversations.archive',
+      ),
+      query: z.record(z.string(), z.string()).optional(),
+      body: z
+        .object({
+          channel: z.string().min(1),
+        })
+        .passthrough()
+        .optional(),
+      headers: z.record(z.string(), z.string()).optional(),
+    }),
+  },
+  '/slack/channel/unarchive': {
+    apiCallSchema: z.object({
+      method: z.literal('POST'),
+      path: safePath.refine(
+        (p) => /^\/conversations\.unarchive$/.test(p),
+        'apiCall.path does not match action template /conversations.unarchive',
+      ),
+      query: z.record(z.string(), z.string()).optional(),
+      body: z
+        .object({
+          channel: z.string().min(1),
+        })
+        .passthrough()
+        .optional(),
+      headers: z.record(z.string(), z.string()).optional(),
+    }),
+  },
+  '/slack/file/list': {
+    apiCallSchema: z.object({
+      method: z.literal('GET'),
+      path: safePath.refine(
+        (p) => /^\/files\.list$/.test(p),
+        'apiCall.path does not match action template /files.list',
+      ),
+      query: z.record(z.string(), z.string()).optional(),
+      body: z.unknown().optional(),
+      headers: z.record(z.string(), z.string()).optional(),
+    }),
+  },
+  '/slack/file/delete': {
+    apiCallSchema: z.object({
+      method: z.literal('POST'),
+      path: safePath.refine(
+        (p) => /^\/files\.delete$/.test(p),
+        'apiCall.path does not match action template /files.delete',
+      ),
+      query: z.record(z.string(), z.string()).optional(),
+      body: z
+        .object({
+          file: z.string().min(1),
+        })
+        .passthrough()
+        .optional(),
+      headers: z.record(z.string(), z.string()).optional(),
+    }),
+  },
+  '/slack/file/read': {
+    apiCallSchema: z.object({
+      method: z.literal('GET'),
+      path: safePath.refine(
+        (p) => /^\/files\.info$/.test(p),
+        'apiCall.path does not match action template /files.info',
+      ),
+      query: z
+        .object({
+          file: z.string(),
+        })
+        .catchall(z.string())
+        .optional(),
+      body: z.unknown().optional(),
+      headers: z.record(z.string(), z.string()).optional(),
+    }),
+  },
+  '/slack/channel/leave': {
+    apiCallSchema: z.object({
+      method: z.literal('POST'),
+      path: safePath.refine(
+        (p) => /^\/conversations\.leave$/.test(p),
+        'apiCall.path does not match action template /conversations.leave',
+      ),
+      query: z.record(z.string(), z.string()).optional(),
+      body: z
+        .object({
+          channel: z.string().min(1),
         })
         .passthrough()
         .optional(),

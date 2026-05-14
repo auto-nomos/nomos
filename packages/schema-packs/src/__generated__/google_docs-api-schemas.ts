@@ -5,7 +5,7 @@
 // This file is the apiCall floor for the PDP proxy. Hand-curated overrides
 // in <pack>/schemas.ts can tighten body shape further. See types.ts
 // `mergeActionSchemas` for how the two layers combine.
-// pack=google_docs actions=4 mapped=4
+// pack=google_docs actions=11 mapped=11
 
 import { z } from 'zod';
 import type { ActionSchemas } from '../types.js';
@@ -79,6 +79,120 @@ export const generated: Partial<Record<string, ActionSchemas>> = {
         })
         .passthrough()
         .optional(),
+      headers: z.record(z.string(), z.string()).optional(),
+    }),
+  },
+  '/google/docs/document/insert_text': {
+    apiCallSchema: z.object({
+      method: z.literal('POST'),
+      path: safePath.refine(
+        (p) => /^\/documents\/[^/]+:batchUpdate$/.test(p),
+        'apiCall.path does not match action template /documents/{documentId}:batchUpdate',
+      ),
+      query: z.record(z.string(), z.string()).optional(),
+      body: z
+        .object({
+          requests: z.array(z.unknown()),
+        })
+        .passthrough()
+        .optional(),
+      headers: z.record(z.string(), z.string()).optional(),
+    }),
+  },
+  '/google/docs/document/delete_text': {
+    apiCallSchema: z.object({
+      method: z.literal('POST'),
+      path: safePath.refine(
+        (p) => /^\/documents\/[^/]+:batchUpdate$/.test(p),
+        'apiCall.path does not match action template /documents/{documentId}:batchUpdate',
+      ),
+      query: z.record(z.string(), z.string()).optional(),
+      body: z
+        .object({
+          requests: z.array(z.unknown()),
+        })
+        .passthrough()
+        .optional(),
+      headers: z.record(z.string(), z.string()).optional(),
+    }),
+  },
+  '/google/docs/document/format_text': {
+    apiCallSchema: z.object({
+      method: z.literal('POST'),
+      path: safePath.refine(
+        (p) => /^\/documents\/[^/]+:batchUpdate$/.test(p),
+        'apiCall.path does not match action template /documents/{documentId}:batchUpdate',
+      ),
+      query: z.record(z.string(), z.string()).optional(),
+      body: z
+        .object({
+          requests: z.array(z.unknown()),
+        })
+        .passthrough()
+        .optional(),
+      headers: z.record(z.string(), z.string()).optional(),
+    }),
+  },
+  '/google/docs/document/insert_table': {
+    apiCallSchema: z.object({
+      method: z.literal('POST'),
+      path: safePath.refine(
+        (p) => /^\/documents\/[^/]+:batchUpdate$/.test(p),
+        'apiCall.path does not match action template /documents/{documentId}:batchUpdate',
+      ),
+      query: z.record(z.string(), z.string()).optional(),
+      body: z
+        .object({
+          requests: z.array(z.unknown()),
+        })
+        .passthrough()
+        .optional(),
+      headers: z.record(z.string(), z.string()).optional(),
+    }),
+  },
+  '/google/docs/document/insert_image': {
+    apiCallSchema: z.object({
+      method: z.literal('POST'),
+      path: safePath.refine(
+        (p) => /^\/documents\/[^/]+:batchUpdate$/.test(p),
+        'apiCall.path does not match action template /documents/{documentId}:batchUpdate',
+      ),
+      query: z.record(z.string(), z.string()).optional(),
+      body: z
+        .object({
+          requests: z.array(z.unknown()),
+        })
+        .passthrough()
+        .optional(),
+      headers: z.record(z.string(), z.string()).optional(),
+    }),
+  },
+  '/google/docs/document/named_range/create': {
+    apiCallSchema: z.object({
+      method: z.literal('POST'),
+      path: safePath.refine(
+        (p) => /^\/documents\/[^/]+:batchUpdate$/.test(p),
+        'apiCall.path does not match action template /documents/{documentId}:batchUpdate',
+      ),
+      query: z.record(z.string(), z.string()).optional(),
+      body: z
+        .object({
+          requests: z.array(z.unknown()),
+        })
+        .passthrough()
+        .optional(),
+      headers: z.record(z.string(), z.string()).optional(),
+    }),
+  },
+  '/google/docs/document/revisions/read': {
+    apiCallSchema: z.object({
+      method: z.literal('GET'),
+      path: safePath.refine(
+        (p) => /^\/documents\/.+$/.test(p),
+        'apiCall.path does not match action template /documents/{documentId}',
+      ),
+      query: z.record(z.string(), z.string()).optional(),
+      body: z.unknown().optional(),
       headers: z.record(z.string(), z.string()).optional(),
     }),
   },

@@ -68,6 +68,96 @@ actions:
       - { name: replaceText, in: body, required: true, type: string }
       - { name: matchCase, in: body, type: boolean, default: false }
 
+  - id: insert_text
+    description: Insert text at a specific location via batchUpdate.
+    expected_use: Append a heading or paragraph to a doc.
+    auto_execute: false
+    required_scopes: [https://www.googleapis.com/auth/documents]
+    risk: { category: write, sensitivity: medium }
+    http:
+      method: POST
+      path: "/documents/{documentId}:batchUpdate"
+    params:
+      - { name: documentId, in: path, required: true, type: string }
+      - { name: requests, in: body, required: true, type: array }
+
+  - id: delete_text
+    description: Delete a range of text via batchUpdate.
+    expected_use: Remove a section of the document.
+    auto_execute: false
+    required_scopes: [https://www.googleapis.com/auth/documents]
+    risk: { category: delete, sensitivity: medium }
+    http:
+      method: POST
+      path: "/documents/{documentId}:batchUpdate"
+    params:
+      - { name: documentId, in: path, required: true, type: string }
+      - { name: requests, in: body, required: true, type: array }
+
+  - id: format_text
+    description: Apply formatting (bold, italic, link) to a text range.
+    expected_use: Highlight key passages.
+    auto_execute: false
+    required_scopes: [https://www.googleapis.com/auth/documents]
+    risk: { category: write, sensitivity: low }
+    http:
+      method: POST
+      path: "/documents/{documentId}:batchUpdate"
+    params:
+      - { name: documentId, in: path, required: true, type: string }
+      - { name: requests, in: body, required: true, type: array }
+
+  - id: insert_table
+    description: Insert a table into the document.
+    expected_use: Add a structured table for data presentation.
+    auto_execute: false
+    required_scopes: [https://www.googleapis.com/auth/documents]
+    risk: { category: write, sensitivity: low }
+    http:
+      method: POST
+      path: "/documents/{documentId}:batchUpdate"
+    params:
+      - { name: documentId, in: path, required: true, type: string }
+      - { name: requests, in: body, required: true, type: array }
+
+  - id: insert_image
+    description: Insert an image into the document.
+    expected_use: Add a generated diagram or chart.
+    auto_execute: false
+    required_scopes: [https://www.googleapis.com/auth/documents]
+    risk: { category: write, sensitivity: low }
+    http:
+      method: POST
+      path: "/documents/{documentId}:batchUpdate"
+    params:
+      - { name: documentId, in: path, required: true, type: string }
+      - { name: requests, in: body, required: true, type: array }
+
+  - id: create_named_range
+    description: Create a named range for later reference.
+    expected_use: Mark a section for programmatic re-edit.
+    auto_execute: false
+    required_scopes: [https://www.googleapis.com/auth/documents]
+    risk: { category: write, sensitivity: low }
+    http:
+      method: POST
+      path: "/documents/{documentId}:batchUpdate"
+    params:
+      - { name: documentId, in: path, required: true, type: string }
+      - { name: requests, in: body, required: true, type: array }
+
+  - id: get_revisions
+    description: List revisions of the document (via Drive API).
+    expected_use: Audit recent edits.
+    auto_execute: true
+    required_scopes: [https://www.googleapis.com/auth/drive.readonly]
+    risk: { category: read, sensitivity: medium }
+    http:
+      method: GET
+      path: "/documents/{documentId}"
+    params:
+      - { name: documentId, in: path, required: true, type: string }
+
 notes: |
   - Google Docs uses the shared google OAuth connector. Scope must include
     `https://www.googleapis.com/auth/documents` to permit writes.

@@ -15,6 +15,14 @@ export const actionToCommand: Record<string, string> = {
   list_labels: '/google/gmail/label/list',
   create_draft: '/google/gmail/draft/create',
   get_profile: '/google/gmail/profile/read',
+  list_drafts: '/google/gmail/draft/list',
+  send_draft: '/google/gmail/draft/send',
+  delete_draft: '/google/gmail/draft/delete',
+  get_draft: '/google/gmail/draft/read',
+  create_label: '/google/gmail/label/create',
+  delete_label: '/google/gmail/label/delete',
+  untrash_message: '/google/gmail/message/untrash',
+  get_label: '/google/gmail/label/read',
 };
 
 export function resourceFor(
@@ -30,13 +38,23 @@ export function resourceFor(
     case 'send_message':
     case 'create_draft':
     case 'get_profile':
+    case 'list_drafts':
+    case 'create_label':
       return {};
     case 'get_message':
     case 'trash_message':
     case 'modify_message':
+    case 'untrash_message':
       return id ? { message: id } : {};
     case 'get_thread':
       return id ? { thread: id } : {};
+    case 'send_draft':
+    case 'get_draft':
+    case 'delete_draft':
+      return id ? { draft: id } : {};
+    case 'get_label':
+    case 'delete_label':
+      return id ? { label: id } : {};
     default:
       return {};
   }

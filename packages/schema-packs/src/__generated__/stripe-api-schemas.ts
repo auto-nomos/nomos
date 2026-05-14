@@ -5,7 +5,7 @@
 // This file is the apiCall floor for the PDP proxy. Hand-curated overrides
 // in <pack>/schemas.ts can tighten body shape further. See types.ts
 // `mergeActionSchemas` for how the two layers combine.
-// pack=stripe actions=23 mapped=23
+// pack=stripe actions=26 mapped=26
 
 import { z } from 'zod';
 import type { ActionSchemas } from '../types.js';
@@ -305,6 +305,42 @@ export const generated: Partial<Record<string, ActionSchemas>> = {
       path: safePath.refine(
         (p) => /^\/balance_transactions$/.test(p),
         'apiCall.path does not match action template /balance_transactions',
+      ),
+      query: z.record(z.string(), z.string()).optional(),
+      body: z.unknown().optional(),
+      headers: z.record(z.string(), z.string()).optional(),
+    }),
+  },
+  '/stripe/balance/read': {
+    apiCallSchema: z.object({
+      method: z.literal('GET'),
+      path: safePath.refine(
+        (p) => /^\/balance$/.test(p),
+        'apiCall.path does not match action template /balance',
+      ),
+      query: z.record(z.string(), z.string()).optional(),
+      body: z.unknown().optional(),
+      headers: z.record(z.string(), z.string()).optional(),
+    }),
+  },
+  '/stripe/setup_intent/list': {
+    apiCallSchema: z.object({
+      method: z.literal('GET'),
+      path: safePath.refine(
+        (p) => /^\/setup_intents$/.test(p),
+        'apiCall.path does not match action template /setup_intents',
+      ),
+      query: z.record(z.string(), z.string()).optional(),
+      body: z.unknown().optional(),
+      headers: z.record(z.string(), z.string()).optional(),
+    }),
+  },
+  '/stripe/refund/list': {
+    apiCallSchema: z.object({
+      method: z.literal('GET'),
+      path: safePath.refine(
+        (p) => /^\/refunds$/.test(p),
+        'apiCall.path does not match action template /refunds',
       ),
       query: z.record(z.string(), z.string()).optional(),
       body: z.unknown().optional(),

@@ -5,7 +5,7 @@
 // This file is the apiCall floor for the PDP proxy. Hand-curated overrides
 // in <pack>/schemas.ts can tighten body shape further. See types.ts
 // `mergeActionSchemas` for how the two layers combine.
-// pack=linear actions=17 mapped=17
+// pack=linear actions=23 mapped=23
 
 import { z } from 'zod';
 import type { ActionSchemas } from '../types.js';
@@ -261,6 +261,90 @@ export const generated: Partial<Record<string, ActionSchemas>> = {
         .object({
           query: z.string().min(1),
           variables: z.record(z.string(), z.unknown()),
+        })
+        .passthrough()
+        .optional(),
+      headers: z.record(z.string(), z.string()).optional(),
+    }),
+  },
+  '/linear/issue/assign': {
+    apiCallSchema: z.object({
+      method: z.literal('POST'),
+      path: safePath.refine((p) => /^\/$/.test(p), 'apiCall.path does not match action template /'),
+      query: z.record(z.string(), z.string()).optional(),
+      body: z
+        .object({
+          query: z.string().min(1),
+        })
+        .passthrough()
+        .optional(),
+      headers: z.record(z.string(), z.string()).optional(),
+    }),
+  },
+  '/linear/project/archive': {
+    apiCallSchema: z.object({
+      method: z.literal('POST'),
+      path: safePath.refine((p) => /^\/$/.test(p), 'apiCall.path does not match action template /'),
+      query: z.record(z.string(), z.string()).optional(),
+      body: z
+        .object({
+          query: z.string().min(1),
+        })
+        .passthrough()
+        .optional(),
+      headers: z.record(z.string(), z.string()).optional(),
+    }),
+  },
+  '/linear/cycle/list': {
+    apiCallSchema: z.object({
+      method: z.literal('POST'),
+      path: safePath.refine((p) => /^\/$/.test(p), 'apiCall.path does not match action template /'),
+      query: z.record(z.string(), z.string()).optional(),
+      body: z
+        .object({
+          query: z.string().min(1),
+        })
+        .passthrough()
+        .optional(),
+      headers: z.record(z.string(), z.string()).optional(),
+    }),
+  },
+  '/linear/team/read': {
+    apiCallSchema: z.object({
+      method: z.literal('POST'),
+      path: safePath.refine((p) => /^\/$/.test(p), 'apiCall.path does not match action template /'),
+      query: z.record(z.string(), z.string()).optional(),
+      body: z
+        .object({
+          query: z.string().min(1),
+        })
+        .passthrough()
+        .optional(),
+      headers: z.record(z.string(), z.string()).optional(),
+    }),
+  },
+  '/linear/comment/create': {
+    apiCallSchema: z.object({
+      method: z.literal('POST'),
+      path: safePath.refine((p) => /^\/$/.test(p), 'apiCall.path does not match action template /'),
+      query: z.record(z.string(), z.string()).optional(),
+      body: z
+        .object({
+          query: z.string().min(1),
+        })
+        .passthrough()
+        .optional(),
+      headers: z.record(z.string(), z.string()).optional(),
+    }),
+  },
+  '/linear/issue/move': {
+    apiCallSchema: z.object({
+      method: z.literal('POST'),
+      path: safePath.refine((p) => /^\/$/.test(p), 'apiCall.path does not match action template /'),
+      query: z.record(z.string(), z.string()).optional(),
+      body: z
+        .object({
+          query: z.string().min(1),
         })
         .passthrough()
         .optional(),

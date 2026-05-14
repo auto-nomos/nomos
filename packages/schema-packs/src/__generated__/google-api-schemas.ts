@@ -5,7 +5,7 @@
 // This file is the apiCall floor for the PDP proxy. Hand-curated overrides
 // in <pack>/schemas.ts can tighten body shape further. See types.ts
 // `mergeActionSchemas` for how the two layers combine.
-// pack=google actions=15 mapped=15
+// pack=google actions=20 mapped=20
 
 import { z } from 'zod';
 import type { ActionSchemas } from '../types.js';
@@ -213,6 +213,81 @@ export const generated: Partial<Record<string, ActionSchemas>> = {
     }),
   },
   '/google/drive/quota/read': {
+    apiCallSchema: z.object({
+      method: z.literal('GET'),
+      path: safePath.refine(
+        (p) => /^\/about$/.test(p),
+        'apiCall.path does not match action template /about',
+      ),
+      query: z.record(z.string(), z.string()).optional(),
+      body: z.unknown().optional(),
+      headers: z.record(z.string(), z.string()).optional(),
+    }),
+  },
+  '/google/drive/trash': {
+    apiCallSchema: z.object({
+      method: z.literal('PATCH'),
+      path: safePath.refine(
+        (p) => /^\/files\/.+$/.test(p),
+        'apiCall.path does not match action template /files/{fileId}',
+      ),
+      query: z.record(z.string(), z.string()).optional(),
+      body: z
+        .object({
+          trashed: z.boolean(),
+        })
+        .passthrough()
+        .optional(),
+      headers: z.record(z.string(), z.string()).optional(),
+    }),
+  },
+  '/google/drive/untrash': {
+    apiCallSchema: z.object({
+      method: z.literal('PATCH'),
+      path: safePath.refine(
+        (p) => /^\/files\/.+$/.test(p),
+        'apiCall.path does not match action template /files/{fileId}',
+      ),
+      query: z.record(z.string(), z.string()).optional(),
+      body: z
+        .object({
+          trashed: z.boolean(),
+        })
+        .passthrough()
+        .optional(),
+      headers: z.record(z.string(), z.string()).optional(),
+    }),
+  },
+  '/google/drive/change/list': {
+    apiCallSchema: z.object({
+      method: z.literal('GET'),
+      path: safePath.refine(
+        (p) => /^\/changes$/.test(p),
+        'apiCall.path does not match action template /changes',
+      ),
+      query: z
+        .object({
+          pageToken: z.string(),
+        })
+        .catchall(z.string())
+        .optional(),
+      body: z.unknown().optional(),
+      headers: z.record(z.string(), z.string()).optional(),
+    }),
+  },
+  '/google/drive/revision/read': {
+    apiCallSchema: z.object({
+      method: z.literal('GET'),
+      path: safePath.refine(
+        (p) => /^\/files\/[^/]+\/revisions\/.+$/.test(p),
+        'apiCall.path does not match action template /files/{fileId}/revisions/{revisionId}',
+      ),
+      query: z.record(z.string(), z.string()).optional(),
+      body: z.unknown().optional(),
+      headers: z.record(z.string(), z.string()).optional(),
+    }),
+  },
+  '/google/drive/about/read': {
     apiCallSchema: z.object({
       method: z.literal('GET'),
       path: safePath.refine(

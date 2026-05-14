@@ -253,6 +253,58 @@ actions:
       path: "/users/me"
     params: []
 
+  - id: archive_page
+    description: Archive a Notion page (soft-delete).
+    expected_use: Retire a completed page without losing data.
+    auto_execute: false
+    required_scopes: []
+    risk: { category: delete, sensitivity: medium }
+    http:
+      method: PATCH
+      path: "/pages/{page_id}"
+    params:
+      - { name: page_id, in: path, required: true, type: string }
+      - { name: archived, in: body, required: true, type: boolean, default: true }
+
+  - id: search_pages
+    description: Search pages by query string.
+    expected_use: Find a page by title or content.
+    auto_execute: true
+    required_scopes: []
+    risk: { category: search, sensitivity: medium }
+    http:
+      method: POST
+      path: "/search"
+    params:
+      - { name: query, in: body, required: true, type: string }
+      - { name: filter, in: body, type: object }
+
+  - id: restore_page
+    description: Restore an archived page.
+    expected_use: Recover a soft-deleted page.
+    auto_execute: false
+    required_scopes: []
+    risk: { category: write, sensitivity: medium }
+    http:
+      method: PATCH
+      path: "/pages/{page_id}"
+    params:
+      - { name: page_id, in: path, required: true, type: string }
+      - { name: archived, in: body, required: true, type: boolean, default: false }
+
+  - id: get_page_properties
+    description: Read a page's property values.
+    expected_use: Inspect database row metadata.
+    auto_execute: true
+    required_scopes: []
+    risk: { category: read, sensitivity: medium }
+    http:
+      method: GET
+      path: "/pages/{page_id}/properties/{property_id}"
+    params:
+      - { name: page_id, in: path, required: true, type: string }
+      - { name: property_id, in: path, required: true, type: string }
+
 notes: |
   Notion does not issue refresh tokens; access tokens are long-lived but the
   user can revoke them via Settings → Connected apps. Treat 401 as

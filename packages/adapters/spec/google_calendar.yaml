@@ -201,3 +201,64 @@ actions:
       - { name: description, in: body, type: string }
       - { name: attendees, in: body, type: array }
       - { name: location, in: body, type: string }
+
+  - id: get_calendar_meta
+    description: Get a calendar's metadata.
+    expected_use: Inspect a calendar's owner or access role.
+    auto_execute: true
+    required_scopes: [https://www.googleapis.com/auth/calendar.readonly]
+    risk: { category: read, sensitivity: low }
+    http:
+      method: GET
+      path: "/users/me/calendarList/{calendarId}"
+    params:
+      - { name: calendarId, in: path, required: true, type: string }
+
+  - id: list_acl
+    description: List the access control list for a calendar.
+    expected_use: Audit who can read/edit the calendar.
+    auto_execute: true
+    required_scopes: [https://www.googleapis.com/auth/calendar.readonly]
+    risk: { category: read, sensitivity: medium }
+    http:
+      method: GET
+      path: "/calendars/{calendarId}/acl"
+    params:
+      - { name: calendarId, in: path, required: true, type: string }
+
+  - id: get_settings
+    description: Read calendar user settings.
+    expected_use: Inspect default timezone and notification preferences.
+    auto_execute: true
+    required_scopes: [https://www.googleapis.com/auth/calendar.readonly]
+    risk: { category: read, sensitivity: low }
+    http:
+      method: GET
+      path: "/users/me/settings"
+    params: []
+
+  - id: respond_to_event
+    description: Set the calling user's RSVP status on an event.
+    expected_use: Accept, tentatively accept, or decline an invitation.
+    auto_execute: false
+    required_scopes: [https://www.googleapis.com/auth/calendar.events]
+    risk: { category: write, sensitivity: low }
+    http:
+      method: PATCH
+      path: "/calendars/{calendarId}/events/{eventId}"
+    params:
+      - { name: calendarId, in: path, required: true, type: string }
+      - { name: eventId, in: path, required: true, type: string }
+      - { name: attendees, in: body, required: true, type: array }
+
+  - id: clear_calendar
+    description: Clear the primary calendar (delete all events). Destructive.
+    expected_use: Empty an automation-managed calendar before re-populating.
+    auto_execute: false
+    required_scopes: [https://www.googleapis.com/auth/calendar.events]
+    risk: { category: delete, sensitivity: high }
+    http:
+      method: POST
+      path: "/calendars/{calendarId}/clear"
+    params:
+      - { name: calendarId, in: path, required: true, type: string }

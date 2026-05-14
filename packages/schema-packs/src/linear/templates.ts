@@ -7,10 +7,12 @@ export const READS = [
   '/linear/project/read',
   '/linear/project/list',
   '/linear/team/list',
+  '/linear/team/read',
   '/linear/user/me',
   '/linear/user/list',
   '/linear/workflow_state/list',
   '/linear/label/list',
+  '/linear/cycle/list',
   '/linear/comment/list',
 ] as const;
 export const WRITES = [
@@ -18,10 +20,13 @@ export const WRITES = [
   '/linear/issue/comment',
   '/linear/issue/update',
   '/linear/issue/close',
+  '/linear/issue/assign',
+  '/linear/issue/move',
+  '/linear/comment/create',
   '/linear/project/create',
   '/linear/project/update',
 ] as const;
-export const DELETES = ['/linear/issue/delete'] as const;
+export const DELETES = ['/linear/issue/delete', '/linear/project/archive'] as const;
 export const actions = [...READS, ...WRITES, ...DELETES] as const;
 
 const READ_LIST = READS.map((a) => `Action::"${a}"`).join(', ');

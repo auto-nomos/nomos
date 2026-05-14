@@ -1,12 +1,21 @@
 import type { PolicyTemplate } from '../types.js';
 
-export const READS = ['/google/docs/document/read'] as const;
+export const READS = [
+  '/google/docs/document/read',
+  '/google/docs/document/revisions/read',
+] as const;
 export const WRITES = [
   '/google/docs/document/create',
   '/google/docs/document/batch_update',
   '/google/docs/document/replace_text',
+  '/google/docs/document/insert_text',
+  '/google/docs/document/format_text',
+  '/google/docs/document/insert_table',
+  '/google/docs/document/insert_image',
+  '/google/docs/document/named_range/create',
 ] as const;
-export const actions = [...READS, ...WRITES] as const;
+export const DELETES = ['/google/docs/document/delete_text'] as const;
+export const actions = [...READS, ...WRITES, ...DELETES] as const;
 
 const READ_LIST = READS.map((a) => `Action::"${a}"`).join(', ');
 const WRITE_LIST = WRITES.map((a) => `Action::"${a}"`).join(', ');

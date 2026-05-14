@@ -5,7 +5,7 @@
 // This file is the apiCall floor for the PDP proxy. Hand-curated overrides
 // in <pack>/schemas.ts can tighten body shape further. See types.ts
 // `mergeActionSchemas` for how the two layers combine.
-// pack=google_sheets actions=6 mapped=6
+// pack=google_sheets actions=11 mapped=11
 
 import { z } from 'zod';
 import type { ActionSchemas } from '../types.js';
@@ -104,6 +104,81 @@ export const generated: Partial<Record<string, ActionSchemas>> = {
       body: z
         .object({
           requests: z.array(z.unknown()),
+        })
+        .passthrough()
+        .optional(),
+      headers: z.record(z.string(), z.string()).optional(),
+    }),
+  },
+  '/google/sheets/values/clear': {
+    apiCallSchema: z.object({
+      method: z.literal('POST'),
+      path: safePath.refine(
+        (p) => /^\/spreadsheets\/[^/]+\/values\/[^/]+:clear$/.test(p),
+        'apiCall.path does not match action template /spreadsheets/{spreadsheetId}/values/{range}:clear',
+      ),
+      query: z.record(z.string(), z.string()).optional(),
+      body: z.unknown().optional(),
+      headers: z.record(z.string(), z.string()).optional(),
+    }),
+  },
+  '/google/sheets/values/batch_get': {
+    apiCallSchema: z.object({
+      method: z.literal('GET'),
+      path: safePath.refine(
+        (p) => /^\/spreadsheets\/[^/]+\/values:batchGet$/.test(p),
+        'apiCall.path does not match action template /spreadsheets/{spreadsheetId}/values:batchGet',
+      ),
+      query: z.record(z.string(), z.string()).optional(),
+      body: z.unknown().optional(),
+      headers: z.record(z.string(), z.string()).optional(),
+    }),
+  },
+  '/google/sheets/spreadsheet/copy': {
+    apiCallSchema: z.object({
+      method: z.literal('POST'),
+      path: safePath.refine(
+        (p) => /^\/spreadsheets\/[^/]+\/sheets\/[^/]+:copyTo$/.test(p),
+        'apiCall.path does not match action template /spreadsheets/{spreadsheetId}/sheets/{sheetId}:copyTo',
+      ),
+      query: z.record(z.string(), z.string()).optional(),
+      body: z
+        .object({
+          destinationSpreadsheetId: z.string().min(1),
+        })
+        .passthrough()
+        .optional(),
+      headers: z.record(z.string(), z.string()).optional(),
+    }),
+  },
+  '/google/sheets/metadata/list': {
+    apiCallSchema: z.object({
+      method: z.literal('POST'),
+      path: safePath.refine(
+        (p) => /^\/spreadsheets\/[^/]+\/developerMetadata:search$/.test(p),
+        'apiCall.path does not match action template /spreadsheets/{spreadsheetId}/developerMetadata:search',
+      ),
+      query: z.record(z.string(), z.string()).optional(),
+      body: z
+        .object({
+          dataFilters: z.array(z.unknown()),
+        })
+        .passthrough()
+        .optional(),
+      headers: z.record(z.string(), z.string()).optional(),
+    }),
+  },
+  '/google/sheets/values/batch_update': {
+    apiCallSchema: z.object({
+      method: z.literal('POST'),
+      path: safePath.refine(
+        (p) => /^\/spreadsheets\/[^/]+\/values:batchUpdate$/.test(p),
+        'apiCall.path does not match action template /spreadsheets/{spreadsheetId}/values:batchUpdate',
+      ),
+      query: z.record(z.string(), z.string()).optional(),
+      body: z
+        .object({
+          data: z.array(z.unknown()),
         })
         .passthrough()
         .optional(),

@@ -5,7 +5,7 @@
 // This file is the apiCall floor for the PDP proxy. Hand-curated overrides
 // in <pack>/schemas.ts can tighten body shape further. See types.ts
 // `mergeActionSchemas` for how the two layers combine.
-// pack=google_gmail actions=10 mapped=10
+// pack=google_gmail actions=18 mapped=18
 
 import { z } from 'zod';
 import type { ActionSchemas } from '../types.js';
@@ -142,6 +142,112 @@ export const generated: Partial<Record<string, ActionSchemas>> = {
       path: safePath.refine(
         (p) => /^\/users\/me\/profile$/.test(p),
         'apiCall.path does not match action template /users/me/profile',
+      ),
+      query: z.record(z.string(), z.string()).optional(),
+      body: z.unknown().optional(),
+      headers: z.record(z.string(), z.string()).optional(),
+    }),
+  },
+  '/google/gmail/draft/list': {
+    apiCallSchema: z.object({
+      method: z.literal('GET'),
+      path: safePath.refine(
+        (p) => /^\/users\/me\/drafts$/.test(p),
+        'apiCall.path does not match action template /users/me/drafts',
+      ),
+      query: z.record(z.string(), z.string()).optional(),
+      body: z.unknown().optional(),
+      headers: z.record(z.string(), z.string()).optional(),
+    }),
+  },
+  '/google/gmail/draft/send': {
+    apiCallSchema: z.object({
+      method: z.literal('POST'),
+      path: safePath.refine(
+        (p) => /^\/users\/me\/drafts\/send$/.test(p),
+        'apiCall.path does not match action template /users/me/drafts/send',
+      ),
+      query: z.record(z.string(), z.string()).optional(),
+      body: z
+        .object({
+          id: z.string().min(1),
+        })
+        .passthrough()
+        .optional(),
+      headers: z.record(z.string(), z.string()).optional(),
+    }),
+  },
+  '/google/gmail/draft/delete': {
+    apiCallSchema: z.object({
+      method: z.literal('DELETE'),
+      path: safePath.refine(
+        (p) => /^\/users\/me\/drafts\/.+$/.test(p),
+        'apiCall.path does not match action template /users/me/drafts/{id}',
+      ),
+      query: z.record(z.string(), z.string()).optional(),
+      body: z.unknown().optional(),
+      headers: z.record(z.string(), z.string()).optional(),
+    }),
+  },
+  '/google/gmail/draft/read': {
+    apiCallSchema: z.object({
+      method: z.literal('GET'),
+      path: safePath.refine(
+        (p) => /^\/users\/me\/drafts\/.+$/.test(p),
+        'apiCall.path does not match action template /users/me/drafts/{id}',
+      ),
+      query: z.record(z.string(), z.string()).optional(),
+      body: z.unknown().optional(),
+      headers: z.record(z.string(), z.string()).optional(),
+    }),
+  },
+  '/google/gmail/label/create': {
+    apiCallSchema: z.object({
+      method: z.literal('POST'),
+      path: safePath.refine(
+        (p) => /^\/users\/me\/labels$/.test(p),
+        'apiCall.path does not match action template /users/me/labels',
+      ),
+      query: z.record(z.string(), z.string()).optional(),
+      body: z
+        .object({
+          name: z.string().min(1),
+        })
+        .passthrough()
+        .optional(),
+      headers: z.record(z.string(), z.string()).optional(),
+    }),
+  },
+  '/google/gmail/label/delete': {
+    apiCallSchema: z.object({
+      method: z.literal('DELETE'),
+      path: safePath.refine(
+        (p) => /^\/users\/me\/labels\/.+$/.test(p),
+        'apiCall.path does not match action template /users/me/labels/{id}',
+      ),
+      query: z.record(z.string(), z.string()).optional(),
+      body: z.unknown().optional(),
+      headers: z.record(z.string(), z.string()).optional(),
+    }),
+  },
+  '/google/gmail/message/untrash': {
+    apiCallSchema: z.object({
+      method: z.literal('POST'),
+      path: safePath.refine(
+        (p) => /^\/users\/me\/messages\/[^/]+\/untrash$/.test(p),
+        'apiCall.path does not match action template /users/me/messages/{id}/untrash',
+      ),
+      query: z.record(z.string(), z.string()).optional(),
+      body: z.unknown().optional(),
+      headers: z.record(z.string(), z.string()).optional(),
+    }),
+  },
+  '/google/gmail/label/read': {
+    apiCallSchema: z.object({
+      method: z.literal('GET'),
+      path: safePath.refine(
+        (p) => /^\/users\/me\/labels\/.+$/.test(p),
+        'apiCall.path does not match action template /users/me/labels/{id}',
       ),
       query: z.record(z.string(), z.string()).optional(),
       body: z.unknown().optional(),

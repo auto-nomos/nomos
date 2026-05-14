@@ -21,6 +21,11 @@ export const actionToCommand: Record<string, string> = {
   delete_permission: '/google/drive/permission/delete',
   list_revisions: '/google/drive/revision/list',
   get_storage_quota: '/google/drive/quota/read',
+  trash_file: '/google/drive/trash',
+  untrash_file: '/google/drive/untrash',
+  list_changes: '/google/drive/change/list',
+  get_revision: '/google/drive/revision/read',
+  get_about: '/google/drive/about/read',
 };
 
 export function resourceFor(
@@ -34,8 +39,7 @@ export function resourceFor(
         ? params.file_id
         : undefined;
 
-  const permissionId =
-    typeof params.permissionId === 'string' ? params.permissionId : undefined;
+  const permissionId = typeof params.permissionId === 'string' ? params.permissionId : undefined;
 
   switch (actionId) {
     case 'list_files':
@@ -43,7 +47,19 @@ export function resourceFor(
     case 'create_folder':
     case 'search_files':
     case 'get_storage_quota':
+    case 'list_changes':
+    case 'get_about':
       return {};
+    case 'get_revision': {
+      const revisionId = typeof params.revisionId === 'string' ? params.revisionId : undefined;
+      return {
+        ...(fileId ? { file_id: fileId } : {}),
+        ...(revisionId ? { revision_id: revisionId } : {}),
+      };
+    }
+    case 'trash_file':
+    case 'untrash_file':
+      return fileId ? { file_id: fileId } : {};
     case 'delete_permission':
       return {
         ...(fileId ? { file_id: fileId } : {}),

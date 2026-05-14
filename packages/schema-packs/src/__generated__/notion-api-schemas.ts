@@ -5,7 +5,7 @@
 // This file is the apiCall floor for the PDP proxy. Hand-curated overrides
 // in <pack>/schemas.ts can tighten body shape further. See types.ts
 // `mergeActionSchemas` for how the two layers combine.
-// pack=notion actions=18 mapped=18
+// pack=notion actions=22 mapped=22
 
 import { z } from 'zod';
 import type { ActionSchemas } from '../types.js';
@@ -262,6 +262,69 @@ export const generated: Partial<Record<string, ActionSchemas>> = {
       path: safePath.refine(
         (p) => /^\/users\/me$/.test(p),
         'apiCall.path does not match action template /users/me',
+      ),
+      query: z.record(z.string(), z.string()).optional(),
+      body: z.unknown().optional(),
+      headers: z.record(z.string(), z.string()).optional(),
+    }),
+  },
+  '/notion/page/archive': {
+    apiCallSchema: z.object({
+      method: z.literal('PATCH'),
+      path: safePath.refine(
+        (p) => /^\/pages\/.+$/.test(p),
+        'apiCall.path does not match action template /pages/{page_id}',
+      ),
+      query: z.record(z.string(), z.string()).optional(),
+      body: z
+        .object({
+          archived: z.boolean(),
+        })
+        .passthrough()
+        .optional(),
+      headers: z.record(z.string(), z.string()).optional(),
+    }),
+  },
+  '/notion/page/search': {
+    apiCallSchema: z.object({
+      method: z.literal('POST'),
+      path: safePath.refine(
+        (p) => /^\/search$/.test(p),
+        'apiCall.path does not match action template /search',
+      ),
+      query: z.record(z.string(), z.string()).optional(),
+      body: z
+        .object({
+          query: z.string().min(1),
+        })
+        .passthrough()
+        .optional(),
+      headers: z.record(z.string(), z.string()).optional(),
+    }),
+  },
+  '/notion/page/restore': {
+    apiCallSchema: z.object({
+      method: z.literal('PATCH'),
+      path: safePath.refine(
+        (p) => /^\/pages\/.+$/.test(p),
+        'apiCall.path does not match action template /pages/{page_id}',
+      ),
+      query: z.record(z.string(), z.string()).optional(),
+      body: z
+        .object({
+          archived: z.boolean(),
+        })
+        .passthrough()
+        .optional(),
+      headers: z.record(z.string(), z.string()).optional(),
+    }),
+  },
+  '/notion/page/property/read': {
+    apiCallSchema: z.object({
+      method: z.literal('GET'),
+      path: safePath.refine(
+        (p) => /^\/pages\/[^/]+\/properties\/.+$/.test(p),
+        'apiCall.path does not match action template /pages/{page_id}/properties/{property_id}',
       ),
       query: z.record(z.string(), z.string()).optional(),
       body: z.unknown().optional(),

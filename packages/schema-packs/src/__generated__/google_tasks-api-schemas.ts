@@ -5,7 +5,7 @@
 // This file is the apiCall floor for the PDP proxy. Hand-curated overrides
 // in <pack>/schemas.ts can tighten body shape further. See types.ts
 // `mergeActionSchemas` for how the two layers combine.
-// pack=google_tasks actions=6 mapped=6
+// pack=google_tasks actions=10 mapped=10
 
 import { z } from 'zod';
 import type { ActionSchemas } from '../types.js';
@@ -89,6 +89,59 @@ export const generated: Partial<Record<string, ActionSchemas>> = {
       path: safePath.refine(
         (p) => /^\/lists\/[^/]+\/tasks\/.+$/.test(p),
         'apiCall.path does not match action template /lists/{tasklist}/tasks/{task}',
+      ),
+      query: z.record(z.string(), z.string()).optional(),
+      body: z.unknown().optional(),
+      headers: z.record(z.string(), z.string()).optional(),
+    }),
+  },
+  '/google/tasks/task/move': {
+    apiCallSchema: z.object({
+      method: z.literal('POST'),
+      path: safePath.refine(
+        (p) => /^\/lists\/[^/]+\/tasks\/[^/]+\/move$/.test(p),
+        'apiCall.path does not match action template /lists/{tasklist}/tasks/{task}/move',
+      ),
+      query: z.record(z.string(), z.string()).optional(),
+      body: z.unknown().optional(),
+      headers: z.record(z.string(), z.string()).optional(),
+    }),
+  },
+  '/google/tasks/task/clear_completed': {
+    apiCallSchema: z.object({
+      method: z.literal('POST'),
+      path: safePath.refine(
+        (p) => /^\/lists\/[^/]+\/clear$/.test(p),
+        'apiCall.path does not match action template /lists/{tasklist}/clear',
+      ),
+      query: z.record(z.string(), z.string()).optional(),
+      body: z.unknown().optional(),
+      headers: z.record(z.string(), z.string()).optional(),
+    }),
+  },
+  '/google/tasks/tasklist/create': {
+    apiCallSchema: z.object({
+      method: z.literal('POST'),
+      path: safePath.refine(
+        (p) => /^\/users\/@me\/lists$/.test(p),
+        'apiCall.path does not match action template /users/@me/lists',
+      ),
+      query: z.record(z.string(), z.string()).optional(),
+      body: z
+        .object({
+          title: z.string().min(1),
+        })
+        .passthrough()
+        .optional(),
+      headers: z.record(z.string(), z.string()).optional(),
+    }),
+  },
+  '/google/tasks/tasklist/delete': {
+    apiCallSchema: z.object({
+      method: z.literal('DELETE'),
+      path: safePath.refine(
+        (p) => /^\/users\/@me\/lists\/.+$/.test(p),
+        'apiCall.path does not match action template /users/@me/lists/{tasklist}',
       ),
       query: z.record(z.string(), z.string()).optional(),
       body: z.unknown().optional(),

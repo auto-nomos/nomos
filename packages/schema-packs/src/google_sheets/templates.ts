@@ -3,14 +3,19 @@ import type { PolicyTemplate } from '../types.js';
 export const READS = [
   '/google/sheets/spreadsheet/read',
   '/google/sheets/values/read',
+  '/google/sheets/values/batch_get',
+  '/google/sheets/metadata/list',
 ] as const;
 export const WRITES = [
   '/google/sheets/spreadsheet/create',
   '/google/sheets/values/update',
   '/google/sheets/values/append',
+  '/google/sheets/values/batch_update',
   '/google/sheets/spreadsheet/batch_update',
+  '/google/sheets/spreadsheet/copy',
 ] as const;
-export const actions = [...READS, ...WRITES] as const;
+export const DELETES = ['/google/sheets/values/clear'] as const;
+export const actions = [...READS, ...WRITES, ...DELETES] as const;
 
 const READ_LIST = READS.map((a) => `Action::"${a}"`).join(', ');
 const WRITE_LIST = WRITES.map((a) => `Action::"${a}"`).join(', ');
