@@ -64,6 +64,16 @@ export const grantScopeEnum = pgEnum('grant_scope', ['exact', 'any']);
 export const riskScoreEnum = pgEnum('risk_score', ['low', 'medium', 'high']);
 export const agentPoliciesSourceEnum = pgEnum('agent_policies_source', ['manual', 'step_up']);
 
+// M0/M1 — Cloud IAM expansion. Cloud connections live in their own table
+// (see end of file) because federated auth has no encrypted tokens to store.
+export const cloudConnectorEnum = pgEnum('cloud_connector', ['azure', 'aws', 'gcp']);
+export const cloudBootstrapStatusEnum = pgEnum('cloud_bootstrap_status', [
+  'pending',
+  'verified',
+  'broken',
+]);
+export const oidcKeyStatusEnum = pgEnum('oidc_key_status', ['next', 'active', 'retired']);
+
 // ===== Better-Auth tables (auth identity) =====
 
 export const user = pgTable(
@@ -864,6 +874,81 @@ export const usageCounters = pgTable(
 export const usageCountersRelations = relations(usageCounters, ({ one }) => ({
   customer: one(customers, {
     fields: [usageCounters.customerId],
+    references: [customers.id],
+  }),
+}));
+
+// ===== M0: OIDC issuer keys =====
+
+/**
+ * Signing keys for the Nomos-hosted OIDC issuer at id.auto-nomos.com.
+ *
+ * One row per active/next/retired kid. Private key lives in AWS KMS — only
+ * the KMS key ARN is stored here. The Cloudflare Worker that serves /jwks.json
+ * reads this table directly; the control-plane mint endpoint signs via KMS.
+ *
+ * Rotation cadence: 90 days. Overlap window: publish `next` 14d before
+ * cutover, retire old 14d after.
+ */
+export const oidcIssuerKeys = pgTable(
+  'oidc_issuer_keys',
+  {
+    kid: text('kid').primaryKey(),
+    alg: text('alg').notNull(), // 'RS256' for AWS STS + Azure AD compatibility
+    publicJwk: jsonb('public_jwk').notNull(), // served verbatim in /jwks.json
+    kmsKeyRef: text('kms_key_ref').notNull(), // arn:aws:kms:...:key/<id>
+    status: oidcKeyStatusEnum('status').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    rotatedAt: timestamp('rotated_at', { withTimezone: true }),
+    retiredAt: timestamp('retired_at', { withTimezone: true }),
+  },
+  (t) => ({
+    statusIdx: index('oidc_issuer_keys_status_idx').on(t.status),
+  }),
+);
+
+// ===== M1: cloud connections =====
+
+/**
+ * Customer-cloud binding for federated IAM. No tokens stored — every request
+ * mints a fresh OIDC ID token and exchanges it with the cloud (STS / AAD /
+ * STS-GCP) per-request. config is per-provider shape:
+ *
+ *   Azure: { app_id, federation_subject_pattern, role_scope, default_rg? }
+ *   AWS:   { role_arn, oidc_provider_arn, region? }
+ *   GCP:   { wif_pool, wif_provider, service_account_email, project_id }
+ */
+export const cloudConnections = pgTable(
+  'cloud_connections',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    customerId: uuid('customer_id')
+      .notNull()
+      .references(() => customers.id, { onDelete: 'cascade' }),
+    connector: cloudConnectorEnum('connector').notNull(),
+    accountId: text('account_id').notNull(), // subscription_id | aws_account_id | project_id
+    tenantId: text('tenant_id'), // Azure-specific; null for AWS/GCP
+    externalId: text('external_id').notNull(), // app_object_id (Azure) | role_arn (AWS) | wif_provider (GCP)
+    displayName: text('display_name'),
+    config: jsonb('config').$type<Record<string, unknown>>().notNull(),
+    bootstrapStatus: cloudBootstrapStatusEnum('bootstrap_status').notNull().default('pending'),
+    lastVerifiedAt: timestamp('last_verified_at', { withTimezone: true }),
+    lastVerifyError: text('last_verify_error'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    customerIdx: index('cloud_connections_customer_idx').on(t.customerId),
+    customerConnectorIdx: index('cloud_connections_customer_connector_idx').on(
+      t.customerId,
+      t.connector,
+    ),
+  }),
+);
+
+export const cloudConnectionsRelations = relations(cloudConnections, ({ one }) => ({
+  customer: one(customers, {
+    fields: [cloudConnections.customerId],
     references: [customers.id],
   }),
 }));
