@@ -18,7 +18,7 @@ import { TRPCError } from '@trpc/server';
 import { and, eq } from 'drizzle-orm';
 import { z } from 'zod';
 import * as schema from '../../db/schema.js';
-import { router, tenantProcedure } from '../index.js';
+import { router, withPermission } from '../index.js';
 
 const cloudConnectorId = z.enum(['azure', 'aws', 'gcp']);
 
@@ -38,7 +38,7 @@ const updateInput = z.object({
 });
 
 export const cloudConnectionsRouter = router({
-  list: tenantProcedure.query(async ({ ctx }) => {
+  list: withPermission('cloud_connections', 'read').query(async ({ ctx }) => {
     const rows = await ctx.db.drizzle.query.cloudConnections.findMany({
       where: eq(schema.cloudConnections.customerId, ctx.customerId),
       columns: {
@@ -59,7 +59,7 @@ export const cloudConnectionsRouter = router({
     return rows;
   }),
 
-  get: tenantProcedure
+  get: withPermission('cloud_connections', 'read')
     .input(z.object({ connectionId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
       const [row] = await ctx.db.drizzle
@@ -78,52 +78,56 @@ export const cloudConnectionsRouter = router({
       return row;
     }),
 
-  create: tenantProcedure.input(createInput).mutation(async ({ ctx, input }) => {
-    if (input.connector === 'azure' && !input.tenantId) {
-      throw new TRPCError({
-        code: 'BAD_REQUEST',
-        message: 'tenantId is required for Azure connections',
-      });
-    }
-    const [row] = await ctx.db.drizzle
-      .insert(schema.cloudConnections)
-      .values({
-        customerId: ctx.customerId,
-        connector: input.connector,
-        accountId: input.accountId,
-        tenantId: input.tenantId ?? null,
-        externalId: input.externalId,
-        displayName: input.displayName ?? null,
-        config: input.config,
-        bootstrapStatus: 'pending',
-      })
-      .returning();
-    return row;
-  }),
+  create: withPermission('cloud_connections', 'create')
+    .input(createInput)
+    .mutation(async ({ ctx, input }) => {
+      if (input.connector === 'azure' && !input.tenantId) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'tenantId is required for Azure connections',
+        });
+      }
+      const [row] = await ctx.db.drizzle
+        .insert(schema.cloudConnections)
+        .values({
+          customerId: ctx.customerId,
+          connector: input.connector,
+          accountId: input.accountId,
+          tenantId: input.tenantId ?? null,
+          externalId: input.externalId,
+          displayName: input.displayName ?? null,
+          config: input.config,
+          bootstrapStatus: 'pending',
+        })
+        .returning();
+      return row;
+    }),
 
-  update: tenantProcedure.input(updateInput).mutation(async ({ ctx, input }) => {
-    const patch: Partial<typeof schema.cloudConnections.$inferInsert> = {
-      updatedAt: new Date(),
-    };
-    if (input.displayName !== undefined) patch.displayName = input.displayName;
-    if (input.config !== undefined) patch.config = input.config;
-    const [row] = await ctx.db.drizzle
-      .update(schema.cloudConnections)
-      .set(patch)
-      .where(
-        and(
-          eq(schema.cloudConnections.id, input.connectionId),
-          eq(schema.cloudConnections.customerId, ctx.customerId),
-        ),
-      )
-      .returning();
-    if (!row) {
-      throw new TRPCError({ code: 'NOT_FOUND', message: 'cloud connection not found' });
-    }
-    return row;
-  }),
+  update: withPermission('cloud_connections', 'update')
+    .input(updateInput)
+    .mutation(async ({ ctx, input }) => {
+      const patch: Partial<typeof schema.cloudConnections.$inferInsert> = {
+        updatedAt: new Date(),
+      };
+      if (input.displayName !== undefined) patch.displayName = input.displayName;
+      if (input.config !== undefined) patch.config = input.config;
+      const [row] = await ctx.db.drizzle
+        .update(schema.cloudConnections)
+        .set(patch)
+        .where(
+          and(
+            eq(schema.cloudConnections.id, input.connectionId),
+            eq(schema.cloudConnections.customerId, ctx.customerId),
+          ),
+        )
+        .returning();
+      if (!row) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'cloud connection not found' });
+      }
+      return row;
+    }),
 
-  disconnect: tenantProcedure
+  disconnect: withPermission('cloud_connections', 'delete')
     .input(z.object({ connectionId: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
       const result = await ctx.db.drizzle
@@ -149,7 +153,7 @@ export const cloudConnectionsRouter = router({
    * 24h verify-poll worker, but for one connection synchronously.
    * Dashboard calls this from the cloud detail page button.
    */
-  verifyNow: tenantProcedure
+  verifyNow: withPermission('cloud_connections', 'update')
     .input(z.object({ connectionId: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
       if (!ctx.cloudVerifyPoll) {
@@ -170,7 +174,7 @@ export const cloudConnectionsRouter = router({
    * + ad-hoc operator flows. Prefer `verifyNow` which exercises the real
    * federation handshake.
    */
-  recordVerify: tenantProcedure
+  recordVerify: withPermission('cloud_connections', 'update')
     .input(
       z.object({
         connectionId: z.string().uuid(),

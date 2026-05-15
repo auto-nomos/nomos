@@ -1,9 +1,10 @@
 import { sha256Hex } from '@auto-nomos/crypto';
+import { ROLES, type Role } from '@auto-nomos/rbac';
 import { TRPCError } from '@trpc/server';
 import { and, desc, eq, isNull } from 'drizzle-orm';
 import { z } from 'zod';
 import * as schema from '../../db/schema.js';
-import { router, tenantProcedure } from '../index.js';
+import { router, withPermission } from '../index.js';
 
 const SECRET_BYTES = 24;
 
@@ -26,7 +27,7 @@ export const apiKeysRouter = router({
    * List API keys for the active customer (optionally scoped to one agent).
    * `keyHash` is never returned; only the prefix + name + createdAt + revokedAt.
    */
-  list: tenantProcedure
+  list: withPermission('api_keys', 'read')
     .input(z.object({ agentId: z.string().uuid().optional() }))
     .query(async ({ ctx, input }) => {
       const where = input.agentId
@@ -44,6 +45,7 @@ export const apiKeysRouter = router({
         agentId: r.agentId,
         name: r.name,
         prefix: r.prefix,
+        role: r.role as Role,
         createdAt: r.createdAt,
         revokedAt: r.revokedAt,
         lastUsedAt: r.lastUsedAt,
@@ -56,11 +58,16 @@ export const apiKeysRouter = router({
    * Create an API key for an agent. The plaintext token is returned ONCE.
    * Subsequent reads only ever see prefix + metadata.
    */
-  create: tenantProcedure
+  create: withPermission('api_keys', 'create')
     .input(
       z.object({
         agentId: z.string().uuid(),
         name: z.string().min(1).max(100),
+        /** Role bound to this key. Defaults to 'admin' for back-compat with
+         *  callers that don't yet pass a role. Owner/admin sessions can mint
+         *  any role; the matrix gate on the parent withPermission already
+         *  ensured ctx.role has api_keys:create. */
+        role: z.enum(ROLES).optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -83,6 +90,7 @@ export const apiKeysRouter = router({
           keyHash,
           prefix,
           name: input.name,
+          ...(input.role ? { role: input.role } : {}),
         })
         .returning();
       if (!created) {
@@ -99,12 +107,13 @@ export const apiKeysRouter = router({
         agentId: created.agentId,
         name: created.name,
         prefix: created.prefix,
+        role: created.role as Role,
         createdAt: created.createdAt,
         plaintextOnce: plaintext,
       };
     }),
 
-  revoke: tenantProcedure
+  revoke: withPermission('api_keys', 'delete')
     .input(z.object({ id: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
       const [revoked] = await ctx.db.drizzle

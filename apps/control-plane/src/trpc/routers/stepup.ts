@@ -22,7 +22,7 @@ import {
   mintCosignerForApproval,
 } from '../../services/stepup/cosigner.js';
 import { authenticationOptions, verifyAuthentication } from '../../services/stepup/webauthn.js';
-import { router, tenantProcedure } from '../index.js';
+import { router, withPermission } from '../index.js';
 
 function deriveIntegrationIdFromCommand(command: string): string | null {
   // Commands look like `/github/issues/comment` — first segment is the
@@ -79,7 +79,7 @@ function deriveStage(
 
 export const stepupRouter = router({
   /** Non-expired pending + awaiting_review approvals for the current customer. */
-  listPending: tenantProcedure.query(async ({ ctx }) => {
+  listPending: withPermission('grants', 'read').query(async ({ ctx }) => {
     const now = new Date();
     const rows = await ctx.db.drizzle
       .select({
@@ -122,7 +122,7 @@ export const stepupRouter = router({
    * now() is folded into the expired bucket without requiring a state
    * change. This avoids needing a background sweeper to relabel rows.
    */
-  listHistory: tenantProcedure
+  listHistory: withPermission('grants', 'read')
     .input(
       z
         .object({
@@ -208,7 +208,7 @@ export const stepupRouter = router({
     }),
 
   /** Returns the latest pending approval for an agent in the current customer. */
-  latestForAgent: tenantProcedure
+  latestForAgent: withPermission('grants', 'read')
     .input(z.object({ agentId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
       const [row] = await ctx.db.drizzle
@@ -225,7 +225,7 @@ export const stepupRouter = router({
       return row ?? null;
     }),
 
-  getApproval: tenantProcedure
+  getApproval: withPermission('grants', 'read')
     .input(z.object({ approvalId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
       const row = await loadApprovalForCustomer(ctx, ctx.customerId, input.approvalId);
@@ -240,7 +240,7 @@ export const stepupRouter = router({
       return { ...row, state: effectiveState, cosignerWindowEndsAt };
     }),
 
-  assertOptions: tenantProcedure
+  assertOptions: withPermission('grants', 'update')
     .input(z.object({ approvalId: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
       if (!ctx.webauthn) {
@@ -259,7 +259,7 @@ export const stepupRouter = router({
       return { options, hasCredentials };
     }),
 
-  approve: tenantProcedure
+  approve: withPermission('grants', 'update')
     .input(
       z.object({
         approvalId: z.string().uuid(),
@@ -408,7 +408,7 @@ export const stepupRouter = router({
       }
     }),
 
-  deny: tenantProcedure
+  deny: withPermission('grants', 'update')
     .input(
       z.object({
         approvalId: z.string().uuid(),

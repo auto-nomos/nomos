@@ -7,12 +7,12 @@
 import { eq } from 'drizzle-orm';
 import * as schema from '../../db/schema.js';
 import { currentPeriodStart, PLAN_CAPS, type PlanTier } from '../../services/usage.js';
-import { router, tenantProcedure } from '../index.js';
+import { router, withPermission } from '../index.js';
 
 export const billingRouter = router({
   /** Current period usage + plan + cap. Refreshes whenever the dashboard
    *  poll fires (default 5s in the free-tier banner). */
-  usage: tenantProcedure.query(async ({ ctx }) => {
+  usage: withPermission('billing', 'read').query(async ({ ctx }) => {
     const periodStart = currentPeriodStart();
     const customer = await ctx.db.drizzle.query.customers.findFirst({
       where: eq(schema.customers.id, ctx.customerId),

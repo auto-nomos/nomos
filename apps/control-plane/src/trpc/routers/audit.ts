@@ -2,12 +2,12 @@ import { TRPCError } from '@trpc/server';
 import { and, asc, desc, eq, gte, inArray, lte } from 'drizzle-orm';
 import { z } from 'zod';
 import * as schema from '../../db/schema.js';
-import { router, tenantProcedure } from '../index.js';
+import { router, withPermission } from '../index.js';
 
 const DECISION = z.enum(['allow', 'deny', 'stepup']);
 
 export const auditRouter = router({
-  list: tenantProcedure
+  list: withPermission('audit', 'read')
     .input(
       z.object({
         agent: z.string().optional(),
@@ -54,7 +54,7 @@ export const auditRouter = router({
    * Output is the canonical `AuditBundle` shape consumed by the
    * @auto-nomos/audit-verify CLI.
    */
-  proof: tenantProcedure
+  proof: withPermission('audit', 'read')
     .input(z.object({ eventId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
       const ev = await ctx.db.drizzle.query.auditEvents.findFirst({

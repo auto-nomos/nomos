@@ -10,7 +10,7 @@ import { TRPCError } from '@trpc/server';
 import { and, eq, gte } from 'drizzle-orm';
 import { z } from 'zod';
 import * as schema from '../../db/schema.js';
-import { router, tenantProcedure } from '../index.js';
+import { router, type tenantProcedure, withPermission } from '../index.js';
 
 async function descendantsOf(
   ctx: Parameters<typeof tenantProcedure.query>[0] extends (a: infer A) => unknown
@@ -43,7 +43,7 @@ async function descendantsOf(
 }
 
 export const chainApprovalsRouter = router({
-  list: tenantProcedure.query(async ({ ctx }) => {
+  list: withPermission('grants', 'read').query(async ({ ctx }) => {
     return ctx.db.drizzle.query.agentChainApprovals.findMany({
       where: and(
         eq(schema.agentChainApprovals.customerId, ctx.customerId),
@@ -58,7 +58,7 @@ export const chainApprovalsRouter = router({
    * shows these ids inline so the human sees the snapshot before they
    * click Approve.
    */
-  create: tenantProcedure
+  create: withPermission('grants', 'create')
     .input(
       z.object({
         rootAgentId: z.string().uuid(),
@@ -101,7 +101,7 @@ export const chainApprovalsRouter = router({
    * Snapshot preview: what agents *would* be covered if the user approves
    * for the chain right now. Shown inline on the approve page.
    */
-  preview: tenantProcedure
+  preview: withPermission('grants', 'read')
     .input(z.object({ rootAgentId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
       const ids = await descendantsOf(ctx, input.rootAgentId);

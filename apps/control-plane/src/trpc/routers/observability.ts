@@ -20,7 +20,7 @@ import { TRPCError } from '@trpc/server';
 import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import * as schema from '../../db/schema.js';
-import { router, tenantProcedure } from '../index.js';
+import { router, withPermission } from '../index.js';
 
 const WindowDays = z.number().int().min(1).max(30).default(7);
 
@@ -52,7 +52,7 @@ export const observabilityRouter = router({
    * filtered to a single swarm). Caller polls with `refetchInterval` for a
    * live feed.
    */
-  liveFeed: tenantProcedure
+  liveFeed: withPermission('audit', 'read')
     .input(
       z.object({
         swarmId: z.string().uuid().optional(),
@@ -84,7 +84,7 @@ export const observabilityRouter = router({
    * Per-agent aggregates over a rolling N-day window. Single GROUP BY agent
    * over audit_events; joins to the agents table for name + DID.
    */
-  agentInventory: tenantProcedure
+  agentInventory: withPermission('audit', 'read')
     .input(
       z.object({
         swarmId: z.string().uuid().optional(),
@@ -158,7 +158,7 @@ export const observabilityRouter = router({
    * enumerates the action ids; any policy with `action.kind === 'all'`
    * widens the capability set to wildcard.
    */
-  capabilityDiff: tenantProcedure
+  capabilityDiff: withPermission('audit', 'read')
     .input(
       z.object({
         agentId: z.string().uuid(),
@@ -255,7 +255,7 @@ export const observabilityRouter = router({
    * - `depth_spike`: today's max chain depth > 7d max.
    * - `resource_widened`: today's distinct resources > 2× 7d daily avg (min 3 today).
    */
-  anomalies: tenantProcedure
+  anomalies: withPermission('audit', 'read')
     .input(
       z.object({
         swarmId: z.string().uuid().optional(),
@@ -448,7 +448,7 @@ export const observabilityRouter = router({
    * Combines: agent_policies → policies (allowed commands) + oauth_connections
    * (customer-wide upstream tokens) + audit-derived actual reach.
    */
-  blastRadius: tenantProcedure
+  blastRadius: withPermission('audit', 'read')
     .input(z.object({ swarmId: z.string().uuid(), windowDays: WindowDays }))
     .query(async ({ ctx, input }) => {
       const swarm = await ctx.db.drizzle.query.swarms.findFirst({
@@ -583,7 +583,7 @@ export const observabilityRouter = router({
   /**
    * Workspace-wide summary for the /monitoring header tiles.
    */
-  globalSummary: tenantProcedure
+  globalSummary: withPermission('audit', 'read')
     .input(z.object({ windowDays: WindowDays }))
     .query(async ({ ctx, input }) => {
       const since = sql`now() - (${input.windowDays} || ' days')::interval`;
@@ -634,7 +634,7 @@ export const observabilityRouter = router({
    * Window defaults to 60 minutes; capped at 24h so the React Flow canvas
    * stays usable.
    */
-  actionGraph: tenantProcedure
+  actionGraph: withPermission('audit', 'read')
     .input(
       z.object({
         swarmId: z.string().uuid().optional(),
@@ -785,7 +785,7 @@ export const observabilityRouter = router({
    * Flat list of recent spans, newest first. Cheap fallback when the graph
    * is too dense to read.
    */
-  actionTimeline: tenantProcedure
+  actionTimeline: withPermission('audit', 'read')
     .input(
       z.object({
         swarmId: z.string().uuid().optional(),
@@ -827,7 +827,7 @@ export const observabilityRouter = router({
   /**
    * Full detail for one span — opened in the drawer when a node is clicked.
    */
-  spanDetail: tenantProcedure
+  spanDetail: withPermission('audit', 'read')
     .input(z.object({ spanId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
       const row = await ctx.db.drizzle.query.agentSpans.findFirst({

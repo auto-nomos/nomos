@@ -3,12 +3,12 @@ import { and, desc, eq } from 'drizzle-orm';
 import { z } from 'zod';
 import * as schema from '../../db/schema.js';
 import { MintError, mintUcan } from '../../services/ucan-mint.js';
-import { router, tenantProcedure } from '../index.js';
+import { router, withPermission } from '../index.js';
 
 const COMMAND_RE = /^\/[a-z0-9_-]+(\/[a-z0-9_-]+)*$/;
 
 export const ucansRouter = router({
-  list: tenantProcedure
+  list: withPermission('agents', 'read')
     .input(z.object({ agentId: z.string().uuid().optional() }))
     .query(async ({ ctx, input }) => {
       const where = input.agentId
@@ -24,7 +24,7 @@ export const ucansRouter = router({
       });
     }),
 
-  mint: tenantProcedure
+  mint: withPermission('agents', 'update')
     .input(
       z.object({
         agentId: z.string().uuid(),
@@ -80,7 +80,7 @@ export const ucansRouter = router({
       }
     }),
 
-  revoke: tenantProcedure
+  revoke: withPermission('agents', 'update')
     .input(z.object({ cid: z.string().min(1), reason: z.string().max(500).optional() }))
     .mutation(async ({ ctx, input }) => {
       const issued = await ctx.db.drizzle.query.ucanIssues.findFirst({

@@ -4,7 +4,7 @@ import { z } from 'zod';
 import * as schema from '../../db/schema.js';
 import { saveConnection } from '../../oauth/tokens.js';
 import { RefreshError, refreshConnection } from '../../services/oauth-refresh.js';
-import { router, tenantProcedure } from '../index.js';
+import { router, withPermission } from '../index.js';
 
 const ALL_CONNECTOR_IDS = [
   'github',
@@ -34,7 +34,7 @@ export const oauthRouter = router({
    *  `hasRefreshToken` lets the dashboard hide the Refresh button when the
    *  provider didn't issue one (GitHub OAuth apps without expiring tokens,
    *  Notion). */
-  list: tenantProcedure.query(async ({ ctx }) => {
+  list: withPermission('oauth', 'read').query(async ({ ctx }) => {
     const rows = await ctx.db.drizzle.query.oauthConnections.findMany({
       where: eq(schema.oauthConnections.customerId, ctx.customerId),
       columns: {
@@ -58,7 +58,7 @@ export const oauthRouter = router({
   /** Drop the connection row. Outstanding UCANs minted against this
    *  connection still expire on their own TTL — this only blocks future
    *  mintUcan calls from picking the connector up. */
-  disconnect: tenantProcedure
+  disconnect: withPermission('oauth', 'delete')
     .input(z.object({ connectionId: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
       const result = await ctx.db.drizzle
@@ -79,7 +79,7 @@ export const oauthRouter = router({
   /** Force-refresh the access token via the connector's refresh endpoint.
    *  Returns the new expiry. Useful when a customer suspects a stale
    *  cached token is causing 401s in the wild. */
-  refresh: tenantProcedure
+  refresh: withPermission('oauth', 'update')
     .input(z.object({ connectionId: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
       if (!ctx.oauth) {
@@ -115,7 +115,7 @@ export const oauthRouter = router({
    *  out of band; we just encrypt + persist. No upstream call. Useful when
    *  the OAuth click-through is blocked (corp SSO interstitials, etc.) or
    *  for API-key style integrations (Granola, Perplexity, Twilio). */
-  addManual: tenantProcedure
+  addManual: withPermission('oauth', 'create')
     .input(
       z.object({
         connector: z.enum(ALL_CONNECTOR_IDS),
