@@ -13,7 +13,7 @@
 
 set -euo pipefail
 
-DOMAINS=(api.auto-nomos.com pdp.auto-nomos.com)
+DOMAINS=(api.auto-nomos.com pdp.auto-nomos.com id.auto-nomos.com)
 EMAIL="admin@auto-nomos.com"   # certbot expiry warnings go here
 
 log() { echo "[$(date '+%H:%M:%S')] nomos-ssl: $*"; }
@@ -46,7 +46,7 @@ log "Issuing certificates for ${DOMAINS[*]}..."
 certbot --nginx --non-interactive --agree-tos \
   --email "$EMAIL" \
   --redirect \
-  -d "${DOMAINS[0]}" -d "${DOMAINS[1]}"
+  -d "${DOMAINS[0]}" -d "${DOMAINS[1]}" -d "${DOMAINS[2]}"
 
 # ── 4. Auto-renewal cron ──────────────────────────────────────────────────────
 # certbot ships a systemd timer by default on Ubuntu 22.04; this is a

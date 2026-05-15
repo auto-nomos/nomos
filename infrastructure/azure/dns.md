@@ -18,6 +18,7 @@ registrar change so the record table never drifts from reality.
 | `app.auto-nomos.com` | CNAME | `cname.vercel-dns.com.` | proxied | Dashboard (Next.js on Vercel) |
 | `api.auto-nomos.com` | A | 52.172.250.27 | DNS-only | Control plane on Azure VM; TLS via certbot |
 | `pdp.auto-nomos.com` | A | 52.172.250.27 | DNS-only | PDP on Azure VM; TLS via certbot |
+| `id.auto-nomos.com` | A | 52.172.250.27 | DNS-only | OIDC issuer (cloud federation); TLS via certbot. Must NOT be proxied — AWS STS / Azure AD / GCP STS fetch `/jwks.json` directly. |
 | `_acme-challenge.api` | TXT | (dynamic) | DNS-only | Only present mid-issuance |
 
 api/pdp are NOT proxied through Cloudflare — certbot's HTTP-01 challenge
@@ -28,7 +29,7 @@ DNS-01 challenge with a Cloudflare API token.
 
 ```sh
 # Verify the records before running setup-ssl.sh
-for h in api pdp app www; do
+for h in api pdp id app www; do
   echo "--- $h.auto-nomos.com ---"
   dig +short "$h.auto-nomos.com"
 done
@@ -40,6 +41,8 @@ Expected output for the wedge launch:
 --- api.auto-nomos.com ---
 52.172.250.27
 --- pdp.auto-nomos.com ---
+52.172.250.27
+--- id.auto-nomos.com ---
 52.172.250.27
 --- app.auto-nomos.com ---
 76.76.21.21

@@ -34,6 +34,7 @@
     "dev:ps": "docker compose -f infrastructure/docker/docker-compose.dev.yml ps",
     "dev:setup:host": "tsx scripts/setup-wizard.mts",
     "gen-keys": "tsx scripts/gen-keys.mts",
+    "gen:oidc-keys": "tsx scripts/gen-oidc-issuer-keys.mts",
     "test:packs": "tsx scripts/pack-smoke.mts",
     "test:smoke": "tsx scripts/deploy-smoke.mts",
     "audit:extractors": "tsx scripts/audit-pack-extractor-coverage.mts",
