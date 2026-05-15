@@ -42,15 +42,20 @@ function AcceptInviteInner() {
   const accept = trpc.invites.accept.useMutation();
   const [autoAttempted, setAutoAttempted] = useState(false);
 
-  // Auto-attempt once the session resolves. The mutation surfaces all four
-  // branches (joined / wrong_account / needs_signup / error) so the user can
-  // pick the right next step.
+  // Auto-attempt once the session resolves.
   useEffect(() => {
     if (autoAttempted || !token) return;
     if (session.isPending) return;
     setAutoAttempted(true);
     accept.mutate({ token });
   }, [autoAttempted, token, session.isPending, accept]);
+
+  // Auto-redirect after join: set org cookie so the invited org becomes active.
+  useEffect(() => {
+    if (accept.data?.status !== 'joined') return;
+    document.cookie = `x-cb-org=${accept.data.customerId}; path=/; SameSite=Lax`;
+    router.push('/app');
+  }, [accept.data, router]);
 
   return (
     <main className="grid min-h-screen place-items-center bg-background p-6">
@@ -77,7 +82,15 @@ function AcceptInviteInner() {
                 <span className="font-medium">{accept.data.orgName}</span> as{' '}
                 <span className="font-medium">{accept.data.role}</span>.
               </p>
-              <Button onClick={() => router.push('/app')} className="w-full">
+              <Button
+                onClick={() => {
+                  if (accept.data?.status === 'joined') {
+                    document.cookie = `x-cb-org=${accept.data.customerId}; path=/; SameSite=Lax`;
+                  }
+                  router.push('/app');
+                }}
+                className="w-full"
+              >
                 Open dashboard
               </Button>
             </div>
