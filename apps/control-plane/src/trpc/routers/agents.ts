@@ -3,17 +3,17 @@ import { TRPCError } from '@trpc/server';
 import { and, desc, eq, inArray, isNull } from 'drizzle-orm';
 import { z } from 'zod';
 import * as schema from '../../db/schema.js';
-import { router, tenantProcedure } from '../index.js';
+import { router, withPermission } from '../index.js';
 
 export const agentsRouter = router({
-  list: tenantProcedure.query(async ({ ctx }) => {
+  list: withPermission('agents', 'read').query(async ({ ctx }) => {
     return ctx.db.drizzle.query.agents.findMany({
       where: eq(schema.agents.customerId, ctx.customerId),
       orderBy: [desc(schema.agents.createdAt)],
     });
   }),
 
-  create: tenantProcedure
+  create: withPermission('agents', 'create')
     .input(
       z.object({
         name: z.string().min(1).max(100),
@@ -60,7 +60,7 @@ export const agentsRouter = router({
       return agent;
     }),
 
-  pendingConnections: tenantProcedure.query(async ({ ctx }) => {
+  pendingConnections: withPermission('agents', 'read').query(async ({ ctx }) => {
     return ctx.db.drizzle.query.agents.findMany({
       where: and(
         eq(schema.agents.customerId, ctx.customerId),
@@ -71,7 +71,7 @@ export const agentsRouter = router({
     });
   }),
 
-  approveConnection: tenantProcedure
+  approveConnection: withPermission('agents', 'update')
     .input(z.object({ id: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
       const [updated] = await ctx.db.drizzle
@@ -88,7 +88,7 @@ export const agentsRouter = router({
       return updated;
     }),
 
-  denyConnection: tenantProcedure
+  denyConnection: withPermission('agents', 'update')
     .input(z.object({ id: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
       const [updated] = await ctx.db.drizzle
@@ -102,7 +102,7 @@ export const agentsRouter = router({
       return updated;
     }),
 
-  update: tenantProcedure
+  update: withPermission('agents', 'update')
     .input(
       z.object({
         id: z.string().uuid(),
@@ -125,7 +125,7 @@ export const agentsRouter = router({
       return updated;
     }),
 
-  setMode: tenantProcedure
+  setMode: withPermission('agents', 'update')
     .input(
       z.object({
         id: z.string().uuid(),
@@ -144,7 +144,7 @@ export const agentsRouter = router({
       return updated;
     }),
 
-  delete: tenantProcedure
+  delete: withPermission('agents', 'delete')
     .input(z.object({ id: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
       const [updated] = await ctx.db.drizzle
@@ -206,7 +206,7 @@ export const agentsRouter = router({
       return { id: updated.id, deleted: true, revokedUcans: cids.length };
     }),
 
-  listPolicies: tenantProcedure
+  listPolicies: withPermission('agents', 'read')
     .input(z.object({ agentId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
       await assertAgentInCustomer(ctx, input.agentId);
@@ -231,7 +231,7 @@ export const agentsRouter = router({
       return rows;
     }),
 
-  assignPolicies: tenantProcedure
+  assignPolicies: withPermission('agents', 'update')
     .input(
       z.object({
         agentId: z.string().uuid(),
@@ -257,7 +257,7 @@ export const agentsRouter = router({
       return { assigned: input.policyIds.length };
     }),
 
-  unassignPolicy: tenantProcedure
+  unassignPolicy: withPermission('agents', 'update')
     .input(z.object({ agentId: z.string().uuid(), policyId: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
       await assertAgentInCustomer(ctx, input.agentId);

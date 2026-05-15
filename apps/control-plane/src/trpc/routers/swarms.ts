@@ -11,7 +11,7 @@ import { TRPCError } from '@trpc/server';
 import { and, desc, eq, inArray } from 'drizzle-orm';
 import { z } from 'zod';
 import * as schema from '../../db/schema.js';
-import { router, tenantProcedure } from '../index.js';
+import { router, withPermission } from '../index.js';
 
 export interface AgentTreeNode {
   id: string;
@@ -25,7 +25,7 @@ export interface AgentTreeNode {
 }
 
 export const swarmsRouter = router({
-  list: tenantProcedure.query(async ({ ctx }) => {
+  list: withPermission('swarms', 'read').query(async ({ ctx }) => {
     return ctx.db.drizzle.query.swarms.findMany({
       where: eq(schema.swarms.customerId, ctx.customerId),
       orderBy: [desc(schema.swarms.createdAt)],
@@ -33,41 +33,46 @@ export const swarmsRouter = router({
   }),
 
   /** Return the agent tree (root → children) for a swarm. */
-  tree: tenantProcedure.input(z.object({ id: z.string().uuid() })).query(async ({ ctx, input }) => {
-    const swarm = await ctx.db.drizzle.query.swarms.findFirst({
-      where: and(eq(schema.swarms.id, input.id), eq(schema.swarms.customerId, ctx.customerId)),
-    });
-    if (!swarm) throw new TRPCError({ code: 'NOT_FOUND', message: 'swarm not found' });
-    const agents = await ctx.db.drizzle.query.agents.findMany({
-      where: and(eq(schema.agents.customerId, ctx.customerId), eq(schema.agents.swarmId, input.id)),
-    });
-    const byId = new Map<string, AgentTreeNode>();
-    for (const a of agents) {
-      byId.set(a.id, {
-        id: a.id,
-        name: a.name,
-        did: a.did,
-        depth: a.depth,
-        parentAgentId: a.parentAgentId ?? null,
-        rootAgentId: a.rootAgentId ?? null,
-        swarmId: a.swarmId ?? null,
-        children: [],
+  tree: withPermission('swarms', 'read')
+    .input(z.object({ id: z.string().uuid() }))
+    .query(async ({ ctx, input }) => {
+      const swarm = await ctx.db.drizzle.query.swarms.findFirst({
+        where: and(eq(schema.swarms.id, input.id), eq(schema.swarms.customerId, ctx.customerId)),
       });
-    }
-    const roots: AgentTreeNode[] = [];
-    for (const node of byId.values()) {
-      const parent = node.parentAgentId ? byId.get(node.parentAgentId) : undefined;
-      if (parent) {
-        parent.children.push(node);
-      } else {
-        roots.push(node);
+      if (!swarm) throw new TRPCError({ code: 'NOT_FOUND', message: 'swarm not found' });
+      const agents = await ctx.db.drizzle.query.agents.findMany({
+        where: and(
+          eq(schema.agents.customerId, ctx.customerId),
+          eq(schema.agents.swarmId, input.id),
+        ),
+      });
+      const byId = new Map<string, AgentTreeNode>();
+      for (const a of agents) {
+        byId.set(a.id, {
+          id: a.id,
+          name: a.name,
+          did: a.did,
+          depth: a.depth,
+          parentAgentId: a.parentAgentId ?? null,
+          rootAgentId: a.rootAgentId ?? null,
+          swarmId: a.swarmId ?? null,
+          children: [],
+        });
       }
-    }
-    return { swarm, roots, totalAgents: agents.length };
-  }),
+      const roots: AgentTreeNode[] = [];
+      for (const node of byId.values()) {
+        const parent = node.parentAgentId ? byId.get(node.parentAgentId) : undefined;
+        if (parent) {
+          parent.children.push(node);
+        } else {
+          roots.push(node);
+        }
+      }
+      return { swarm, roots, totalAgents: agents.length };
+    }),
 
   /** Last `limit` receipts for the swarm (allow / deny / step-up). */
-  recentReceipts: tenantProcedure
+  recentReceipts: withPermission('swarms', 'read')
     .input(
       z.object({ id: z.string().uuid(), limit: z.number().int().min(1).max(500).default(100) }),
     )
@@ -102,7 +107,7 @@ export const swarmsRouter = router({
    * to the root. Computed from the most recent allow receipt per agent.
    * Cheap heuristic; per-receipt detail is in the audit log.
    */
-  scopeContainment: tenantProcedure
+  scopeContainment: withPermission('swarms', 'read')
     .input(z.object({ id: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
       const agents = await ctx.db.drizzle.query.agents.findMany({
@@ -148,7 +153,7 @@ export const swarmsRouter = router({
       };
     }),
 
-  create: tenantProcedure
+  create: withPermission('swarms', 'create')
     .input(
       z.object({
         name: z.string().min(1).max(100),
@@ -189,7 +194,7 @@ export const swarmsRouter = router({
    * caller must ensure the child UCAN chain is rooted at the swarm's root
    * — DB attachment is metadata only; PDP enforces UCAN chain validity.
    */
-  attachChild: tenantProcedure
+  attachChild: withPermission('swarms', 'update')
     .input(
       z.object({
         swarmId: z.string().uuid(),

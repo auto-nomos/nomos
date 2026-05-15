@@ -11,11 +11,11 @@ import { and, desc, eq, isNull } from 'drizzle-orm';
 import { z } from 'zod';
 import * as schema from '../../db/schema.js';
 import { revokeGrant, upsertGrant } from '../../services/grants/upsert.js';
-import { router, tenantProcedure } from '../index.js';
+import { router, withPermission } from '../index.js';
 
 export const grantsRouter = router({
   /** Active (non-revoked) grants for the current customer, optionally filtered to one agent. */
-  list: tenantProcedure
+  list: withPermission('grants', 'read')
     .input(z.object({ agentId: z.string().uuid().optional() }).optional())
     .query(async ({ ctx, input }) => {
       const filter = input?.agentId
@@ -48,7 +48,7 @@ export const grantsRouter = router({
     }),
 
   /** Toggle decision allow↔deny by revoking and re-issuing. */
-  toggle: tenantProcedure
+  toggle: withPermission('grants', 'update')
     .input(z.object({ grantId: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
       const [row] = await ctx.db.drizzle
@@ -91,7 +91,7 @@ export const grantsRouter = router({
       return { id: result.id, decision: result.decision };
     }),
 
-  revoke: tenantProcedure
+  revoke: withPermission('grants', 'delete')
     .input(z.object({ grantId: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
       const ok = await revokeGrant(
