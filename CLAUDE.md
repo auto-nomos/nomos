@@ -7,6 +7,18 @@ Available gstack skills:
 
 Setup: `git clone --single-branch --depth 1 https://github.com/garrytan/gstack.git ~/.claude/skills/gstack && cd ~/.claude/skills/gstack && PATH="$HOME/.bun/bin:$PATH" ./setup`
 
+## Glossary
+
+- **organization** ≡ the `customers` table row. The DB column name stays
+  `customer_id` everywhere for back-compat (PDP, UCAN, audit chain all key
+  on it); the new API + dashboard surface says "organization".
+- **roles** — `owner` / `admin` / `agent_manager` / `policy_author` /
+  `auditor` / `member`. Single source of truth lives in
+  `packages/rbac/src/permissions.ts`. See `docs/RBAC.md`.
+- **invite flow** — `org_invites` table + 4-branch accept mutation
+  (`joined` / `wrong_account` / `needs_signup` / error). See
+  `docs/INVITES.md`.
+
 ## graphify
 
 This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships.
