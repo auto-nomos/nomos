@@ -1,6 +1,7 @@
 'use client';
 
 import { Trash2, UserPlus } from 'lucide-react';
+import Link from 'next/link';
 import { useState } from 'react';
 import { Badge } from '../../../../components/ui/badge';
 import { Button } from '../../../../components/ui/button';
@@ -73,10 +74,28 @@ export default function MembersPage() {
   return (
     <div className="space-y-6">
       <header>
-        <h1 className="text-2xl font-semibold tracking-tight">Members</h1>
-        <p className="text-sm text-muted-foreground">
-          Manage who can access this organization and what they can do.
-        </p>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">Members</h1>
+            <p className="text-sm text-muted-foreground">
+              Manage who can access this organization and what they can do.
+            </p>
+          </div>
+          <div className="flex shrink-0 gap-2">
+            <Link
+              href="/app/guide/members"
+              className="rounded-sm border border-aegis-line px-3 py-1.5 font-mono text-[11px] uppercase tracking-wider text-aegis-mute transition-colors hover:border-aegis-line-strong hover:text-aegis-paper"
+            >
+              Roles guide →
+            </Link>
+            <Link
+              href="/app/guide/invites"
+              className="rounded-sm border border-aegis-line px-3 py-1.5 font-mono text-[11px] uppercase tracking-wider text-aegis-mute transition-colors hover:border-aegis-line-strong hover:text-aegis-paper"
+            >
+              Invite guide →
+            </Link>
+          </div>
+        </div>
       </header>
 
       {canManage ? (

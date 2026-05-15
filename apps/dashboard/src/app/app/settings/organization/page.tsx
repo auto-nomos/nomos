@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { Button } from '../../../../components/ui/button';
 import {
@@ -37,11 +38,21 @@ export default function OrganizationSettingsPage() {
   return (
     <div className="space-y-6">
       <header>
-        <h1 className="text-2xl font-semibold tracking-tight">Organization</h1>
-        <p className="text-sm text-muted-foreground">
-          How this org appears in the dashboard, API responses, and audit receipts. The DB-level
-          handle (slug) stays stable for URLs and webhooks.
-        </p>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">Organization</h1>
+            <p className="text-sm text-muted-foreground">
+              How this org appears in the dashboard, API responses, and audit receipts. The DB-level
+              handle (slug) stays stable for URLs and webhooks.
+            </p>
+          </div>
+          <Link
+            href="/app/guide/organizations"
+            className="shrink-0 rounded-sm border border-aegis-line px-3 py-1.5 font-mono text-[11px] uppercase tracking-wider text-aegis-mute transition-colors hover:border-aegis-line-strong hover:text-aegis-paper"
+          >
+            Read guide →
+          </Link>
+        </div>
       </header>
 
       <Card>

@@ -11,11 +11,14 @@ import {
   Hash,
   KeyRound,
   Layers,
+  Mail,
   MessageCircle,
   Plug,
   ShieldAlert,
   ShieldCheck,
   Terminal,
+  UserCog,
+  Users,
   Workflow,
 } from 'lucide-react';
 import Link from 'next/link';
@@ -54,6 +57,9 @@ const SECTIONS: Section[] = [
   { id: 'cloud', label: 'Cloud IAM (Azure/AWS/GCP)', group: 'Runtime', icon: Cloud },
   { id: 'sdk', label: 'SDK & MCP', group: 'Integrate', icon: Terminal },
   { id: 'telegram', label: 'Telegram notifications', group: 'Integrate', icon: MessageCircle },
+  { id: 'organizations', label: 'Organizations', group: 'Operate', icon: UserCog },
+  { id: 'members', label: 'Members & roles', group: 'Operate', icon: Users },
+  { id: 'invites', label: 'Invite teammates', group: 'Operate', icon: Mail },
   { id: 'faq', label: 'FAQ', group: 'Reference', icon: KeyRound },
 ];
 
@@ -102,6 +108,9 @@ export function GuideContent() {
           <CloudIam />
           <Sdk />
           <TelegramSetup />
+          <Organizations />
+          <MembersAndRoles />
+          <Invites />
           <Faq />
         </article>
         <RightRail />
@@ -1731,9 +1740,196 @@ nomos status`}</Code>
   );
 }
 
+function Organizations() {
+  return (
+    <Section id="organizations" eyebrow="15 · operate" title="Organizations.">
+      <P>
+        Everything in Nomos belongs to an <strong className="text-aegis-paper">organization</strong>
+        : connections, apps, policies, audit events, API keys. When you sign up, you get one
+        organization with you as its <K>owner</K>. You can belong to multiple organizations and
+        switch between them from the top-nav switcher.
+      </P>
+      <P>
+        Find the switcher to the left of the breadcrumb at the top of every page. Picking an org
+        sets a cookie (<K>x-cb-org</K>) and refreshes the dashboard against that org&rsquo;s data.
+        Every server-side query re-verifies your membership, so the cookie is just a hint — you
+        can&rsquo;t see another org&rsquo;s data by forging it.
+      </P>
+      <ul className="ml-6 list-disc space-y-2 marker:text-aegis-signal">
+        <li>
+          <strong className="text-aegis-paper">Display name</strong> — what shows in the dashboard,
+          email subjects, and audit receipts. Edit it under{' '}
+          <Link href="/app/settings/organization" className="text-aegis-signal hover:underline">
+            Settings → Organization
+          </Link>
+          .
+        </li>
+        <li>
+          <strong className="text-aegis-paper">Slug</strong> — a stable URL-safe handle generated at
+          signup. Used in webhooks and link previews. Doesn&rsquo;t change unless you ask support.
+        </li>
+        <li>
+          <strong className="text-aegis-paper">Plan</strong> — usage tier, set on the Billing page.
+          The free tier covers ~10k authorize calls per month; check the quota banner in the
+          sidebar.
+        </li>
+      </ul>
+      <Callout tone="info">
+        <strong className="text-aegis-paper">Migrating from before May 2026?</strong> Every legacy
+        user account was promoted to <K>owner</K> of a default organization at the same time. No
+        data was moved; your API keys keep working.
+      </Callout>
+    </Section>
+  );
+}
+
+function MembersAndRoles() {
+  return (
+    <Section id="members" eyebrow="16 · operate" title="Members &amp; roles.">
+      <P>
+        Add teammates to an organization under{' '}
+        <Link href="/app/settings/members" className="text-aegis-signal hover:underline">
+          Settings → Members
+        </Link>
+        . Every member carries one role from a fixed list of six. Roles map to a permission matrix
+        that gates every mutation across the platform — the same matrix the SDK and PDP consult on
+        behalf of API keys.
+      </P>
+
+      <div className="overflow-hidden rounded-sm border border-aegis-line">
+        <table className="w-full text-[13px]">
+          <thead className="bg-aegis-surface-2 text-left font-mono text-[10px] uppercase tracking-[0.18em] text-aegis-faint">
+            <tr>
+              <th className="px-4 py-2.5">Role</th>
+              <th className="px-4 py-2.5">Best for</th>
+              <th className="px-4 py-2.5">What it can do</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-aegis-line text-aegis-paper">
+            <tr>
+              <td className="px-4 py-3 font-mono">owner</td>
+              <td className="px-4 py-3 text-aegis-mute">founders, primary admins</td>
+              <td className="px-4 py-3 text-aegis-mute">
+                Everything, including org delete + billing.
+              </td>
+            </tr>
+            <tr>
+              <td className="px-4 py-3 font-mono">admin</td>
+              <td className="px-4 py-3 text-aegis-mute">eng leads</td>
+              <td className="px-4 py-3 text-aegis-mute">
+                Everything except org delete and ownership transfer.
+              </td>
+            </tr>
+            <tr>
+              <td className="px-4 py-3 font-mono">agent_manager</td>
+              <td className="px-4 py-3 text-aegis-mute">MCP operators / DevOps</td>
+              <td className="px-4 py-3 text-aegis-mute">
+                CRUD on agents, grants, swarms, MCP servers. Read policies + audit.
+              </td>
+            </tr>
+            <tr>
+              <td className="px-4 py-3 font-mono">policy_author</td>
+              <td className="px-4 py-3 text-aegis-mute">security / compliance</td>
+              <td className="px-4 py-3 text-aegis-mute">
+                CRUD on policies, schemas, envelopes. Read agents + audit.
+              </td>
+            </tr>
+            <tr>
+              <td className="px-4 py-3 font-mono">auditor</td>
+              <td className="px-4 py-3 text-aegis-mute">SOC, support engineers</td>
+              <td className="px-4 py-3 text-aegis-mute">
+                Read-only across audit, agents, policies, grants.
+              </td>
+            </tr>
+            <tr>
+              <td className="px-4 py-3 font-mono">member</td>
+              <td className="px-4 py-3 text-aegis-mute">default for new invites</td>
+              <td className="px-4 py-3 text-aegis-mute">
+                See members + org name. Promote them when you&rsquo;re ready.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <P>
+        Change a teammate&rsquo;s role from the Members table&rsquo;s dropdown — admins and owners
+        can do this. The last <K>owner</K> in an org can&rsquo;t be demoted or removed; transfer
+        ownership first by promoting another member.
+      </P>
+
+      <Callout tone="info">
+        <strong className="text-aegis-paper">API keys carry a role too.</strong> When you issue a
+        key on an app&rsquo;s detail page, you pick a role from the same list. Existing keys default
+        to <K>admin</K>; re-scope to least privilege via the issue dialog or SQL:
+        <Code lang="sql">{`UPDATE api_keys SET role = 'agent_manager' WHERE id = '...';`}</Code>
+      </Callout>
+    </Section>
+  );
+}
+
+function Invites() {
+  return (
+    <Section id="invites" eyebrow="17 · operate" title="Invite teammates.">
+      <P>
+        Anyone with the <K>invites:create</K> permission (owner + admin by default) can invite a
+        teammate by email. The recipient gets a one-click accept link; if they don&rsquo;t have a
+        Nomos account yet, the link routes them to sign-up and finishes the join automatically.
+      </P>
+
+      <ol className="ml-0 list-none space-y-4">
+        <Step n="01" title="Send the invite">
+          <Link href="/app/settings/members" className="text-aegis-signal hover:underline">
+            Settings → Members
+          </Link>{' '}
+          → <K>Invite teammate</K>. Enter the email + pick a role (default <K>member</K>). The
+          dashboard sends the email through Resend with a 7-day expiry.
+        </Step>
+        <Step n="02" title="Recipient clicks the link">
+          The link lands on <K>/accept-invite?token=…</K>. Four outcomes:
+          <ul className="mt-2 ml-4 list-disc space-y-1 marker:text-aegis-faint">
+            <li>
+              <strong className="text-aegis-paper">Signed in + email matches</strong> → joined.
+            </li>
+            <li>
+              <strong className="text-aegis-paper">Signed in + email mismatches</strong> →{' '}
+              <K>wrong_account</K>. Sign out, sign back in.
+            </li>
+            <li>
+              <strong className="text-aegis-paper">Not signed in</strong> → redirect to{' '}
+              <K>/sign-up?invite_token=…</K> and finish join after signup.
+            </li>
+            <li>
+              <strong className="text-aegis-paper">Expired / revoked</strong> → friendly error.
+              Re-issue from the Members page.
+            </li>
+          </ul>
+        </Step>
+        <Step n="03" title="Triage in the dashboard">
+          Pending invites surface in the Members page. Revoke any that aren&rsquo;t needed; expired
+          ones are clearly flagged.
+        </Step>
+      </ol>
+
+      <Callout tone="info">
+        <strong className="text-aegis-paper">No email provider yet?</strong> Without{' '}
+        <K>RESEND_API_KEY</K> set, the broker logs the raw token to the server&rsquo;s console — you
+        can paste the accept URL by hand for dev / smoke tests. Hosted accounts already have Resend
+        wired.
+      </Callout>
+
+      <Callout tone="warn">
+        <strong className="text-aegis-paper">One pending invite per email per org.</strong> Issuing
+        a second invite to the same address returns <K>CONFLICT</K> — revoke the existing one first.
+        This is intentional so you don&rsquo;t spam invitees with duplicate links.
+      </Callout>
+    </Section>
+  );
+}
+
 function Faq() {
   return (
-    <Section id="faq" eyebrow="15 · reference" title="FAQ.">
+    <Section id="faq" eyebrow="18 · reference" title="FAQ.">
       <Faqs
         items={[
           [
@@ -1829,6 +2025,9 @@ export type TopicId =
   | 'cloud'
   | 'sdk'
   | 'telegram'
+  | 'organizations'
+  | 'members'
+  | 'invites'
   | 'faq';
 
 const TOPIC_COMPONENTS: Record<TopicId, React.ComponentType> = {
@@ -1847,6 +2046,9 @@ const TOPIC_COMPONENTS: Record<TopicId, React.ComponentType> = {
   cloud: CloudIam,
   sdk: Sdk,
   telegram: TelegramSetup,
+  organizations: Organizations,
+  members: MembersAndRoles,
+  invites: Invites,
   faq: Faq,
 };
 

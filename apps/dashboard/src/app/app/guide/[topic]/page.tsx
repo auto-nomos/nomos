@@ -19,6 +19,9 @@ const VALID_TOPICS = new Set<string>([
   'cloud',
   'sdk',
   'telegram',
+  'organizations',
+  'members',
+  'invites',
   'faq',
 ]);
 
