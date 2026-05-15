@@ -115,7 +115,7 @@ output "nomos_paste_into_dashboard" {
             The module creates: <code>azuread_application</code>,{' '}
             <code>azuread_service_principal</code>,{' '}
             <code>azuread_application_federated_identity_credential</code> (with{' '}
-            <code>issuer = id.auto-nomos.com</code>), and <code>azurerm_role_assignment</code> at
+            <code>issuer = nomos_oidc_issuer</code>), and <code>azurerm_role_assignment</code> at
             the chosen scope. Copy the outputs back here.
           </p>
         </CardContent>
