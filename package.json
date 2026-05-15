@@ -10,7 +10,7 @@
   },
   "scripts": {
     "build": "turbo run build",
-    "build:server": "pnpm --filter @auto-nomos/control-plane --filter @auto-nomos/pdp --filter @auto-nomos/core --filter @auto-nomos/cedar --filter @auto-nomos/crypto --filter @auto-nomos/ucan --filter @auto-nomos/shared-types --filter @auto-nomos/schema-packs --filter @auto-nomos/policy-builder --filter @auto-nomos/sdk --filter @auto-nomos/adapters --filter @auto-nomos/audit-verify build",
+    "build:server": "pnpm --filter @auto-nomos/control-plane --filter @auto-nomos/pdp --filter @auto-nomos/core --filter @auto-nomos/cedar --filter @auto-nomos/crypto --filter @auto-nomos/ucan --filter @auto-nomos/shared-types --filter @auto-nomos/schema-packs --filter @auto-nomos/policy-builder --filter @auto-nomos/rbac --filter @auto-nomos/sdk --filter @auto-nomos/adapters --filter @auto-nomos/audit-verify build",
     "test": "turbo run test",
     "test:watch": "turbo run test -- --watch",
     "lint": "biome check .",
