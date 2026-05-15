@@ -15,7 +15,7 @@ import { Input } from '../../../../../components/ui/input';
 import { Label } from '../../../../../components/ui/label';
 import { trpc } from '../../../../../lib/trpc';
 
-const TF_REPO_URL = 'https://github.com/auto-nomos/terraform-azurerm-nomos-bootstrap';
+const TF_MODULE_PATH = 'infra/terraform/azurerm-nomos-bootstrap';
 
 export default function AzureConnectPage() {
   const router = useRouter();
@@ -52,14 +52,29 @@ export default function AzureConnectPage() {
     }
   }
 
-  const tfvarsSnippet = `# Save as terraform.tfvars and run \`terraform apply\` against
-# the Azure tenant you want Nomos to federate to.
+  const tfvarsSnippet = `# Save as nomos.tf alongside the module checkout, or copy
+# infra/terraform/azurerm-nomos-bootstrap/ into your own Terraform repo
+# and adjust the source path.
 
-nomos_oidc_issuer  = "https://id.auto-nomos.com"
-customer_id        = "<your-nomos-customer-id>"  # from the Nomos dashboard
-subscription_id    = "${subscriptionId || '<subscription-id>'}"
-# Optional: narrow Reader role assignment to one RG instead of subscription scope.
-# resource_group_name = "rg-agent-sandbox"`;
+module "nomos" {
+  # Preview: no public mirror yet. Local-path source to this repo's module:
+  source = "../credential-broker/infra/terraform/azurerm-nomos-bootstrap"
+
+  customer_id       = "<your-nomos-customer-id>"  # from /app/settings/workspace
+  subscription_id   = "${subscriptionId || '<subscription-id>'}"
+  nomos_oidc_issuer = "https://<your-issuer-host>"  # the URL of the OIDC issuer you deployed
+  # Optional: narrow Reader role assignment to one RG instead of subscription scope.
+  # resource_group_name = "rg-agent-sandbox"
+}
+
+output "nomos_paste_into_dashboard" {
+  value = {
+    app_object_id   = module.nomos.app_object_id
+    app_client_id   = module.nomos.app_client_id
+    tenant_id       = module.nomos.tenant_id
+    subscription_id = module.nomos.subscription_id
+  }
+}`;
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -72,21 +87,24 @@ subscription_id    = "${subscriptionId || '<subscription-id>'}"
           Federated credential on an App Registration. Nomos mints OIDC ID tokens; AAD trusts them
           via the federated credential trust block created by the Terraform module.
         </p>
+        <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-amber-900 dark:text-amber-200">
+          <strong>Preview.</strong> The OIDC issuer at <code>id.auto-nomos.com</code> is not
+          deployed yet and there is no public Terraform mirror. Before running the snippet below you
+          must deploy <code>apps/oidc-issuer</code> (Cloudflare Worker) and set{' '}
+          <code>nomos_oidc_issuer</code> to its URL. See the{' '}
+          <Link href="/app/guide/cloud" className="underline">
+            Cloud IAM guide
+          </Link>{' '}
+          (Step 1) for the deploy commands.
+        </div>
       </header>
 
       <Card>
         <CardHeader>
           <CardTitle>1. Run the Terraform bootstrap</CardTitle>
           <CardDescription>
-            Public, MIT —{' '}
-            <a
-              href={TF_REPO_URL}
-              target="_blank"
-              rel="noreferrer"
-              className="text-primary underline"
-            >
-              {TF_REPO_URL}
-            </a>
+            Module source: <code>{TF_MODULE_PATH}</code> in this repo. Copy the directory into your
+            own Terraform repo and pin to a commit SHA before any production use.
           </CardDescription>
         </CardHeader>
         <CardContent>

@@ -5,20 +5,24 @@ Registration + federated identity credential + a Reader role assignment so
 the Nomos PDP can broker short-lived access tokens for agent requests
 against `management.azure.com`.
 
-> **Source of truth:** this module is mirrored to
-> `github.com/auto-nomos/terraform-azurerm-nomos-bootstrap` once M1 lands.
-> Customers run it from there — they should not depend on the monorepo
-> path.
+> **Preview (2026-05-15):** no public mirror yet. Source this module from
+> a local path that points at `infra/terraform/azurerm-nomos-bootstrap/` in
+> the Nomos repo, or copy the directory into your own Terraform repo and
+> pin to a commit SHA. The CLI emits a working snippet automatically:
+> `nomos cloud install --azure --customer-id <id> --nomos-oidc-issuer <url>`.
 
 ## Usage
 
 ```hcl
 module "nomos" {
-  source  = "github.com/auto-nomos/terraform-azurerm-nomos-bootstrap"
-  version = "0.1.0"
+  # Preview: local-path source. Adjust the relative path to wherever
+  # you cloned the credential-broker repo.
+  source = "../credential-broker/infra/terraform/azurerm-nomos-bootstrap"
 
-  customer_id     = "your-nomos-customer-uuid"  # from the Nomos dashboard
-  subscription_id = "00000000-0000-0000-0000-000000000000"
+  customer_id       = "your-nomos-customer-uuid"      # from /app/settings/workspace
+  subscription_id   = "00000000-0000-0000-0000-000000000000"
+  nomos_oidc_issuer = "https://<your-issuer-host>"    # URL of the OIDC issuer you deployed
+                                                      # (see apps/oidc-issuer/)
 
   # Optional — narrow to one RG instead of subscription scope:
   # resource_group_name = "rg-agent-sandbox"
@@ -66,13 +70,14 @@ Paste these into the Nomos dashboard at `/app/cloud/connect/azure`:
 
 ## How the federation works
 
-1. Nomos mints an OIDC ID token signed by an RS256 key in AWS KMS.
-2. Token claims include `iss=id.auto-nomos.com`, `sub=customer/{id}/agent/{agent_id}`,
+1. Nomos mints an OIDC ID token signed by an RS256 key. In preview the
+   signer can be in-memory (dev) or AWS KMS-backed (`OIDC_KMS_KEY_REF`).
+2. Token claims include `iss=<your nomos_oidc_issuer>`, `sub=customer/{id}/agent/{agent_id}`,
    `aud=api://AzureADTokenExchange`.
 3. Nomos POSTs the token to `https://login.microsoftonline.com/{tenant}/oauth2/v2.0/token`
    with `grant_type=client_credentials`, `client_assertion_type=...:jwt-bearer`,
    `client_assertion=<id-token>`, `scope=https://management.azure.com/.default`.
-4. AAD validates the token against `id.auto-nomos.com/.well-known/openid-configuration`
+4. AAD validates the token against `<your nomos_oidc_issuer>/.well-known/openid-configuration`
    and the federated identity credential on the App Registration, returns
    an AAD access token.
 5. PDP attaches the AAD token as `Authorization: Bearer` to ARM calls.

@@ -4,17 +4,24 @@ Bootstrap a GCP project for Nomos federation. Creates a Workload Identity
 Federation pool + provider, plus a service account the federated identity
 impersonates.
 
-> Final home: `github.com/auto-nomos/terraform-google-nomos-bootstrap`.
+> **Preview (2026-05-15):** no public mirror yet. Source this module from a
+> local path that points at `infra/terraform/google-nomos-bootstrap/` in the
+> Nomos repo, or copy the directory into your own Terraform repo and pin to
+> a commit SHA. The CLI emits a working snippet automatically:
+> `nomos cloud install --gcp --customer-id <id> --nomos-oidc-issuer <url>`.
 
 ## Usage
 
 ```hcl
 module "nomos" {
-  source  = "github.com/auto-nomos/terraform-google-nomos-bootstrap"
-  version = "0.1.0"
+  # Preview: local-path source. Adjust the relative path to wherever
+  # you cloned the credential-broker repo.
+  source = "../credential-broker/infra/terraform/google-nomos-bootstrap"
 
-  customer_id = "your-nomos-customer-uuid"
-  project_id  = "my-gcp-project"
+  customer_id       = "your-nomos-customer-uuid"      # from /app/settings/workspace
+  project_id        = "my-gcp-project"
+  nomos_oidc_issuer = "https://<your-issuer-host>"    # URL of the OIDC issuer you deployed
+                                                      # (see apps/oidc-issuer/)
 }
 
 output "nomos_paste_into_dashboard" {

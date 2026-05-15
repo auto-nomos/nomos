@@ -15,7 +15,7 @@ import { Input } from '../../../../../components/ui/input';
 import { Label } from '../../../../../components/ui/label';
 import { trpc } from '../../../../../lib/trpc';
 
-const TF_REPO_URL = 'https://github.com/auto-nomos/terraform-aws-nomos-bootstrap';
+const TF_MODULE_PATH = 'infra/terraform/aws-nomos-bootstrap';
 
 export default function AwsConnectPage() {
   const router = useRouter();
@@ -51,15 +51,17 @@ export default function AwsConnectPage() {
     }
   }
 
-  const tfvarsSnippet = `# Save as nomos.tf and run \`terraform apply\` against
-# the AWS account you want Nomos to federate to.
+  const tfvarsSnippet = `# Save as nomos.tf inside the directory where you cloned
+# the Nomos repo, or copy infra/terraform/aws-nomos-bootstrap/ into
+# your own Terraform repo and adjust the source path accordingly.
 
 module "nomos" {
-  source  = "github.com/auto-nomos/terraform-aws-nomos-bootstrap"
-  version = "0.1.0"
+  # Preview: no public mirror yet. Use a local path to this repo's module:
+  source = "../credential-broker/infra/terraform/aws-nomos-bootstrap"
 
-  customer_id = "<your-nomos-customer-id>"  # from the Nomos dashboard
-  region      = "${region}"
+  customer_id       = "<your-nomos-customer-id>"  # from /app/settings/workspace
+  region            = "${region}"
+  nomos_oidc_issuer = "https://<your-issuer-host>"  # the URL of the OIDC issuer you deployed
 }
 
 output "nomos_paste_into_dashboard" {
@@ -81,21 +83,24 @@ output "nomos_paste_into_dashboard" {
           IAM OIDC trust with <code>sts:AssumeRoleWithWebIdentity</code>. Nomos mints OIDC ID
           tokens; STS exchanges them for short-lived AccessKey/SecretKey/SessionToken.
         </p>
+        <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-amber-900 dark:text-amber-200">
+          <strong>Preview.</strong> The OIDC issuer at <code>id.auto-nomos.com</code> is not
+          deployed yet and there is no public Terraform mirror. Before running the snippet below you
+          must deploy <code>apps/oidc-issuer</code> (Cloudflare Worker) and set{' '}
+          <code>nomos_oidc_issuer</code> to its URL. See the{' '}
+          <Link href="/app/guide/cloud" className="underline">
+            Cloud IAM guide
+          </Link>{' '}
+          (Step 1) for the deploy commands.
+        </div>
       </header>
 
       <Card>
         <CardHeader>
           <CardTitle>1. Run the Terraform bootstrap</CardTitle>
           <CardDescription>
-            Public, MIT —{' '}
-            <a
-              href={TF_REPO_URL}
-              target="_blank"
-              rel="noreferrer"
-              className="text-primary underline"
-            >
-              {TF_REPO_URL}
-            </a>
+            Module source: <code>{TF_MODULE_PATH}</code> in this repo. Copy the directory into your
+            own Terraform repo and pin to a commit SHA before any production use.
           </CardDescription>
         </CardHeader>
         <CardContent>

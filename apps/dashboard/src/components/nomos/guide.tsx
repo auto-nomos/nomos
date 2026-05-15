@@ -127,7 +127,7 @@ function Header() {
       <div className="mt-6 flex flex-wrap items-center gap-2 font-mono text-[11px] uppercase tracking-[0.16em] text-aegis-faint">
         <span>~20 min read</span>
         <span aria-hidden>·</span>
-        <span>last updated 2026-05-15 · MAOS beta · filesystem + SSH GA · Cloud IAM beta</span>
+        <span>last updated 2026-05-15 · MAOS beta · filesystem + SSH GA · Cloud IAM preview</span>
         <span aria-hidden>·</span>
         <a href="#quickstart" className="text-aegis-signal hover:underline">
           Skip to 5-min quickstart →
@@ -1118,19 +1118,30 @@ subprocess.Popen(["python","./researcher.py"], env=env)`}</Code>
 
 function CloudIam() {
   return (
-    <Section id="cloud" eyebrow="12 · runtime · beta" title="Cloud IAM — Azure, AWS, GCP.">
+    <Section id="cloud" eyebrow="12 · runtime · preview" title="Cloud IAM — Azure, AWS, GCP.">
+      <Callout tone="warn">
+        <strong className="text-aegis-paper">Preview status (2026-05-15).</strong> Cloud federation
+        code, Terraform modules, and dashboard wizards are merged on <K>main</K>, but the public
+        OIDC issuer at <K>id.auto-nomos.com</K> is <strong>not deployed yet</strong> and there is no
+        public mirror of the Terraform modules. This guide explains how to self-host the issuer and
+        reference the modules from this repo so you can run end-to-end against a real cloud tenant
+        today. Production-grade KMS-backed signing + the public mirror are coming with the first
+        cloud GA release.
+      </Callout>
+
       <P>
-        Nomos brokers cloud the same way it brokers SaaS — except there&rsquo;s no token to store.
-        We host an OIDC issuer at <K>id.auto-nomos.com</K>; your cloud trusts it via federation; we
-        mint a fresh OIDC ID token per request and exchange it for a short-lived cloud session
-        credential. <strong className="text-aegis-paper">Zero standing cloud secrets</strong> in
-        your workspace — disconnect a cloud account and the next call denies within a second.
+        Nomos brokers cloud the same way it brokers SaaS — except there is{' '}
+        <em>no token to store</em>. We run an OIDC issuer; your cloud trusts it via federation; on
+        every agent request we mint a fresh OIDC ID token and exchange it with the cloud&rsquo;s STS
+        endpoint for a short-lived session credential (1–15 min TTL). Disconnect the cloud account
+        in <K>/app/cloud</K> and the next call denies within a second.
       </P>
       <P>
-        Three connectors ship in beta: <K>azure</K> (AAD federated credential, JWT-bearer
+        Three connectors ship in this preview: <K>azure</K> (AAD federated credential, JWT-bearer
         assertion), <K>aws</K> (IAM OIDC provider + <K>sts:AssumeRoleWithWebIdentity</K> + SigV4),{' '}
-        <K>gcp</K> (Workload Identity Federation, STS exchange + SA impersonation). All three reuse
-        the same Cedar engine, the same UCAN audience, the same audit chain, the same step-up.
+        <K>gcp</K> (Workload Identity Federation, STS exchange + service-account impersonation). All
+        three reuse the same Cedar engine, the same UCAN audience, the same audit chain, and the
+        same step-up flow as SaaS connectors.
       </P>
 
       <h3 className="mt-8 font-display text-[22px] text-aegis-paper">Mental model</h3>
@@ -1141,7 +1152,7 @@ function CloudIam() {
      │  cloud_connection_id on UCAN meta
      ▼
 [ CP /v1/internal/cloud/api-call/:id ]
-     │  1. mint OIDC ID token (RS256 via AWS KMS)   → cloud.token.minted
+     │  1. mint OIDC ID token (RS256)              → cloud.token.minted
      │  2. POST to AAD / STS / GCP-STS              → cloud.federation.exchanged
      │  3. signAndCall(session-creds, request)
      ▼  upstream cloud API call
@@ -1155,70 +1166,221 @@ function CloudIam() {
       </P>
 
       <h3 className="mt-8 font-display text-[22px] text-aegis-paper">
-        Onboarding (Terraform-only)
+        End-to-end setup — eight steps
       </h3>
       <P>
-        Customer trust requirement: you read the IAM module before applying it. No SaaS-side
-        terraform-apply button. Each module lives in its own public repo so it shows up in your
-        Terraform tooling as third-party code, not a vendor blob.
+        Two roles are involved. <strong>Operator</strong> = the person running the Nomos control
+        plane (Steps 1–3, done once per Nomos deployment). <strong>Customer</strong> = the cloud
+        owner who wants their agent to reach into AWS / Azure / GCP (Steps 4–8, done once per cloud
+        account). If you&rsquo;re self-hosting Nomos for your own org, you are both roles — run all
+        eight in order.
+      </P>
+
+      <h4 className="mt-6 font-display text-[18px] text-aegis-paper">
+        Step 1 — Operator: deploy the OIDC issuer
+      </h4>
+      <P>
+        The issuer is a tiny Cloudflare Worker that exposes <K>/.well-known/openid-configuration</K>{' '}
+        and <K>/jwks.json</K>. Source lives at <K>apps/oidc-issuer/</K> in this repo. Two preview
+        paths:
+      </P>
+      <Code lang="bash">{`# A. Deploy to your own *.workers.dev subdomain (fastest preview):
+cd apps/oidc-issuer
+pnpm install
+npx wrangler deploy
+# → prints e.g. https://nomos-oidc.<your-account>.workers.dev
+
+# B. Bind a custom domain (e.g. id.<your-company>.com) so AAD/STS/WIF accept it:
+#   1. Cloudflare dashboard → Workers & Pages → your worker → Triggers → Custom domain
+#   2. Add CNAME id.<your-company>.com → workers.dev hostname
+#   3. Set CP env: OIDC_ISSUER_URL=https://id.<your-company>.com
+
+# JWKS key material — for the preview, key-store.ts ships an in-memory dev signer.
+# AWS KMS-backed signing is wired in apps/control-plane/src/oidc/kms-signer.ts; set
+#   OIDC_KMS_KEY_REF=arn:aws:kms:us-east-1:<acct>:key/<id>
+# on the control plane to use it (recommended before any prod use).`}</Code>
+      <Callout tone="info">
+        <strong className="text-aegis-paper">Why an OIDC issuer.</strong> AWS STS, Azure AD, and GCP
+        WIF all accept ID tokens from any RFC 8414-compliant issuer URL whose JWKS validates. We
+        don&rsquo;t need to host the issuer at <K>id.auto-nomos.com</K> for things to work — we need
+        the issuer URL you set in CP env to be reachable from the cloud&rsquo;s STS. A{' '}
+        <K>*.workers.dev</K> URL is fine for preview; a custom domain is recommended for any
+        production deployment so it survives Cloudflare account changes.
+      </Callout>
+
+      <h4 className="mt-6 font-display text-[18px] text-aegis-paper">
+        Step 2 — Operator: control-plane environment
+      </h4>
+      <Code lang="bash">{`# In your control-plane .env (or production secret store):
+OIDC_ISSUER_URL=https://nomos-oidc.<your-account>.workers.dev
+# Optional but recommended once you have AWS KMS provisioned:
+OIDC_KMS_KEY_REF=arn:aws:kms:us-east-1:<acct>:key/<id>
+
+# PDP webhook so cloud mint + exchange events land in the same audit chain.
+# Use your PDP's public URL (Fly / Render / Cloud Run / your VM):
+PDP_WEBHOOK_URLS=https://pdp.<your-host>/v1/internal/audit/emit-cloud
+PDP_SERVICE_TOKEN=<shared-secret-between-cp-and-pdp>`}</Code>
+
+      <h4 className="mt-6 font-display text-[18px] text-aegis-paper">
+        Step 3 — Operator: apply migration 0028
+      </h4>
+      <P>
+        Migration <K>0028_cloud_iam_m0</K> creates the <K>oidc_issuer_keys</K> and{' '}
+        <K>cloud_connections</K> tables. Run drizzle-kit from the control plane:
+      </P>
+      <Code lang="bash">{`pnpm --filter @auto-nomos/control-plane db:migrate
+# verify with:
+psql "$DATABASE_URL" -c "\\dt cloud_connections oidc_issuer_keys"`}</Code>
+
+      <h4 className="mt-6 font-display text-[18px] text-aegis-paper">
+        Step 4 — Customer: get your customer_id from the dashboard
+      </h4>
+      <P>
+        Log in, open <K>/app/settings/workspace</K> (or any page in the dashboard — your customer
+        UUID is shown in the workspace card). Copy it; every Terraform module needs it because the
+        federated identity subject is pinned to <K>customer/{`{cid}`}/agent/*</K>.
+      </P>
+
+      <h4 className="mt-6 font-display text-[18px] text-aegis-paper">
+        Step 5 — Customer: generate the Terraform snippet
+      </h4>
+      <P>The Nomos CLI prints a paste-ready Terraform block per cloud. Install once:</P>
+      <Code lang="bash">{`npm i -g @auto-nomos/cli
+# or use the local repo binary directly:
+#   pnpm --filter @auto-nomos/cli build && node packages/cli/dist/bin.js ...
+
+nomos cloud install --azure --customer-id <your-customer-uuid> \\
+  --subscription-id 00000000-0000-0000-0000-000000000000 > nomos.tf
+
+nomos cloud install --aws --customer-id <your-customer-uuid> \\
+  --aws-region us-east-1 > nomos.tf
+
+nomos cloud install --gcp --customer-id <your-customer-uuid> \\
+  --project-id my-prod-proj > nomos.tf`}</Code>
+      <Callout tone="warn">
+        <strong className="text-aegis-paper">No public Terraform mirror yet.</strong> The CLI
+        currently emits a snippet that references{' '}
+        <K>github.com/auto-nomos/terraform-{`{cloud}`}-nomos-bootstrap</K> — that repo does not
+        exist yet. For preview, change the <K>source</K> line of the generated snippet to a local
+        path that points at this repo&rsquo;s <K>infra/terraform/{`{cloud}`}-nomos-bootstrap/</K>{' '}
+        directory, e.g.{' '}
+        <K>source = &quot;../credential-broker/infra/terraform/azurerm-nomos-bootstrap&quot;</K>.
+        Pin a commit SHA once you&rsquo;ve copied the module out into your own infra repo so nothing
+        rolls forward without review.
+      </Callout>
+
+      <h4 className="mt-6 font-display text-[18px] text-aegis-paper">
+        Step 6 — Customer: review and apply the Terraform
+      </h4>
+      <P>
+        <strong>Read the module before applying.</strong> The three modules each create a tightly
+        scoped IAM grant — defaults are intentionally read-only at the broadest documented scope.
       </P>
       <ul className="ml-6 list-disc space-y-1.5 marker:text-aegis-signal">
         <li>
-          <strong className="text-aegis-paper">Azure</strong>{' '}
-          <K>github.com/auto-nomos/terraform-azurerm-nomos-bootstrap</K> — app registration +
-          federated identity credential (issuer=<K>id.auto-nomos.com</K>, audience=
-          <K>api://AzureADTokenExchange</K>, subject=
-          <K>
-            customer/{`{cid}`}/agent/{`{aid}`}
-          </K>
-          ) + Reader role assignment at sub scope (narrow to RG via variable).
+          <strong className="text-aegis-paper">Azure</strong> (
+          <K>infra/terraform/azurerm-nomos-bootstrap/</K>) — App Registration + Service Principal +
+          Federated Identity Credential (issuer = your <K>OIDC_ISSUER_URL</K>, audience ={' '}
+          <K>api://AzureADTokenExchange</K>, subject = <K>customer/{`{cid}`}/agent/*</K>) + Reader
+          role assignment at subscription scope. Variables: <K>customer_id</K>,{' '}
+          <K>subscription_id</K>, <K>nomos_oidc_issuer</K> (override default to your issuer URL),{' '}
+          <K>resource_group_name</K> (narrow to one RG).
         </li>
         <li>
-          <strong className="text-aegis-paper">AWS</strong>{' '}
-          <K>github.com/auto-nomos/terraform-aws-nomos-bootstrap</K> — IAM OIDC provider + IAM role
-          with <K>sts:AssumeRoleWithWebIdentity</K> trust (sub-matched) +<K>ReadOnlyAccess</K>{' '}
-          managed policy. Region defaults to <K>us-east-1</K>; GovCloud is a separate variant.
+          <strong className="text-aegis-paper">AWS</strong> (
+          <K>infra/terraform/aws-nomos-bootstrap/</K>) — IAM OIDC provider trusting your issuer +
+          IAM role with <K>sts:AssumeRoleWithWebIdentity</K> trust keyed on{' '}
+          <K>sub == customer/{`{cid}`}/agent/*</K> + <K>aws:iam::aws:policy/ReadOnlyAccess</K>{' '}
+          attached. Variables: <K>customer_id</K>, <K>region</K>, <K>nomos_oidc_issuer</K>,{' '}
+          <K>managed_policy_arns</K>, <K>additional_policy_json</K> (narrow further).
         </li>
         <li>
-          <strong className="text-aegis-paper">GCP</strong>{' '}
-          <K>github.com/auto-nomos/terraform-google-nomos-bootstrap</K> — Workload Identity Pool +
-          Provider (issuer URI + audience + attribute mapping) + service account with{' '}
-          <K>roles/iam.workloadIdentityUser</K> and <K>roles/iam.serviceAccountTokenCreator</K> +
-          <K>roles/viewer</K>.
+          <strong className="text-aegis-paper">GCP</strong> (
+          <K>infra/terraform/google-nomos-bootstrap/</K>) — Workload Identity Pool + OIDC Provider
+          (with <K>attribute.customer == &quot;{`{cid}`}&quot;</K> condition so cross-customer cred
+          sharing is impossible) + service account granted <K>roles/viewer</K> + impersonation IAM
+          binding. Variables: <K>customer_id</K>, <K>project_id</K>, <K>nomos_oidc_issuer</K>,
+          <K>service_account_roles</K>.
         </li>
       </ul>
-      <P>
-        The <K>nomos</K> CLI ships a wrapper that scaffolds each TF module with a pinned version and
-        prints the <K>terraform init && terraform apply</K> commands. You run them — the CLI does
-        not <K>apply</K> on your behalf.
-      </P>
-      <Code lang="bash">{`# Bootstrap each cloud (interactive):
-nomos cloud-install azure
-nomos cloud-install aws  --role-name nomos-broker-readonly --region us-east-1
-nomos cloud-install gcp  --project my-proj --service-account nomos-broker`}</Code>
+      <Code lang="bash">{`terraform init
+terraform plan          # READ this carefully — it shows exactly what IAM lands
+terraform apply
+terraform output paste_into_nomos_dashboard
+# {
+#   "app_object_id"   = "..."
+#   "app_client_id"   = "..."
+#   "tenant_id"       = "..."
+#   "subscription_id" = "..."
+# }`}</Code>
 
-      <h3 className="mt-8 font-display text-[22px] text-aegis-paper">Dashboard — /app/cloud</h3>
+      <h4 className="mt-6 font-display text-[18px] text-aegis-paper">
+        Step 7 — Customer: paste outputs into the dashboard
+      </h4>
       <P>
-        Top-level nav under <strong>Build → Cloud accounts</strong>. Lists every connection row with
-        status badge (<K>verified</K> / <K>pending</K> / <K>broken</K>), last-verified timestamp,
-        and per-row <K>Verify now</K> + <K>Disconnect</K> actions. The bottom card starts the three
-        connect wizards (Azure / AWS / GCP). Paste Terraform outputs → wizard calls{' '}
-        <K>cloudConnections.create</K> → polls <K>verifyNow</K> until status flips green.
+        Open <K>/app/cloud</K>, click the connector card (Azure / AWS / GCP), and paste each
+        Terraform output into the matching field. The wizard calls <K>cloudConnections.create</K> on
+        the control plane, kicks off a verify probe, and redirects you to the list view. Watch the
+        status badge flip from <K>pending</K> to <K>verified</K> — that means we successfully minted
+        an ID token, exchanged it with the cloud&rsquo;s STS, and made a real probe call.
       </P>
-      <Callout tone="info">
-        Once <K>verified</K>, the agent flow is identical to OAuth: mint a UCAN carrying{' '}
-        <K>meta.cloud_connection_id</K>, call <K>/v1/proxy</K>, PDP routes through the cloud branch.
-      </Callout>
+      <ul className="ml-6 list-disc space-y-1.5 marker:text-aegis-signal">
+        <li>
+          Azure: <K>app_object_id</K>, <K>app_client_id</K>, <K>tenant_id</K>,{' '}
+          <K>subscription_id</K>.
+        </li>
+        <li>
+          AWS: <K>role_arn</K>, <K>account_id</K>, <K>region</K>.
+        </li>
+        <li>
+          GCP: <K>wif_provider</K>, <K>service_account_email</K>, <K>project_id</K>.
+        </li>
+      </ul>
 
-      <h3 className="mt-8 font-display text-[22px] text-aegis-paper">
+      <h4 className="mt-6 font-display text-[18px] text-aegis-paper">
+        Step 8 — Customer: write a Cedar policy and make the first call
+      </h4>
+      <P>
+        Go to <K>/app/policies</K>, click <strong>New policy</strong>, attach it to your app, and
+        paste something narrow — for example, allow only resource-group listing in one Azure
+        subscription:
+      </P>
+      <Code lang="cedar">{`permit (
+  principal,
+  action == Action::"/azure/resource_groups/list",
+  resource
+) when {
+  resource.subscription_id == "00000000-0000-0000-0000-000000000000"
+};`}</Code>
+      <P>
+        Mint a UCAN (dashboard <strong>Apps → API keys → Mint UCAN</strong> or via SDK), making sure{' '}
+        <K>meta.cloud_connection_id</K> is the UUID of the row you just created. Then your agent /
+        curl works end-to-end:
+      </P>
+      <Code lang="bash">{`curl -s https://pdp.<your-host>/v1/proxy \\
+  -H "authorization: Bearer $UCAN" \\
+  -H "content-type: application/json" \\
+  -d '{
+    "action": "/azure/resource_groups/list",
+    "resource": { "subscription_id": "00000000-..." },
+    "apiCall": {
+      "method": "GET",
+      "path": "/subscriptions/00000000-.../resourcegroups?api-version=2021-04-01"
+    }
+  }'
+# → 200 OK with the upstream ARM response.
+# Open /app/audit — three cloud rows linked to one receipt id.`}</Code>
+
+      <h3 className="mt-10 font-display text-[22px] text-aegis-paper">
         Permissions — three layers, in order
       </h3>
       <ol className="ml-6 list-decimal space-y-2 marker:text-aegis-signal">
         <li>
-          <strong className="text-aegis-paper">Cloud-side IAM grant</strong> — the Terraform module
-          attaches a role/policy to the federated identity. Narrow it: Reader at RG scope (Azure),
+          <strong className="text-aegis-paper">Cloud-side IAM grant</strong> — what the Terraform
+          module attaches to the federated identity. Narrow it: Reader at RG scope (Azure),{' '}
           <K>s3:GetObject</K> on one bucket (AWS), <K>roles/storage.objectViewer</K> on one project
-          (GCP). The federated identity can never do more than your cloud IAM allows.
+          (GCP). The federated identity can never do more than your cloud IAM allows — this is your
+          hard ceiling.
         </li>
         <li>
           <strong className="text-aegis-paper">Cedar policy</strong> — what the agent may ask the
@@ -1226,8 +1388,9 @@ nomos cloud-install gcp  --project my-proj --service-account nomos-broker`}</Cod
           resource attrs) that the cloud language can&rsquo;t express.
         </li>
         <li>
-          <strong className="text-aegis-paper">UCAN capability</strong> — the time-bound, App-bound
-          capability presented per call. Always a subset of policy. Revoke → next call denies.
+          <strong className="text-aegis-paper">UCAN capability</strong> — the time-bound, app-bound
+          capability presented per call. Always a subset of policy. Revoke → next call denies within
+          ~1s via the push channel.
         </li>
       </ol>
       <P>
@@ -1235,19 +1398,8 @@ nomos cloud-install gcp  --project my-proj --service-account nomos-broker`}</Cod
         attenuation (each child ⊆ parent).
       </P>
 
-      <h3 className="mt-8 font-display text-[22px] text-aegis-paper">Example Cedar policies</h3>
-      <Code lang="cedar">{`// Azure: allow VM reads, force cosigner on every destructive verb.
-permit (principal,
-        action in [Action::"/azure/vm/list", Action::"/azure/vm/get"],
-        resource)
-when { resource.subscription_id == "00000000-0000-0000-0000-000000000000" };
-
-forbid (principal,
-        action in [Action::"/azure/vm/delete", Action::"/azure/vm/stop"],
-        resource)
-unless { context.cosigner_present == true };
-
-// AWS: pin to one account, scope to one bucket.
+      <h3 className="mt-8 font-display text-[22px] text-aegis-paper">More Cedar examples</h3>
+      <Code lang="cedar">{`// AWS: pin to one account, scope to one bucket.
 permit (principal,
         action == Action::"/aws/s3/list_objects",
         resource)
@@ -1255,6 +1407,12 @@ when {
   resource.account_id == "123456789012" &&
   resource.bucket == "acme-reports"
 };
+
+// Azure: allow VM reads, force cosigner on every destructive verb.
+forbid (principal,
+        action in [Action::"/azure/vm/delete", Action::"/azure/vm/stop"],
+        resource)
+unless { context.cosigner_present == true };
 
 // GCP: lock the whole pack to one project.
 permit (principal, action like "/gcp/*", resource)
@@ -1270,26 +1428,26 @@ when { resource.project_id == "my-prod-proj" };`}</Code>
 
       <h3 className="mt-8 font-display text-[22px] text-aegis-paper">Action catalog</h3>
       <P>
-        Each pack curates ~10–25 first-class actions plus a <K>raw_call</K> escape hatch for
-        anything the typed surface doesn&rsquo;t cover yet.
+        Each pack curates first-class typed actions plus a <K>raw_call</K> escape hatch for anything
+        not yet typed. Full lists live in{' '}
+        <K>packages/schema-packs/src/{`{azure,aws,gcp}`}/actions.ts</K>.
       </P>
       <ul className="ml-6 list-disc space-y-1.5 marker:text-aegis-signal">
         <li>
-          <strong className="text-aegis-paper">azure</strong> — subscriptions / resource_groups /
-          resources / vm (list,get,start,stop,restart,delete,run_command) / vmss / aks / storage /
-          blob / key_vaults / app_services / acr / pipelines / metrics / cosmos / synapse /
-          log_analytics / cost_management / deployments. <K>/azure/raw_call</K> escape hatch.
+          <strong className="text-aegis-paper">azure</strong> — subscriptions, resource_groups,
+          resources, vm (list, get, start, stop, restart, delete, run_command), vmss, aks,
+          storage_accounts, blob_containers, key_vaults (metadata only), app_services, acr, metrics.{' '}
+          <K>/azure/raw_call</K> escape hatch.
         </li>
         <li>
-          <strong className="text-aegis-paper">aws</strong> — sts:get_caller_identity / ec2
-          (list,start,stop,terminate) / s3 (buckets,objects,delete) / lambda (list,invoke) / iam
-          (list_*) / rds (describe,reboot) / cloudwatch / cost_explorer / cloudformation.{' '}
-          <K>/aws/raw_call</K>.
+          <strong className="text-aegis-paper">aws</strong> — sts:get_caller_identity, ec2 (list,
+          start, stop, terminate), s3 (buckets, objects), lambda (list, invoke), iam (list_*), rds
+          (describe, reboot), cloudwatch, cost_explorer. <K>/aws/raw_call</K>.
         </li>
         <li>
-          <strong className="text-aegis-paper">gcp</strong> — cloudresourcemanager.projects.list /
-          compute.instances (list,get,start,stop,delete) / storage (buckets,objects) / bigquery /
-          cloudfunctions / iam.serviceaccounts / monitoring / logging. <K>/gcp/raw_call</K>.
+          <strong className="text-aegis-paper">gcp</strong> — cloudresourcemanager.projects.list,
+          compute.instances (list, get, start, stop, delete), storage (buckets, objects), bigquery,
+          cloudfunctions, iam.serviceaccounts, monitoring, logging. <K>/gcp/raw_call</K>.
         </li>
       </ul>
 
@@ -1330,13 +1488,13 @@ when {
         AWS: <K>sts:GetCallerIdentity</K>, GCP: <K>cloudresourcemanager:projects.get</K>).
         Two-strike rule for retryable failures; non-retryable (role removed) flips to <K>broken</K>{' '}
         immediately. Revert your Terraform-managed role by hand → the dashboard shows broken within
-        24 hours. The <K>Verify now</K> button runs the same probe on demand.
+        24 hours. The <K>Verify now</K> button in <K>/app/cloud</K> runs the same probe on demand.
       </P>
 
       <h3 className="mt-8 font-display text-[22px] text-aegis-paper">Step-up + chain snapshots</h3>
       <P>
         Identical to SaaS. Cedar or <K>cloud-risk-rules</K> mark the call requiresStepUp → PDP
-        returns 403 <K>cosigner_required</K> → operator approves via push or <K>/app/approvals</K>→
+        returns 403 <K>cosigner_required</K> → operator approves via push or <K>/app/approvals</K> →
         agent retries with cosigner UCAN → allow. For multi-agent swarms, the snapshot approval from{' '}
         <K>/app/swarms/{`{id}`}</K> covers every cloud call from any agent in the snapshot for the
         TTL, no matter the depth.
@@ -1346,45 +1504,72 @@ when {
         Egress proxy — defense-in-depth gate
       </h3>
       <P>
-        Set <K>EGRESS_PROXY_REQUIRE_TOKEN_FOR_CLOUDS=1</K> and the egress proxy refuses CONNECTs to
-        <K>*.amazonaws.com</K> / <K>management.azure.com</K> / <K>*.googleapis.com</K> without a
-        PDP-issued proxy-authorization token. W3C <K>traceparent</K> passes through so egress
-        observations link back to the PDP audit row via trace ID.
+        Set <K>EGRESS_PROXY_REQUIRE_TOKEN_FOR_CLOUDS=1</K> on the egress proxy and it refuses
+        CONNECTs to <K>*.amazonaws.com</K> / <K>management.azure.com</K> / <K>*.googleapis.com</K>{' '}
+        without a PDP-issued proxy-authorization token. W3C <K>traceparent</K> passes through so
+        egress observations link back to the PDP audit row via trace ID.
       </P>
 
-      <h3 className="mt-8 font-display text-[22px] text-aegis-paper">Operational checklist</h3>
-      <ul className="ml-6 list-disc space-y-1.5 marker:text-aegis-signal">
+      <h3 className="mt-8 font-display text-[22px] text-aegis-paper">Troubleshooting</h3>
+      <ul className="ml-6 list-disc space-y-2 marker:text-aegis-signal">
         <li>
-          AWS KMS key created for the OIDC signing key (RS256), policy granting CP <K>kms:Sign</K>{' '}
-          only.
+          <strong className="text-aegis-paper">
+            Wizard hangs at <K>pending</K>:
+          </strong>{' '}
+          run <K>Verify now</K>. If still pending, the cloud&rsquo;s STS cannot reach your issuer
+          URL — confirm the URL in CP env matches the issuer you deployed, and that{' '}
+          <K>/.well-known/openid-configuration</K> is publicly reachable (curl from a fresh
+          machine).
         </li>
         <li>
-          Cloudflare Worker for <K>id.auto-nomos.com</K> deployed (
-          <K>apps/oidc-issuer/wrangler.toml</K>); DNS pointed.
+          <strong className="text-aegis-paper">
+            <K>cloud.federation.exchanged.failed</K> with <K>InvalidIdentityToken</K> (AWS):
+          </strong>{' '}
+          AWS caches the OIDC thumbprint at IAM-provider create time. If you rotated the issuer TLS
+          cert, re-run <K>terraform apply</K> on the bootstrap module to refresh{' '}
+          <K>aws_iam_openid_connect_provider.thumbprint_list</K>.
         </li>
         <li>
-          CP env: <K>OIDC_ISSUER_URL=https://id.auto-nomos.com</K>,{' '}
-          <K>OIDC_KMS_KEY_REF=arn:aws:kms:...</K>,{' '}
-          <K>PDP_WEBHOOK_URLS=https://pdp.auto-nomos.com/v1/internal/audit/emit-cloud</K>.
+          <strong className="text-aegis-paper">
+            Azure <K>AADSTS70021</K>:
+          </strong>{' '}
+          subject mismatch. The federated credential subject must be{' '}
+          <K>customer/{`{cid}`}/agent/*</K> (wildcard); legacy subjects without the wildcard work
+          for one agent only. Re-run terraform with the latest module.
         </li>
         <li>
-          Migration <K>0028_cloud_iam_m0</K> applied (creates <K>oidc_issuer_keys</K> +{' '}
-          <K>cloud_connections</K>).
+          <strong className="text-aegis-paper">
+            GCP <K>invalid_grant</K>:
+          </strong>{' '}
+          WIF attribute condition rejects the token. Verify <K>attribute.customer</K> in the
+          provider matches your customer UUID exactly (case-sensitive).
         </li>
         <li>
-          Customer runs <K>terraform apply</K> on the bootstrap module for their cloud, pastes
-          outputs into <K>/app/cloud/connect/{`{connector}`}</K>.
-        </li>
-        <li>
-          Dashboard shows <K>verified</K> → first agent call ready.
+          <strong className="text-aegis-paper">
+            Call returns 403 <K>cosigner_required</K>:
+          </strong>{' '}
+          intended — your action hit the destructive-verbs allowlist in <K>cloud-risk-rules</K> or
+          your Cedar marked it. Approve once at <K>/app/approvals</K> or via Telegram and retry.
         </li>
       </ul>
 
-      <Callout tone="warn">
-        <strong className="text-aegis-paper">Beta:</strong> wire format + curated action surface
-        stable for one minor. <K>raw_call</K> seen-tuples table + cosigner-on-first-use semantics
-        will not change. Adding new typed actions never breaks existing ones.
-      </Callout>
+      <h3 className="mt-8 font-display text-[22px] text-aegis-paper">
+        What&rsquo;s still preview vs. GA
+      </h3>
+      <ul className="ml-6 list-disc space-y-1.5 marker:text-aegis-signal">
+        <li>
+          <strong className="text-aegis-paper">Preview today:</strong> issuer hosted at{' '}
+          <K>id.auto-nomos.com</K> (use your own Worker URL for now); public mirror of Terraform
+          modules at <K>github.com/auto-nomos/terraform-*</K>; in-cloud sidecar variant (
+          <K>--in-cloud</K>) — module emits a snippet, no production module yet.
+        </li>
+        <li>
+          <strong className="text-aegis-paper">Stable wire format:</strong>{' '}
+          <K>cloudConnections.create</K> input shape, the three audit kinds, UCAN{' '}
+          <K>meta.cloud_connection_id</K>, the raw_call seen-tuples semantics. New typed actions
+          land additively and never break older clients.
+        </li>
+      </ul>
     </Section>
   );
 }

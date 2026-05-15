@@ -1,19 +1,28 @@
 # terraform-aws-nomos-bootstrap
 
-Bootstrap an AWS account to trust the Nomos OIDC issuer.
+Bootstrap an AWS account to trust the Nomos OIDC issuer. Creates an IAM
+OIDC provider + IAM role with `sts:AssumeRoleWithWebIdentity` trust so the
+Nomos PDP can exchange a fresh ID token for short-lived STS credentials per
+agent request.
 
-> Final home: `github.com/auto-nomos/terraform-aws-nomos-bootstrap`. Mirrored
-> from this monorepo path until first release tag.
+> **Preview (2026-05-15):** no public mirror yet. Source this module from a
+> local path that points at `infra/terraform/aws-nomos-bootstrap/` in the
+> Nomos repo, or copy the directory into your own Terraform repo and pin to
+> a commit SHA. The CLI emits a working snippet automatically:
+> `nomos cloud install --aws --customer-id <id> --nomos-oidc-issuer <url>`.
 
 ## Usage
 
 ```hcl
 module "nomos" {
-  source  = "github.com/auto-nomos/terraform-aws-nomos-bootstrap"
-  version = "0.1.0"
+  # Preview: local-path source. Adjust the relative path to wherever
+  # you cloned the credential-broker repo.
+  source = "../credential-broker/infra/terraform/aws-nomos-bootstrap"
 
-  customer_id = "your-nomos-customer-uuid"
-  region      = "us-east-1"
+  customer_id       = "your-nomos-customer-uuid"      # from /app/settings/workspace
+  region            = "us-east-1"
+  nomos_oidc_issuer = "https://<your-issuer-host>"    # URL of the OIDC issuer you deployed
+                                                      # (see apps/oidc-issuer/)
 }
 
 output "nomos_paste_into_dashboard" {
@@ -35,7 +44,7 @@ output "nomos_paste_into_dashboard" {
 
 ## Federation flow
 
-1. Nomos mints OIDC ID token (RS256, AWS KMS) with `aud=sts.amazonaws.com`, `sub=customer/{id}/agent/{agent_id}`.
+1. Nomos mints OIDC ID token (RS256) with `aud=sts.amazonaws.com`, `sub=customer/{id}/agent/{agent_id}`, signed by either the dev in-memory signer or AWS KMS when `OIDC_KMS_KEY_REF` is set on the control plane.
 2. PDP POSTs to `sts.{region}.amazonaws.com` with `Action=AssumeRoleWithWebIdentity`, `RoleArn=<role-arn>`, `WebIdentityToken=<id-token>`.
 3. STS returns short-lived AccessKey + SecretKey + SessionToken (~1hr).
 4. PDP signs subsequent service calls with SigV4 using the credentials.

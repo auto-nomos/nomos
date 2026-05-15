@@ -38,9 +38,9 @@ const ANCHORS = [
   },
   {
     href: '/docs#cloud',
-    eyebrow: '05 · beta · cloud',
+    eyebrow: '05 · preview · cloud',
     title: 'Cloud IAM (Azure / AWS / GCP)',
-    body: 'Federated cloud access via id.auto-nomos.com. No stored secrets — STS / AAD / WIF token exchange per request.',
+    body: 'Federated cloud access. STS / AAD / WIF token exchange per request, no stored secrets. Self-host the OIDC issuer for now.',
   },
 ];
 

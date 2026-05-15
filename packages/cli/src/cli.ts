@@ -19,9 +19,14 @@ Commands:
   cb tui
       Launch the terminal approval / audit UI.
 
-  cb cloud install --aws|--azure|--gcp --customer-id <id> [--in-cloud]
-      Print the Terraform snippet to bootstrap federated cloud IAM (M5/M1/M7),
-      or with --in-cloud, the Nomos sidecar variant (M10).
+  cb cloud install --aws|--azure|--gcp --customer-id <uuid> \
+                   --nomos-oidc-issuer <https://...> \
+                   [--aws-region <region> | --subscription-id <id> | --project-id <id>] \
+                   [--source <terraform-source-expr>] [--in-cloud]
+      Print the Terraform snippet to bootstrap federated cloud IAM. Defaults
+      to a local-path source against this repo's infra/terraform/. Override
+      --source once you copy the module into your own infra repo (pin to a
+      commit SHA for production).
 
   cb help | --help | -h
       Show this help.
