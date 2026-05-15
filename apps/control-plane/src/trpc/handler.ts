@@ -4,6 +4,7 @@ import type { CredsCache } from '../cloud/creds-cache.js';
 import type { Config } from '../config.js';
 import type { Db } from '../db/index.js';
 import type { Logger } from '../logger.js';
+import type { InviteNotifier } from '../services/invites/notify.js';
 import type { TelegramBot } from '../services/notify/telegram-bot.js';
 import type { PolicyInvalidator } from '../services/policy-invalidator.js';
 import type { RevocationPublisher } from '../services/revocation-publisher.js';
@@ -24,6 +25,7 @@ export interface TrpcHandlerDeps {
   telegramBot?: TelegramBot;
   credsCache?: CredsCache;
   cloudVerifyPoll?: CloudVerifyPoll;
+  inviteNotifier?: InviteNotifier;
 }
 
 export function handleTrpc(req: Request, deps: TrpcHandlerDeps): Promise<Response> {
@@ -44,6 +46,7 @@ export function handleTrpc(req: Request, deps: TrpcHandlerDeps): Promise<Respons
         ...(deps.telegramBot ? { telegramBot: deps.telegramBot } : {}),
         ...(deps.credsCache ? { credsCache: deps.credsCache } : {}),
         ...(deps.cloudVerifyPoll ? { cloudVerifyPoll: deps.cloudVerifyPoll } : {}),
+        ...(deps.inviteNotifier ? { inviteNotifier: deps.inviteNotifier } : {}),
       }),
     onError: ({ error, path }) => {
       deps.logger.error({ err: error, path }, 'trpc error');
