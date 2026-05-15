@@ -1,6 +1,13 @@
 import { sha256Hex } from '@auto-nomos/crypto';
+import {
+  type Action,
+  expandRolePermissions,
+  hasPermission,
+  type Resource,
+  type Role,
+} from '@auto-nomos/rbac';
 import { and, eq, isNull } from 'drizzle-orm';
-import type { MiddlewareHandler } from 'hono';
+import type { Context, MiddlewareHandler } from 'hono';
 import { createMiddleware } from 'hono/factory';
 import type { Db } from '../db/index.js';
 import * as schema from '../db/schema.js';
@@ -13,6 +20,8 @@ export interface ApiKeyAuthVariables {
   customerId: string;
   agentId: string;
   apiKeyId: string;
+  role: Role;
+  permissions: ReturnType<typeof expandRolePermissions>;
 }
 
 /**
@@ -89,5 +98,34 @@ export const apiKeyAuth = (
     c.set('customerId', row.customerId);
     c.set('agentId', row.agentId);
     c.set('apiKeyId', row.id);
+    const role = row.role as Role;
+    c.set('role', role);
+    c.set('permissions', expandRolePermissions(role));
     await next();
   });
+
+/**
+ * Hono helper for routes mounted under `apiKeyAuth` middleware. Use after the
+ * api-key gate when a specific resource:action must be enforced for machine
+ * traffic — e.g. /v1/mint-ucan requires `agents:read` (the SDK is asking
+ * for a UCAN, which is the agent's authority).
+ */
+export function requirePermission(
+  resource: Resource,
+  action: Action,
+): MiddlewareHandler<{ Variables: ApiKeyAuthVariables }> {
+  return async (c: Context<{ Variables: ApiKeyAuthVariables }>, next) => {
+    const role = c.var.role;
+    if (!role || !hasPermission(role, resource, action)) {
+      return c.json(
+        {
+          error: `api key role ${role ?? '<missing>'} cannot ${action} ${resource}`,
+          error_code: 'role_forbidden',
+          requiredPermission: `${resource}:${action}`,
+        },
+        403,
+      );
+    }
+    await next();
+  };
+}
