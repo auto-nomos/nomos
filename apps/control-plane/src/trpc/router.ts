@@ -9,6 +9,8 @@ import { cloudConnectionsRouter } from './routers/cloud-connections.js';
 import { customersRouter } from './routers/customers.js';
 import { envelopesRouter } from './routers/envelopes.js';
 import { grantsRouter } from './routers/grants.js';
+import { invitesRouter } from './routers/invites.js';
+import { membersRouter } from './routers/members.js';
 import { notificationPreferencesRouter } from './routers/notification-preferences.js';
 import { oauthRouter } from './routers/oauth.js';
 import { observabilityRouter } from './routers/observability.js';
@@ -37,6 +39,8 @@ export const appRouter = router({
   swarms: swarmsRouter,
   chainApprovals: chainApprovalsRouter,
   observability: observabilityRouter,
+  members: membersRouter,
+  invites: invitesRouter,
 });
 
 export type AppRouter = typeof appRouter;

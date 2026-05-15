@@ -6,6 +6,7 @@ import type { Config } from '../config.js';
 import type { Db } from '../db/index.js';
 import * as schema from '../db/schema.js';
 import type { Logger } from '../logger.js';
+import { type InviteNotifier, loggerInviteNotifier } from '../services/invites/notify.js';
 import type { TelegramBot } from '../services/notify/telegram-bot.js';
 import { noopPolicyInvalidator, type PolicyInvalidator } from '../services/policy-invalidator.js';
 import {
@@ -35,6 +36,9 @@ export interface ContextDeps {
   credsCache?: CredsCache;
   /** Verify-poll worker for `cloudConnections.verifyNow` mutation. */
   cloudVerifyPoll?: CloudVerifyPoll;
+  /** Sends invite emails. Defaults to a logger-only fallback so dev/test
+   *  flows work without a Knock key. */
+  inviteNotifier?: InviteNotifier;
 }
 
 export interface Context {
@@ -48,6 +52,7 @@ export interface Context {
   telegramBot: TelegramBot | null;
   credsCache: CredsCache | null;
   cloudVerifyPoll: CloudVerifyPoll | null;
+  inviteNotifier: InviteNotifier;
   session: {
     user: { id: string; email: string; name: string | null };
     token: string;
@@ -117,6 +122,7 @@ export async function createContext(req: Request, deps: ContextDeps): Promise<Co
     telegramBot: deps.telegramBot ?? null,
     credsCache: deps.credsCache ?? null,
     cloudVerifyPoll: deps.cloudVerifyPoll ?? null,
+    inviteNotifier: deps.inviteNotifier ?? loggerInviteNotifier(deps.logger),
     session: userPayload,
     customerId,
     membership,

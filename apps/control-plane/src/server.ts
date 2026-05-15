@@ -23,6 +23,7 @@ import { createOidcRoutes } from './routes/oidc.js';
 import { createSkillRoutes } from './routes/skill.js';
 import { createSpansRoutes } from './routes/spans.js';
 import type { CoherenceVerifier } from './services/intent-coherence.js';
+import type { InviteNotifier } from './services/invites/notify.js';
 import type { TelegramBot } from './services/notify/telegram-bot.js';
 import type { PolicyInvalidator } from './services/policy-invalidator.js';
 import type { RevocationPublisher } from './services/revocation-publisher.js';
@@ -69,6 +70,8 @@ export interface ServerDeps {
   webauthn?: WebAuthnConfig;
   /** Telegram bot for customer event notifications. */
   telegramBot?: TelegramBot;
+  /** Org invite notifier. Defaults to a logger-only fallback when omitted. */
+  inviteNotifier?: InviteNotifier;
   /** P-CV1 — Optional LLM intent coherence verifier. When omitted,
    *  /v1/intent skips the coherence step entirely. */
   coherenceVerifier?: CoherenceVerifier;
@@ -204,6 +207,7 @@ export function createServer(deps: ServerDeps): Hono {
         ? { oauth: { config: deps.oauth.config, encryptionKey: deps.oauth.encryptionKey } }
         : {}),
       ...(deps.telegramBot ? { telegramBot: deps.telegramBot } : {}),
+      ...(deps.inviteNotifier ? { inviteNotifier: deps.inviteNotifier } : {}),
       ...(deps.cloud?.credsCache ? { credsCache: deps.cloud.credsCache } : {}),
       ...(deps.cloud?.verifyPoll ? { cloudVerifyPoll: deps.cloud.verifyPoll } : {}),
     }),
