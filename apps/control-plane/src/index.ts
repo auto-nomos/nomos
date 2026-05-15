@@ -16,6 +16,7 @@ import { createRecoveryNotifier } from './services/auth/recovery-notify.js';
 import { createCloudAuditPublisher } from './services/cloud-audit-publisher.js';
 import { createRiskSummarizer } from './services/grants/llm-risk-summary.js';
 import { createCoherenceVerifier } from './services/intent-coherence.js';
+import { createResendInviteNotifier } from './services/invites/resend.js';
 import { createTelegramBot, type TelegramBot } from './services/notify/telegram-bot.js';
 import { createOAuthSweep } from './services/oauth-sweep.js';
 import { createPolicyInvalidator } from './services/policy-invalidator.js';
@@ -267,6 +268,18 @@ async function main(): Promise<void> {
         })
       : undefined;
 
+  const inviteNotifier = createResendInviteNotifier({
+    apiKey: config.RESEND_API_KEY,
+    from: config.RESEND_FROM,
+    dashboardUrl: config.DASHBOARD_PUBLIC_URL,
+    logger,
+  });
+  if (config.RESEND_API_KEY && config.RESEND_FROM) {
+    logger.info({ from: config.RESEND_FROM }, 'resend invite notifier enabled');
+  } else {
+    logger.warn('resend invite notifier disabled — invite tokens log to console only');
+  }
+
   const app = createServer({
     logger,
     db,
@@ -276,6 +289,7 @@ async function main(): Promise<void> {
     oauth: { config, encryptionKey },
     revocationPublisher,
     policyInvalidator,
+    inviteNotifier,
     stepup: {
       notifier: stepUpNotifier,
       dashboardPublicUrl: config.DASHBOARD_PUBLIC_URL,

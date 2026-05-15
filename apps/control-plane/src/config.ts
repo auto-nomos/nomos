@@ -61,6 +61,12 @@ const Config = z.object({
     .default(7 * 24 * 60 * 60 * 1_000),
   DASHBOARD_PUBLIC_URL: z.string().url().default('http://localhost:3000'),
 
+  // Resend — org invite emails. Empty RESEND_API_KEY = dev console fallback
+  // (raw token logged via `loggerInviteNotifier`). RESEND_FROM must be a
+  // verified Resend sender, e.g. `Nomos <invites@auto-nomos.com>`.
+  RESEND_API_KEY: z.string().optional(),
+  RESEND_FROM: z.string().optional(),
+
   // P1 — M6 Telegram approval bot. Empty token = bot disabled (Knock /
   // dashboard PWA still work). Username (without leading @) is used to
   // build deep links: https://t.me/<username>?start=<token>.
