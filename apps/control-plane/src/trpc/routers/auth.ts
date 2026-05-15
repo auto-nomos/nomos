@@ -1,8 +1,37 @@
+import { expandRolePermissions, type Role } from '@auto-nomos/rbac';
 import { count, eq } from 'drizzle-orm';
 import * as schema from '../../db/schema.js';
 import { protectedProcedure, router } from '../index.js';
 
 export const authRouter = router({
+  /**
+   * Session info for the dashboard top-nav: user identity, active org id,
+   * role in the active org, pre-expanded permission bundle, and the list of
+   * orgs available for switching. One round-trip on page load.
+   */
+  me: protectedProcedure.query(async ({ ctx }) => {
+    const memberships = await ctx.db.drizzle.query.memberships.findMany({
+      where: eq(schema.memberships.userId, ctx.user.id),
+      with: { customer: true },
+    });
+    const availableOrgs = memberships
+      .filter((m) => m.customer)
+      .map((m) => ({
+        customerId: m.customerId,
+        slug: m.customer!.slug,
+        displayName: m.customer!.displayName,
+        role: m.role as Role,
+      }))
+      .sort((a, b) => a.displayName.localeCompare(b.displayName));
+    return {
+      user: ctx.user,
+      activeCustomerId: ctx.customerId,
+      activeRole: ctx.membership?.role ?? null,
+      permissions: ctx.membership ? expandRolePermissions(ctx.membership.role) : null,
+      availableOrgs,
+    };
+  }),
+
   /**
    * Returns the calling user's passkey-enrollment state. Consumed by the
    * dashboard `/app` layout to gate routes behind a registered passkey

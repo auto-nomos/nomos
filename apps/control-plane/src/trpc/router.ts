@@ -14,6 +14,7 @@ import { membersRouter } from './routers/members.js';
 import { notificationPreferencesRouter } from './routers/notification-preferences.js';
 import { oauthRouter } from './routers/oauth.js';
 import { observabilityRouter } from './routers/observability.js';
+import { organizationsRouter } from './routers/organizations.js';
 import { policiesRouter } from './routers/policies.js';
 import { schemasRouter } from './routers/schemas.js';
 import { stepupRouter } from './routers/stepup.js';
@@ -41,6 +42,7 @@ export const appRouter = router({
   observability: observabilityRouter,
   members: membersRouter,
   invites: invitesRouter,
+  organizations: organizationsRouter,
 });
 
 export type AppRouter = typeof appRouter;

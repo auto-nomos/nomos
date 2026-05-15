@@ -1,5 +1,5 @@
 import { expandRolePermissions, type Role } from '@auto-nomos/rbac';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import type { Auth } from '../auth/index.js';
 import type { CredsCache } from '../cloud/creds-cache.js';
 import type { Config } from '../config.js';
@@ -101,9 +101,26 @@ export async function createContext(req: Request, deps: ContextDeps): Promise<Co
       token: session.session.token,
     };
 
-    const row = await deps.db.drizzle.query.memberships.findFirst({
-      where: eq(schema.memberships.userId, session.user.id),
-    });
+    // Honor the x-cb-org cookie if it points at an org the user has a
+    // membership in; otherwise fall back to the first owner-role membership,
+    // then to the first membership of any role. Multi-org users have a
+    // dashboard switcher; single-org users always land on their default.
+    const requestedOrg = parseOrgCookie(req.headers.get('cookie') ?? '');
+    let row: Awaited<ReturnType<typeof deps.db.drizzle.query.memberships.findFirst>> | undefined;
+    if (requestedOrg) {
+      row = await deps.db.drizzle.query.memberships.findFirst({
+        where: and(
+          eq(schema.memberships.userId, session.user.id),
+          eq(schema.memberships.customerId, requestedOrg),
+        ),
+      });
+    }
+    if (!row) {
+      const all = await deps.db.drizzle.query.memberships.findMany({
+        where: eq(schema.memberships.userId, session.user.id),
+      });
+      row = all.find((m) => m.role === 'owner') ?? all[0];
+    }
     if (row) {
       customerId = row.customerId;
       membership = { customerId: row.customerId, role: row.role as Role };
@@ -128,4 +145,24 @@ export async function createContext(req: Request, deps: ContextDeps): Promise<Co
     membership,
     permissions,
   };
+}
+
+/**
+ * Extract the active-org id from the request cookie header. Returns null
+ * when the cookie is missing or malformed. UUID-shape check keeps callers
+ * from passing junk that would just miss the membership lookup anyway.
+ */
+function parseOrgCookie(cookieHeader: string): string | null {
+  if (cookieHeader === '') return null;
+  for (const part of cookieHeader.split(';')) {
+    const [rawName, ...rest] = part.split('=');
+    if (!rawName) continue;
+    if (rawName.trim() !== 'x-cb-org') continue;
+    const value = rest.join('=').trim();
+    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)) {
+      return value;
+    }
+    return null;
+  }
+  return null;
 }
