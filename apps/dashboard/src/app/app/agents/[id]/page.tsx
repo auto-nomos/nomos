@@ -25,6 +25,7 @@ import {
 } from '../../../../components/ui/dialog';
 import { Input } from '../../../../components/ui/input';
 import { Label } from '../../../../components/ui/label';
+import { Select } from '../../../../components/ui/select';
 import {
   Table,
   TableBody,
@@ -55,6 +56,9 @@ export default function AgentDetailPage({ params }: { params: Promise<{ id: stri
 
   const [revealedKey, setRevealedKey] = useState<string | null>(null);
   const [keyName, setKeyName] = useState('default');
+  const [keyRole, setKeyRole] = useState<
+    'owner' | 'admin' | 'agent_manager' | 'policy_author' | 'auditor' | 'member'
+  >('admin');
   const [issueOpen, setIssueOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
@@ -145,6 +149,7 @@ export default function AgentDetailPage({ params }: { params: Promise<{ id: stri
                 <TableHeader>
                   <TableRow>
                     <TableHead>Name</TableHead>
+                    <TableHead>Role</TableHead>
                     <TableHead>Prefix</TableHead>
                     <TableHead>Last seen</TableHead>
                     <TableHead>Client</TableHead>
@@ -156,6 +161,9 @@ export default function AgentDetailPage({ params }: { params: Promise<{ id: stri
                   {apiKeys.data.map((k) => (
                     <TableRow key={k.id}>
                       <TableCell className="font-medium">{k.name}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline">{k.role}</Badge>
+                      </TableCell>
                       <TableCell className="font-mono text-[11px] text-muted-foreground">
                         {k.prefix.slice(0, 20)}…
                       </TableCell>
@@ -424,14 +432,34 @@ export default function AgentDetailPage({ params }: { params: Promise<{ id: stri
               The plaintext is returned once. Store it somewhere safe.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-1.5">
-            <Label htmlFor="key-name">Key name</Label>
-            <Input
-              id="key-name"
-              value={keyName}
-              onChange={(e) => setKeyName(e.target.value)}
-              placeholder="ci, prod-deploy, …"
-            />
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="key-name">Key name</Label>
+              <Input
+                id="key-name"
+                value={keyName}
+                onChange={(e) => setKeyName(e.target.value)}
+                placeholder="ci, prod-deploy, …"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="key-role">Role</Label>
+              <Select
+                id="key-role"
+                value={keyRole}
+                onChange={(e) => setKeyRole(e.target.value as typeof keyRole)}
+              >
+                <option value="admin">admin — full access</option>
+                <option value="agent_manager">agent_manager — mint UCANs, manage agent</option>
+                <option value="policy_author">policy_author — read-only on agents</option>
+                <option value="auditor">auditor — read-only, cannot mint</option>
+                <option value="member">member — minimal scope</option>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Pick the least-privilege role for the workload. agent_manager is the safe default
+                for an MCP server that only needs to mint UCANs for its bound agent.
+              </p>
+            </div>
           </div>
           <DialogFooter>
             <Button
@@ -442,7 +470,7 @@ export default function AgentDetailPage({ params }: { params: Promise<{ id: stri
               Cancel
             </Button>
             <Button
-              onClick={() => createKey.mutate({ agentId: id, name: keyName })}
+              onClick={() => createKey.mutate({ agentId: id, name: keyName, role: keyRole })}
               disabled={createKey.isPending || keyName.length === 0}
             >
               {createKey.isPending ? 'Issuing…' : 'Issue key'}
