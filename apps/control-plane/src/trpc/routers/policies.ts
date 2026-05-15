@@ -6,29 +6,34 @@ import { TRPCError } from '@trpc/server';
 import { and, desc, eq, inArray } from 'drizzle-orm';
 import { z } from 'zod';
 import * as schema from '../../db/schema.js';
-import { router, tenantProcedure } from '../index.js';
+import { router, withPermission } from '../index.js';
 
 const COMMAND_RE = /^\/[a-z0-9_-]+(\/[a-z0-9_-]+)*$/;
 
 export const policiesRouter = router({
-  list: tenantProcedure.query(async ({ ctx }) => {
+  list: withPermission('policies', 'read').query(async ({ ctx }) => {
     return ctx.db.drizzle.query.policies.findMany({
       where: eq(schema.policies.customerId, ctx.customerId),
       orderBy: [desc(schema.policies.updatedAt)],
     });
   }),
 
-  get: tenantProcedure.input(z.object({ id: z.string().uuid() })).query(async ({ ctx, input }) => {
-    const policy = await ctx.db.drizzle.query.policies.findFirst({
-      where: and(eq(schema.policies.id, input.id), eq(schema.policies.customerId, ctx.customerId)),
-    });
-    if (!policy) {
-      throw new TRPCError({ code: 'NOT_FOUND', message: 'policy not found' });
-    }
-    return policy;
-  }),
+  get: withPermission('policies', 'read')
+    .input(z.object({ id: z.string().uuid() }))
+    .query(async ({ ctx, input }) => {
+      const policy = await ctx.db.drizzle.query.policies.findFirst({
+        where: and(
+          eq(schema.policies.id, input.id),
+          eq(schema.policies.customerId, ctx.customerId),
+        ),
+      });
+      if (!policy) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'policy not found' });
+      }
+      return policy;
+    }),
 
-  upsert: tenantProcedure
+  upsert: withPermission('policies', 'update')
     .input(
       z.object({
         id: z.string().uuid().optional(),
@@ -84,17 +89,19 @@ export const policiesRouter = router({
     }),
 
   /** Dry-run Cedar parse against arbitrary text without persisting. */
-  preview: tenantProcedure.input(z.object({ cedarText: z.string().min(1) })).query(({ input }) => {
-    const result = parsePolicy(input.cedarText);
-    return { ok: result.ok, errors: result.errors };
-  }),
+  preview: withPermission('policies', 'read')
+    .input(z.object({ cedarText: z.string().min(1) }))
+    .query(({ input }) => {
+      const result = parsePolicy(input.cedarText);
+      return { ok: result.ok, errors: result.errors };
+    }),
 
   /**
    * Cedar text → visual builder IR. Runs server-side because the parser
    * is the Node-only cedar-wasm binding; the dashboard's Visual tab calls
    * this on every Cedar edit (debounced).
    */
-  parseToIr: tenantProcedure
+  parseToIr: withPermission('policies', 'read')
     .input(z.object({ cedarText: z.string().min(1) }))
     .query(({ input }) => parseToIr(input.cedarText)),
 
@@ -105,7 +112,7 @@ export const policiesRouter = router({
    * text — other policies in the customer's bundle are ignored, so the
    * panel reflects what THIS policy decides in isolation.
    */
-  dryRun: tenantProcedure
+  dryRun: withPermission('policies', 'read')
     .input(
       z.object({
         policyId: z.string().uuid(),
@@ -156,7 +163,7 @@ export const policiesRouter = router({
       };
     }),
 
-  listAgents: tenantProcedure
+  listAgents: withPermission('policies', 'read')
     .input(z.object({ policyId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
       await assertPolicyInCustomer(ctx, input.policyId);
@@ -183,7 +190,7 @@ export const policiesRouter = router({
       return rows;
     }),
 
-  assignAgents: tenantProcedure
+  assignAgents: withPermission('policies', 'update')
     .input(
       z.object({
         policyId: z.string().uuid(),
@@ -215,10 +222,7 @@ async function assertPolicyInCustomer(
   policyId: string,
 ): Promise<void> {
   const policy = await ctx.db.drizzle.query.policies.findFirst({
-    where: and(
-      eq(schema.policies.id, policyId),
-      eq(schema.policies.customerId, ctx.customerId),
-    ),
+    where: and(eq(schema.policies.id, policyId), eq(schema.policies.customerId, ctx.customerId)),
     columns: { id: true },
   });
   if (!policy) {
@@ -233,9 +237,7 @@ async function assertAgentsInCustomer(
   const found = await ctx.db.drizzle
     .select({ id: schema.agents.id })
     .from(schema.agents)
-    .where(
-      and(eq(schema.agents.customerId, ctx.customerId), inArray(schema.agents.id, agentIds)),
-    );
+    .where(and(eq(schema.agents.customerId, ctx.customerId), inArray(schema.agents.id, agentIds)));
   if (found.length !== agentIds.length) {
     throw new TRPCError({ code: 'NOT_FOUND', message: 'one or more agents not found' });
   }

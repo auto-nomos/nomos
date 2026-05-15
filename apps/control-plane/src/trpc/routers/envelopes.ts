@@ -6,7 +6,7 @@ import {
   listActiveEnvelopes as listActiveEnvelopesService,
   revokeEnvelope as revokeEnvelopeService,
 } from '../../services/envelope-store.js';
-import { router, tenantProcedure } from '../index.js';
+import { router, withPermission } from '../index.js';
 
 export const envelopesRouter = router({
   /**
@@ -14,7 +14,7 @@ export const envelopesRouter = router({
    * agent). Used by the dashboard "Active grants" panel; revoked /
    * expired rows are filtered out by `listActiveEnvelopes`.
    */
-  list: tenantProcedure
+  list: withPermission('envelopes', 'read')
     .input(z.object({ agentId: z.string().uuid().optional() }))
     .query(async ({ ctx, input }) => {
       if (input.agentId) {
@@ -54,7 +54,7 @@ export const envelopesRouter = router({
    * UCANs minted earlier still respect their own `exp`; if you need
    * those gone immediately, revoke them by cid via ucansRouter.
    */
-  revoke: tenantProcedure
+  revoke: withPermission('envelopes', 'delete')
     .input(z.object({ id: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
       const revoked = await revokeEnvelopeService(
