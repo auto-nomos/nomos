@@ -101,10 +101,14 @@ export async function createContext(req: Request, deps: ContextDeps): Promise<Co
       token: session.session.token,
     };
 
-    // Honor the x-cb-org cookie if it points at an org the user has a
-    // membership in; otherwise fall back to the first owner-role membership,
-    // then to the first membership of any role. Multi-org users have a
-    // dashboard switcher; single-org users always land on their default.
+    // Resolution order for the active organization:
+    //   1. x-cb-org cookie (fast hot-switch via dashboard)
+    //   2. user.active_customer_id (server-persisted on invite-accept + switch)
+    //   3. first owner-role membership
+    //   4. first membership of any role
+    // The cookie and the DB column are kept in sync by the switch mutation
+    // and the invite accept mutation. The fallbacks exist for first-load on
+    // a fresh device where neither has been populated yet.
     const requestedOrg = parseOrgCookie(req.headers.get('cookie') ?? '');
     let row: Awaited<ReturnType<typeof deps.db.drizzle.query.memberships.findFirst>> | undefined;
     if (requestedOrg) {
@@ -114,6 +118,20 @@ export async function createContext(req: Request, deps: ContextDeps): Promise<Co
           eq(schema.memberships.customerId, requestedOrg),
         ),
       });
+    }
+    if (!row) {
+      const userRow = await deps.db.drizzle.query.user.findFirst({
+        where: eq(schema.user.id, session.user.id),
+        columns: { activeCustomerId: true },
+      });
+      if (userRow?.activeCustomerId) {
+        row = await deps.db.drizzle.query.memberships.findFirst({
+          where: and(
+            eq(schema.memberships.userId, session.user.id),
+            eq(schema.memberships.customerId, userRow.activeCustomerId),
+          ),
+        });
+      }
     }
     if (!row) {
       const all = await deps.db.drizzle.query.memberships.findMany({

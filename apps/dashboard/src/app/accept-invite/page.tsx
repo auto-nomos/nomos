@@ -50,10 +50,11 @@ function AcceptInviteInner() {
     accept.mutate({ token });
   }, [autoAttempted, token, session.isPending, accept]);
 
-  // Auto-redirect after join: set org cookie so the invited org becomes active.
+  // Auto-redirect after join. The backend has already persisted
+  // user.active_customer_id on the joined org, so /app loads the invited
+  // org directly — no cookie juggling needed here.
   useEffect(() => {
     if (accept.data?.status !== 'joined') return;
-    document.cookie = `x-cb-org=${accept.data.customerId}; path=/; SameSite=Lax`;
     router.push('/app');
   }, [accept.data, router]);
 
@@ -82,15 +83,7 @@ function AcceptInviteInner() {
                 <span className="font-medium">{accept.data.orgName}</span> as{' '}
                 <span className="font-medium">{accept.data.role}</span>.
               </p>
-              <Button
-                onClick={() => {
-                  if (accept.data?.status === 'joined') {
-                    document.cookie = `x-cb-org=${accept.data.customerId}; path=/; SameSite=Lax`;
-                  }
-                  router.push('/app');
-                }}
-                className="w-full"
-              >
+              <Button onClick={() => router.push('/app')} className="w-full">
                 Open dashboard
               </Button>
             </div>

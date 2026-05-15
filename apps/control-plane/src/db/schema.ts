@@ -99,6 +99,12 @@ export const user = pgTable(
     // on this being non-null so a grace-period password sign-in lands on
     // `/onboarding/enroll-passkey` until the user actually enrolls.
     passkeyEnrolledAt: timestamp('passkey_enrolled_at', { withTimezone: true }),
+    // Active organization for this user. Set on invite accept + org switch.
+    // context.ts honours this after the x-cb-org cookie and before the
+    // owner-role fallback. Nullable so legacy rows + just-signed-up users
+    // (created via the auth hook in a transaction that races migration 0030)
+    // still resolve.
+    activeCustomerId: uuid('active_customer_id'),
   },
   (t) => ({
     emailIdx: uniqueIndex('user_email_idx').on(t.email),

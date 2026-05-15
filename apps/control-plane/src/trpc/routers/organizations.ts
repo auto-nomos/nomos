@@ -57,6 +57,13 @@ export const organizationsRouter = router({
       if (!membership) {
         throw new TRPCError({ code: 'NOT_FOUND', message: 'no membership for that org' });
       }
+      // Persist server-side so a clean browser / incognito session lands in
+      // the right org without the cookie. context.ts honours the cookie first
+      // for hot-switching, but this DB column is the durable source.
+      await ctx.db.drizzle
+        .update(schema.user)
+        .set({ activeCustomerId: input.customerId })
+        .where(eq(schema.user.id, ctx.user.id));
       return {
         customerId: input.customerId,
         role: membership.role,

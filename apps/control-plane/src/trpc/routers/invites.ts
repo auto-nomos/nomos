@@ -217,6 +217,15 @@ export const invitesRouter = router({
         .set({ acceptedAt: new Date() })
         .where(eq(schema.orgInvites.id, invite.id));
 
+      // Steer the just-joined user into the invited org on next page render.
+      // context.ts reads this after the cookie + before the owner-role
+      // fallback, so an admin invited into "Acme" no longer lands in their
+      // own auto-created org.
+      await ctx.db.drizzle
+        .update(schema.user)
+        .set({ activeCustomerId: invite.customerId })
+        .where(eq(schema.user.id, ctx.session.user.id));
+
       return {
         status: 'joined' as const,
         customerId: invite.customerId,
