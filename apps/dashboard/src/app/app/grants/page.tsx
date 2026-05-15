@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { formatEnvelopeAsk } from '../../../lib/format-envelope';
 import { trpc } from '../../../lib/trpc';
+import { usePermissions } from '../../../lib/use-permissions';
 import { cn } from '../../../lib/utils';
 
 /* ======================================================================
@@ -22,6 +23,10 @@ import { cn } from '../../../lib/utils';
 type Klass = 'envelopes' | 'remembered';
 
 export default function StandingGrantsPage() {
+  const { can } = usePermissions();
+  const canRevokeEnv = can('envelopes', 'delete');
+  const canRevokeGrant = can('grants', 'delete');
+  const canToggleGrant = can('grants', 'update');
   const [klass, setKlass] = useState<Klass>('envelopes');
   const envelopes = trpc.envelopes.list.useQuery({});
   const grants = trpc.grants.list.useQuery();
@@ -169,7 +174,8 @@ export default function StandingGrantsPage() {
                         <button
                           type="button"
                           onClick={() => revokeEnvelope.mutate({ id: e.id })}
-                          disabled={revokeEnvelope.isPending}
+                          disabled={!canRevokeEnv || revokeEnvelope.isPending}
+                          title={canRevokeEnv ? undefined : 'Need policy_author/admin role'}
                           className="rounded-sm border border-aegis-line px-3 py-1 font-mono text-[10px] uppercase tracking-[0.16em] text-aegis-coral transition-colors hover:border-aegis-coral/60 hover:bg-aegis-coral/10 disabled:opacity-50"
                         >
                           revoke
@@ -234,7 +240,8 @@ export default function StandingGrantsPage() {
                     <button
                       type="button"
                       onClick={() => toggleGrant.mutate({ grantId: g.id })}
-                      disabled={toggleGrant.isPending}
+                      disabled={!canToggleGrant || toggleGrant.isPending}
+                      title={canToggleGrant ? undefined : 'Need admin or agent_manager role'}
                       className="rounded-sm border border-aegis-line px-3 py-1 font-mono text-[10px] uppercase tracking-[0.16em] text-aegis-paper transition-colors hover:border-aegis-line-strong hover:bg-aegis-surface-2 disabled:opacity-50"
                     >
                       flip
@@ -242,7 +249,8 @@ export default function StandingGrantsPage() {
                     <button
                       type="button"
                       onClick={() => revokeGrant.mutate({ grantId: g.id })}
-                      disabled={revokeGrant.isPending}
+                      disabled={!canRevokeGrant || revokeGrant.isPending}
+                      title={canRevokeGrant ? undefined : 'Need admin or agent_manager role'}
                       className="rounded-sm border border-aegis-line px-3 py-1 font-mono text-[10px] uppercase tracking-[0.16em] text-aegis-coral transition-colors hover:border-aegis-coral/60 hover:bg-aegis-coral/10 disabled:opacity-50"
                     >
                       revoke

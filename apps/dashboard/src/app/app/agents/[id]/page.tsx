@@ -72,6 +72,9 @@ export default function AgentDetailPage({ params }: { params: Promise<{ id: stri
   const revokeKey = trpc.apiKeys.revoke.useMutation({
     onSuccess: () => utils.apiKeys.list.invalidate({ agentId: id }),
   });
+  const updateKeyRole = trpc.apiKeys.updateRole.useMutation({
+    onSuccess: () => utils.apiKeys.list.invalidate({ agentId: id }),
+  });
   const deleteAgent = trpc.agents.delete.useMutation({
     onSuccess: () => {
       utils.agents.list.invalidate();
@@ -162,7 +165,28 @@ export default function AgentDetailPage({ params }: { params: Promise<{ id: stri
                     <TableRow key={k.id}>
                       <TableCell className="font-medium">{k.name}</TableCell>
                       <TableCell>
-                        <Badge variant="outline">{k.role}</Badge>
+                        {k.revokedAt ? (
+                          <Badge variant="outline">{k.role}</Badge>
+                        ) : (
+                          <Select
+                            value={k.role}
+                            disabled={updateKeyRole.isPending}
+                            onChange={(e) =>
+                              updateKeyRole.mutate({
+                                id: k.id,
+                                role: e.target.value as typeof k.role,
+                              })
+                            }
+                            className="h-7 text-xs"
+                          >
+                            <option value="admin">admin</option>
+                            <option value="agent_manager">agent_manager</option>
+                            <option value="policy_author">policy_author</option>
+                            <option value="auditor">auditor</option>
+                            <option value="member">member</option>
+                            <option value="owner">owner</option>
+                          </Select>
+                        )}
                       </TableCell>
                       <TableCell className="font-mono text-[11px] text-muted-foreground">
                         {k.prefix.slice(0, 20)}…

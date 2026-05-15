@@ -20,6 +20,7 @@ import {
 } from '../../../components/ui/table';
 import { type ConnectorId, OAUTH_FLOW_CONNECTORS, startOAuthConnect } from '../../../lib/oauth';
 import { trpc } from '../../../lib/trpc';
+import { usePermissions } from '../../../lib/use-permissions';
 import { ManualTokenForm } from './manual-token';
 
 const CONNECTOR_LABELS: Record<string, string> = {
@@ -30,6 +31,10 @@ const CONNECTOR_LABELS: Record<string, string> = {
 };
 
 export default function ConnectionsPage() {
+  const { can } = usePermissions();
+  const canCreate = can('oauth', 'create');
+  const canUpdate = can('oauth', 'update');
+  const canDelete = can('oauth', 'delete');
   const utils = trpc.useUtils();
   const list = trpc.oauth.list.useQuery();
   const disconnect = trpc.oauth.disconnect.useMutation({
@@ -123,7 +128,8 @@ export default function ConnectionsPage() {
                           <Button
                             size="sm"
                             variant="outline"
-                            disabled={refresh.isPending}
+                            disabled={!canUpdate || refresh.isPending}
+                            title={canUpdate ? undefined : 'Need admin or agent_manager role'}
                             onClick={() => refresh.mutate({ connectionId: r.id })}
                           >
                             {refresh.isPending && refresh.variables?.connectionId === r.id
@@ -134,7 +140,8 @@ export default function ConnectionsPage() {
                         <Button
                           size="sm"
                           variant="outline"
-                          disabled={pendingConnect !== null}
+                          disabled={!canCreate || pendingConnect !== null}
+                          title={canCreate ? undefined : 'Need admin or agent_manager role'}
                           onClick={() => reconnect(r.connector as ConnectorId)}
                         >
                           {pendingConnect === r.connector ? 'Redirecting…' : 'Reconnect'}
@@ -142,7 +149,8 @@ export default function ConnectionsPage() {
                         <Button
                           size="sm"
                           variant="destructive"
-                          disabled={disconnect.isPending}
+                          disabled={!canDelete || disconnect.isPending}
+                          title={canDelete ? undefined : 'Need admin role'}
                           onClick={() => {
                             if (
                               confirm(`Disconnect ${CONNECTOR_LABELS[r.connector] ?? r.connector}?`)
@@ -179,7 +187,11 @@ export default function ConnectionsPage() {
         <Card>
           <CardHeader>
             <CardTitle>Available</CardTitle>
-            <CardDescription>Add a new SaaS connection.</CardDescription>
+            <CardDescription>
+              {canCreate
+                ? 'Add a new SaaS connection.'
+                : "Read-only — your role can't add new connections."}
+            </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-wrap gap-2">
             {unconnected.map((id) => (
@@ -187,7 +199,8 @@ export default function ConnectionsPage() {
                 key={id}
                 size="sm"
                 variant="outline"
-                disabled={pendingConnect !== null}
+                disabled={!canCreate || pendingConnect !== null}
+                title={canCreate ? undefined : 'Need admin or agent_manager role'}
                 onClick={() => reconnect(id)}
               >
                 {pendingConnect === id ? 'Redirecting…' : `Connect ${CONNECTOR_LABELS[id] ?? id}`}

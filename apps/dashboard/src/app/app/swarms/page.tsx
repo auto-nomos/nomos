@@ -21,6 +21,7 @@ import {
   TableRow,
 } from '../../../components/ui/table';
 import { trpc } from '../../../lib/trpc';
+import { usePermissions } from '../../../lib/use-permissions';
 import { formatDate } from '../../../lib/utils';
 
 function ExplainerCard() {
@@ -150,6 +151,8 @@ function CreateSwarmForm({
   agents: { id: string; name: string }[];
   onCreated?: () => void;
 }) {
+  const { can } = usePermissions();
+  const canCreate = can('swarms', 'create');
   const utils = trpc.useUtils();
   const create = trpc.swarms.create.useMutation({
     onSuccess: () => {
@@ -190,7 +193,8 @@ function CreateSwarmForm({
         </select>
         <Button
           onClick={() => create.mutate({ name, rootAgentId })}
-          disabled={!name || !rootAgentId || create.isPending}
+          disabled={!canCreate || !name || !rootAgentId || create.isPending}
+          title={canCreate ? undefined : 'Need admin or agent_manager role'}
         >
           <Plus className="mr-1 h-4 w-4" />
           Create

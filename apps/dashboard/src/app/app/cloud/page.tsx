@@ -19,6 +19,7 @@ import {
   TableRow,
 } from '../../../components/ui/table';
 import { trpc } from '../../../lib/trpc';
+import { usePermissions } from '../../../lib/use-permissions';
 
 const CONNECTOR_LABEL: Record<string, string> = {
   azure: 'Azure',
@@ -33,6 +34,10 @@ const STATUS_VARIANT: Record<string, 'default' | 'secondary' | 'destructive' | '
 };
 
 export default function CloudAccountsPage() {
+  const { can } = usePermissions();
+  const canUpdate = can('cloud_connections', 'update');
+  const canDelete = can('cloud_connections', 'delete');
+  const canCreate = can('cloud_connections', 'create');
   const utils = trpc.useUtils();
   const list = trpc.cloudConnections.list.useQuery();
   const disconnect = trpc.cloudConnections.disconnect.useMutation({
@@ -119,8 +124,10 @@ export default function CloudAccountsPage() {
                         variant="outline"
                         size="sm"
                         disabled={
-                          verifyNow.isPending && verifyNow.variables?.connectionId === row.id
+                          !canUpdate ||
+                          (verifyNow.isPending && verifyNow.variables?.connectionId === row.id)
                         }
+                        title={canUpdate ? undefined : 'Need admin or agent_manager role'}
                         onClick={() => verifyNow.mutate({ connectionId: row.id })}
                       >
                         {verifyNow.isPending && verifyNow.variables?.connectionId === row.id
@@ -130,7 +137,8 @@ export default function CloudAccountsPage() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        disabled={disconnect.isPending}
+                        disabled={!canDelete || disconnect.isPending}
+                        title={canDelete ? undefined : 'Need admin role'}
                         onClick={() => disconnect.mutate({ connectionId: row.id })}
                       >
                         Disconnect
@@ -147,9 +155,15 @@ export default function CloudAccountsPage() {
       <Card>
         <CardHeader>
           <CardTitle>Connect a new cloud</CardTitle>
-          <CardDescription>One Terraform module per cloud. Open-source, MIT.</CardDescription>
+          <CardDescription>
+            {canCreate
+              ? 'One Terraform module per cloud. Open-source, MIT.'
+              : "Read-only — your role can't register a new cloud account. Ask an owner or admin."}
+          </CardDescription>
         </CardHeader>
-        <CardContent className="grid gap-4 md:grid-cols-3">
+        <CardContent
+          className={`grid gap-4 md:grid-cols-3 ${canCreate ? '' : 'pointer-events-none opacity-50'}`}
+        >
           <Link
             href="/app/cloud/connect/azure"
             className="rounded-md border border-border bg-card p-4 transition hover:border-primary"

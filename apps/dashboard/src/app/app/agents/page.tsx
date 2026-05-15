@@ -20,9 +20,13 @@ import {
   TableRow,
 } from '../../../components/ui/table';
 import { trpc } from '../../../lib/trpc';
+import { usePermissions } from '../../../lib/use-permissions';
 import { formatDate, shortId } from '../../../lib/utils';
 
 export default function AgentsPage() {
+  const { can } = usePermissions();
+  const canCreate = can('agents', 'create');
+  const canApprove = can('agents', 'update');
   const list = trpc.agents.list.useQuery();
   const pending = trpc.agents.pendingConnections.useQuery();
   const utils = trpc.useUtils();
@@ -50,16 +54,24 @@ export default function AgentsPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button asChild variant="outline">
-            <Link href="/app/agents/connect">
-              <Plug className="h-4 w-4" /> Connect an agent
-            </Link>
-          </Button>
-          <Button asChild>
-            <Link href="/app/agents/new">
-              <Plus className="h-4 w-4" /> New App
-            </Link>
-          </Button>
+          {canCreate ? (
+            <>
+              <Button asChild variant="outline">
+                <Link href="/app/agents/connect">
+                  <Plug className="h-4 w-4" /> Connect an agent
+                </Link>
+              </Button>
+              <Button asChild>
+                <Link href="/app/agents/new">
+                  <Plus className="h-4 w-4" /> New App
+                </Link>
+              </Button>
+            </>
+          ) : (
+            <span className="text-xs text-muted-foreground">
+              Read-only — your role can't create apps
+            </span>
+          )}
         </div>
       </header>
 
@@ -90,14 +102,16 @@ export default function AgentsPage() {
                     size="sm"
                     variant="outline"
                     onClick={() => deny.mutate({ id: a.id })}
-                    disabled={deny.isPending}
+                    disabled={deny.isPending || !canApprove}
+                    title={canApprove ? undefined : 'Need admin or agent_manager role'}
                   >
                     <X className="h-3.5 w-3.5" /> Deny
                   </Button>
                   <Button
                     size="sm"
                     onClick={() => approve.mutate({ id: a.id })}
-                    disabled={approve.isPending}
+                    disabled={approve.isPending || !canApprove}
+                    title={canApprove ? undefined : 'Need admin or agent_manager role'}
                   >
                     <Check className="h-3.5 w-3.5" /> Approve
                   </Button>

@@ -113,6 +113,34 @@ export const apiKeysRouter = router({
       };
     }),
 
+  /**
+   * Downgrade or upgrade the role bound to an existing API key. Used to
+   * tighten backfilled keys that default to `admin` so machine traffic runs
+   * least-privilege. Cannot revive a revoked key. The plaintext is unaffected.
+   */
+  updateRole: withPermission('api_keys', 'update')
+    .input(z.object({ id: z.string().uuid(), role: z.enum(ROLES) }))
+    .mutation(async ({ ctx, input }) => {
+      const [updated] = await ctx.db.drizzle
+        .update(schema.apiKeys)
+        .set({ role: input.role })
+        .where(
+          and(
+            eq(schema.apiKeys.id, input.id),
+            eq(schema.apiKeys.customerId, ctx.customerId),
+            isNull(schema.apiKeys.revokedAt),
+          ),
+        )
+        .returning({
+          id: schema.apiKeys.id,
+          role: schema.apiKeys.role,
+        });
+      if (!updated) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'api key not found or revoked' });
+      }
+      return { id: updated.id, role: updated.role as Role };
+    }),
+
   revoke: withPermission('api_keys', 'delete')
     .input(z.object({ id: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {

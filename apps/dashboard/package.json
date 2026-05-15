@@ -16,6 +16,7 @@
     "@auto-nomos/cedar": "workspace:*",
     "@auto-nomos/control-plane": "workspace:*",
     "@auto-nomos/policy-builder": "workspace:*",
+    "@auto-nomos/rbac": "workspace:*",
     "@auto-nomos/schema-packs": "workspace:*",
     "@auto-nomos/shared-types": "workspace:*",
     "@dagrejs/dagre": "^1.1.8",

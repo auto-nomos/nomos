@@ -19,9 +19,12 @@ import {
   TableRow,
 } from '../../../components/ui/table';
 import { trpc } from '../../../lib/trpc';
+import { usePermissions } from '../../../lib/use-permissions';
 import { formatDate } from '../../../lib/utils';
 
 export default function PoliciesPage() {
+  const { can } = usePermissions();
+  const canCreate = can('policies', 'create');
   const list = trpc.policies.list.useQuery();
   const grouped = groupByIntegration(list.data ?? []);
 
@@ -34,11 +37,17 @@ export default function PoliciesPage() {
             Cedar policies. The PDP enforces these on every authorize call.
           </p>
         </div>
-        <Button asChild>
-          <Link href="/app/policies/new">
-            <Plus className="h-4 w-4" /> New policy
-          </Link>
-        </Button>
+        {canCreate ? (
+          <Button asChild>
+            <Link href="/app/policies/new">
+              <Plus className="h-4 w-4" /> New policy
+            </Link>
+          </Button>
+        ) : (
+          <span className="text-xs text-muted-foreground">
+            Read-only — need policy_author/admin
+          </span>
+        )}
       </header>
 
       {list.isPending ? (
@@ -81,11 +90,13 @@ export default function PoliciesPage() {
       ) : (
         <div className="rounded-lg border border-dashed p-8 text-center">
           <p className="text-sm text-muted-foreground">No policies yet.</p>
-          <Button asChild className="mt-4" size="sm">
-            <Link href="/app/policies/new">
-              <Plus className="h-4 w-4" /> Create your first policy
-            </Link>
-          </Button>
+          {canCreate ? (
+            <Button asChild className="mt-4" size="sm">
+              <Link href="/app/policies/new">
+                <Plus className="h-4 w-4" /> Create your first policy
+              </Link>
+            </Button>
+          ) : null}
         </div>
       )}
     </div>

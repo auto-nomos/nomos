@@ -189,6 +189,9 @@ importers:
       '@auto-nomos/policy-builder':
         specifier: workspace:*
         version: link:../../packages/policy-builder
+      '@auto-nomos/rbac':
+        specifier: workspace:*
+        version: link:../../packages/rbac
       '@auto-nomos/schema-packs':
         specifier: workspace:*
         version: link:../../packages/schema-packs
