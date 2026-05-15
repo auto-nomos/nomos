@@ -44,6 +44,7 @@ done
 # ── 3. Issue / renew certs via nginx plugin ───────────────────────────────────
 log "Issuing certificates for ${DOMAINS[*]}..."
 certbot --nginx --non-interactive --agree-tos \
+  --expand \
   --email "$EMAIL" \
   --redirect \
   -d "${DOMAINS[0]}" -d "${DOMAINS[1]}" -d "${DOMAINS[2]}"
