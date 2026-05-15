@@ -127,7 +127,7 @@ function Header() {
       <div className="mt-6 flex flex-wrap items-center gap-2 font-mono text-[11px] uppercase tracking-[0.16em] text-aegis-faint">
         <span>~20 min read</span>
         <span aria-hidden>·</span>
-        <span>last updated 2026-05-15 · MAOS beta · filesystem + SSH GA · Cloud IAM preview</span>
+        <span>last updated 2026-05-15 · MAOS beta · filesystem + SSH GA · Cloud IAM beta</span>
         <span aria-hidden>·</span>
         <a href="#quickstart" className="text-aegis-signal hover:underline">
           Skip to 5-min quickstart →
@@ -1118,30 +1118,20 @@ subprocess.Popen(["python","./researcher.py"], env=env)`}</Code>
 
 function CloudIam() {
   return (
-    <Section id="cloud" eyebrow="12 · runtime · preview" title="Cloud IAM — Azure, AWS, GCP.">
-      <Callout tone="warn">
-        <strong className="text-aegis-paper">Preview status (2026-05-15).</strong> Cloud federation
-        code, Terraform modules, and dashboard wizards are merged on <K>main</K>, but the public
-        OIDC issuer at <K>id.auto-nomos.com</K> is <strong>not deployed yet</strong> and there is no
-        public mirror of the Terraform modules. This guide explains how to self-host the issuer and
-        reference the modules from this repo so you can run end-to-end against a real cloud tenant
-        today. Production-grade KMS-backed signing + the public mirror are coming with the first
-        cloud GA release.
-      </Callout>
-
+    <Section id="cloud" eyebrow="12 · runtime · beta" title="Cloud IAM — Azure, AWS, GCP.">
       <P>
         Nomos brokers cloud the same way it brokers SaaS — except there is{' '}
-        <em>no token to store</em>. We run an OIDC issuer; your cloud trusts it via federation; on
-        every agent request we mint a fresh OIDC ID token and exchange it with the cloud&rsquo;s STS
-        endpoint for a short-lived session credential (1–15 min TTL). Disconnect the cloud account
-        in <K>/app/cloud</K> and the next call denies within a second.
+        <em>no token to store</em>. We run an OIDC issuer at <K>id.auto-nomos.com</K>; your cloud
+        trusts it via federation; on every agent request we mint a fresh RS256 ID token and exchange
+        it with the cloud&rsquo;s STS endpoint for a short-lived session credential (1–15 min TTL).
+        Disconnect the cloud account in <K>/app/cloud</K> and the next call denies within a second.
       </P>
       <P>
-        Three connectors ship in this preview: <K>azure</K> (AAD federated credential, JWT-bearer
-        assertion), <K>aws</K> (IAM OIDC provider + <K>sts:AssumeRoleWithWebIdentity</K> + SigV4),{' '}
-        <K>gcp</K> (Workload Identity Federation, STS exchange + service-account impersonation). All
-        three reuse the same Cedar engine, the same UCAN audience, the same audit chain, and the
-        same step-up flow as SaaS connectors.
+        Three connectors ship: <K>azure</K> (AAD federated credential, JWT-bearer assertion),{' '}
+        <K>aws</K> (IAM OIDC provider + <K>sts:AssumeRoleWithWebIdentity</K> + SigV4), <K>gcp</K>{' '}
+        (Workload Identity Federation, STS exchange + service-account impersonation). All three
+        reuse the same Cedar engine, UCAN audience, audit chain, and step-up flow as SaaS
+        connectors.
       </P>
 
       <h3 className="mt-8 font-display text-[22px] text-aegis-paper">Mental model</h3>
@@ -1165,185 +1155,269 @@ function CloudIam() {
         same ActionGraph, same Timeline, same BlastRadius.
       </P>
 
-      <h3 className="mt-8 font-display text-[22px] text-aegis-paper">
+      {/* ------------------------------------------------------------------ */}
+      {/* TERRAFORM — per cloud                                                */}
+      {/* ------------------------------------------------------------------ */}
+      <h3 className="mt-10 font-display text-[22px] text-aegis-paper" id="cloud-terraform">
+        Terraform — bootstrap per cloud
+      </h3>
+      <P>
+        Each cloud needs a one-time Terraform apply to create the federated identity trust. Modules
+        live at <K>infra/terraform/</K> in this repo. The issuer at <K>id.auto-nomos.com</K> is live
+        — <K>nomos_oidc_issuer</K> defaults to it in every module.
+      </P>
+      <Callout tone="info">
+        <strong className="text-aegis-paper">No public registry mirror yet.</strong> Use the
+        local-path <K>source</K> shown below, or pin to a commit SHA:{' '}
+        <K>
+          {`git::https://github.com/varendra007/agent-credential-broker.git//infra/terraform/<module>?ref=<SHA>`}
+        </K>
+        .
+      </Callout>
+
+      <h4 className="mt-6 font-display text-[18px] text-aegis-paper">Azure Terraform</h4>
+      <P>
+        Creates: App Registration + Service Principal + Federated Identity Credential (issuer ={' '}
+        <K>id.auto-nomos.com</K>, audience = <K>api://AzureADTokenExchange</K>, subject ={' '}
+        <K>customer/{`{cid}`}/agent/*</K>) + Reader role at subscription scope.
+      </P>
+      <Code lang="hcl">{`# nomos-azure.tf — copy into your Terraform root
+terraform {
+  required_providers {
+    azurerm = { source = "hashicorp/azurerm", version = "~> 4.0" }
+    azuread = { source = "hashicorp/azuread", version = "~> 3.0" }
+  }
+}
+provider "azurerm" {
+  features {}
+  subscription_id = "<your-subscription-id>"
+}
+
+module "nomos_azure" {
+  source = "../credential-broker/infra/terraform/azurerm-nomos-bootstrap"
+  # Pin for prod: source = "git::https://github.com/varendra007/agent-credential-broker.git//infra/terraform/azurerm-nomos-bootstrap?ref=<SHA>"
+
+  customer_id       = "<your-customer-id>"    # from /app/settings/workspace
+  subscription_id   = "<your-subscription-id>"
+  nomos_oidc_issuer = "https://id.auto-nomos.com"   # live; override only for self-hosted issuer
+
+  # Optional:
+  # resource_group_name  = "rg-my-workload"   # narrow Reader to one RG instead of sub
+  # role_definition_name = "Contributor"       # default: Reader
+}
+
+output "paste_into_nomos_dashboard" {
+  value = {
+    app_object_id   = module.nomos_azure.app_object_id
+    app_client_id   = module.nomos_azure.app_client_id
+    tenant_id       = module.nomos_azure.tenant_id
+    subscription_id = module.nomos_azure.subscription_id
+  }
+}`}</Code>
+      <Code lang="bash">{`terraform init && terraform plan   # review IAM before applying
+terraform apply
+terraform output paste_into_nomos_dashboard
+# Paste the four values → /app/cloud/connect/azure`}</Code>
+
+      <h4 className="mt-6 font-display text-[18px] text-aegis-paper">AWS Terraform</h4>
+      <P>
+        Creates: IAM OIDC provider trusting <K>id.auto-nomos.com</K> + IAM role with{' '}
+        <K>sts:AssumeRoleWithWebIdentity</K> trust keyed on{' '}
+        <K>sub&nbsp;==&nbsp;customer/{`{cid}`}/agent/*</K> +{' '}
+        <K>arn:aws:iam::aws:policy/ReadOnlyAccess</K> attached.
+      </P>
+      <Code lang="hcl">{`# nomos-aws.tf — copy into your Terraform root
+terraform {
+  required_providers {
+    aws = { source = "hashicorp/aws", version = "~> 5.0" }
+    tls = { source = "hashicorp/tls", version = "~> 4.0" }
+  }
+}
+provider "aws" { region = "us-east-1" }
+
+module "nomos_aws" {
+  source = "../credential-broker/infra/terraform/aws-nomos-bootstrap"
+  # Pin for prod: source = "git::https://github.com/varendra007/agent-credential-broker.git//infra/terraform/aws-nomos-bootstrap?ref=<SHA>"
+
+  customer_id       = "<your-customer-id>"    # from /app/settings/workspace
+  region            = "us-east-1"
+  nomos_oidc_issuer = "https://id.auto-nomos.com"
+
+  # Optional:
+  # managed_policy_arns    = ["arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess"]
+  # additional_policy_json = jsonencode({ Version = "2012-10-17", Statement = [...] })
+}
+
+output "paste_into_nomos_dashboard" {
+  value = {
+    role_arn   = module.nomos_aws.role_arn
+    account_id = module.nomos_aws.account_id
+    region     = module.nomos_aws.region
+  }
+}`}</Code>
+      <Code lang="bash">{`terraform init && terraform plan
+terraform apply
+terraform output paste_into_nomos_dashboard
+# Paste the three values → /app/cloud/connect/aws`}</Code>
+
+      <h4 className="mt-6 font-display text-[18px] text-aegis-paper">GCP Terraform</h4>
+      <P>
+        Creates: Workload Identity Pool + OIDC Provider (attribute condition pins{' '}
+        <K>attribute.customer == &quot;{`{cid}`}&quot;</K>, preventing cross-customer credential
+        sharing) + Service Account + impersonation binding + <K>roles/viewer</K> at project scope.
+      </P>
+      <Code lang="hcl">{`# nomos-gcp.tf — copy into your Terraform root
+terraform {
+  required_providers {
+    google = { source = "hashicorp/google", version = "~> 6.0" }
+  }
+}
+provider "google" {
+  project = "<your-project-id>"
+  region  = "us-central1"
+}
+
+module "nomos_gcp" {
+  source = "../credential-broker/infra/terraform/google-nomos-bootstrap"
+  # Pin for prod: source = "git::https://github.com/varendra007/agent-credential-broker.git//infra/terraform/google-nomos-bootstrap?ref=<SHA>"
+
+  customer_id       = "<your-customer-id>"    # from /app/settings/workspace
+  project_id        = "<your-project-id>"
+  nomos_oidc_issuer = "https://id.auto-nomos.com"
+
+  # Optional:
+  # service_account_roles = ["roles/storage.objectViewer"]
+}
+
+output "paste_into_nomos_dashboard" {
+  value = {
+    wif_provider          = module.nomos_gcp.wif_provider
+    service_account_email = module.nomos_gcp.service_account_email
+    project_id            = module.nomos_gcp.project_id
+  }
+}`}</Code>
+      <Code lang="bash">{`# Enable required APIs first (one-time per project):
+gcloud services enable iam.googleapis.com iamcredentials.googleapis.com \
+  cloudresourcemanager.googleapis.com sts.googleapis.com --project=<your-project-id>
+
+terraform init && terraform plan
+terraform apply
+terraform output paste_into_nomos_dashboard
+# Paste the three values → /app/cloud/connect/gcp`}</Code>
+
+      {/* ------------------------------------------------------------------ */}
+      {/* 8-STEP SETUP                                                         */}
+      {/* ------------------------------------------------------------------ */}
+      <h3 className="mt-10 font-display text-[22px] text-aegis-paper">
         End-to-end setup — eight steps
       </h3>
       <P>
-        Two roles are involved. <strong>Operator</strong> = the person running the Nomos control
-        plane (Steps 1–3, done once per Nomos deployment). <strong>Customer</strong> = the cloud
-        owner who wants their agent to reach into AWS / Azure / GCP (Steps 4–8, done once per cloud
-        account). If you&rsquo;re self-hosting Nomos for your own org, you are both roles — run all
-        eight in order.
+        Two roles: <strong>Operator</strong> runs the Nomos control plane (Steps 1–3, once per
+        deployment). <strong>Customer</strong> owns the cloud account (Steps 4–8, once per cloud).
+        Self-hosting? You&rsquo;re both — run all eight in order.
       </P>
 
       <h4 className="mt-6 font-display text-[18px] text-aegis-paper">
-        Step 1 — Operator: deploy the OIDC issuer
+        Step 1 — Operator: OIDC issuer
       </h4>
       <P>
-        The issuer is a tiny Cloudflare Worker that exposes <K>/.well-known/openid-configuration</K>{' '}
-        and <K>/jwks.json</K>. Source lives at <K>apps/oidc-issuer/</K> in this repo. Two preview
-        paths:
+        <strong>Already live</strong> at <K>https://id.auto-nomos.com</K>. Verify:
       </P>
-      <Code lang="bash">{`# A. Deploy to your own *.workers.dev subdomain (fastest preview):
-cd apps/oidc-issuer
-pnpm install
-npx wrangler deploy
-# → prints e.g. https://nomos-oidc.<your-account>.workers.dev
-
-# B. Bind a custom domain (e.g. id.<your-company>.com) so AAD/STS/WIF accept it:
-#   1. Cloudflare dashboard → Workers & Pages → your worker → Triggers → Custom domain
-#   2. Add CNAME id.<your-company>.com → workers.dev hostname
-#   3. Set CP env: OIDC_ISSUER_URL=https://id.<your-company>.com
-
-# JWKS key material — for the preview, key-store.ts ships an in-memory dev signer.
-# AWS KMS-backed signing is wired in apps/control-plane/src/oidc/kms-signer.ts; set
-#   OIDC_KMS_KEY_REF=arn:aws:kms:us-east-1:<acct>:key/<id>
-# on the control plane to use it (recommended before any prod use).`}</Code>
-      <Callout tone="info">
-        <strong className="text-aegis-paper">Why an OIDC issuer.</strong> AWS STS, Azure AD, and GCP
-        WIF all accept ID tokens from any RFC 8414-compliant issuer URL whose JWKS validates. We
-        don&rsquo;t need to host the issuer at <K>id.auto-nomos.com</K> for things to work — we need
-        the issuer URL you set in CP env to be reachable from the cloud&rsquo;s STS. A{' '}
-        <K>*.workers.dev</K> URL is fine for preview; a custom domain is recommended for any
-        production deployment so it survives Cloudflare account changes.
-      </Callout>
+      <Code lang="bash">{`curl -fsS https://id.auto-nomos.com/.well-known/openid-configuration | jq .issuer
+# → "https://id.auto-nomos.com"
+curl -fsS https://id.auto-nomos.com/jwks.json | jq '.keys[].kid'`}</Code>
+      <P>
+        Self-hosting on your own infra? Run <K>pnpm gen:oidc-keys</K> to generate an RS256 keypair,
+        set the env vars on the control plane, and follow{' '}
+        <K>infrastructure/azure/oidc-issuer-deploy.md</K> for the nginx setup.
+      </P>
 
       <h4 className="mt-6 font-display text-[18px] text-aegis-paper">
         Step 2 — Operator: control-plane environment
       </h4>
-      <Code lang="bash">{`# In your control-plane .env (or production secret store):
-OIDC_ISSUER_URL=https://nomos-oidc.<your-account>.workers.dev
-# Optional but recommended once you have AWS KMS provisioned:
-OIDC_KMS_KEY_REF=arn:aws:kms:us-east-1:<acct>:key/<id>
+      <Code lang="bash">{`# /opt/nomos/app/.env.local (or your secret store):
+OIDC_ISSUER_URL=https://id.auto-nomos.com
+OIDC_ID_TOKEN_TTL_SECONDS=300
 
-# PDP webhook so cloud mint + exchange events land in the same audit chain.
-# Use your PDP's public URL (Fly / Render / Cloud Run / your VM):
-PDP_WEBHOOK_URLS=https://pdp.<your-host>/v1/internal/audit/emit-cloud
-PDP_SERVICE_TOKEN=<shared-secret-between-cp-and-pdp>`}</Code>
+# RS256 signer — generate once:
+#   pnpm gen:oidc-keys --kid nomos-issuer-$(date +%Y-%m-%d)-1 >> .env.local
+OIDC_DEV_KID=nomos-issuer-<date>-1
+OIDC_DEV_RSA_PRIVATE_KEY_PEM='-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n'
+OIDC_DEV_RSA_PUBLIC_JWK='{"kid":"...","kty":"RSA","n":"...","e":"AQAB","alg":"RS256","use":"sig"}'
+
+# Cloud audit events flow CP → PDP to land in the same hash chain as SaaS:
+PDP_WEBHOOK_URLS=https://pdp.auto-nomos.com/v1/internal/refresh-revocations,https://pdp.auto-nomos.com/v1/internal/audit/emit-cloud`}</Code>
 
       <h4 className="mt-6 font-display text-[18px] text-aegis-paper">
         Step 3 — Operator: apply migration 0028
       </h4>
       <P>
         Migration <K>0028_cloud_iam_m0</K> creates the <K>oidc_issuer_keys</K> and{' '}
-        <K>cloud_connections</K> tables. Run drizzle-kit from the control plane:
+        <K>cloud_connections</K> tables:
       </P>
       <Code lang="bash">{`pnpm --filter @auto-nomos/control-plane db:migrate
-# verify with:
-psql "$DATABASE_URL" -c "\\dt cloud_connections oidc_issuer_keys"`}</Code>
+psql "$DATABASE_URL" -c "\\dt cloud_connections oidc_issuer_keys"   # verify`}</Code>
 
       <h4 className="mt-6 font-display text-[18px] text-aegis-paper">
-        Step 4 — Customer: get your customer_id from the dashboard
+        Step 4 — Customer: get your customer_id
       </h4>
       <P>
-        Log in, open <K>/app/settings/workspace</K> (or any page in the dashboard — your customer
-        UUID is shown in the workspace card). Copy it; every Terraform module needs it because the
-        federated identity subject is pinned to <K>customer/{`{cid}`}/agent/*</K>.
+        Open <K>/app/settings/workspace</K> — UUID is in the workspace card. Every Terraform module
+        needs it (federated subject is pinned to <K>customer/{`{cid}`}/agent/*</K>).
       </P>
 
       <h4 className="mt-6 font-display text-[18px] text-aegis-paper">
-        Step 5 — Customer: generate the Terraform snippet
-      </h4>
-      <P>The Nomos CLI prints a paste-ready Terraform block per cloud. Install once:</P>
-      <Code lang="bash">{`npm i -g @auto-nomos/cli
-# or use the local repo binary directly:
-#   pnpm --filter @auto-nomos/cli build && node packages/cli/dist/bin.js ...
-
-nomos cloud install --azure --customer-id <your-customer-uuid> \\
-  --subscription-id 00000000-0000-0000-0000-000000000000 > nomos.tf
-
-nomos cloud install --aws --customer-id <your-customer-uuid> \\
-  --aws-region us-east-1 > nomos.tf
-
-nomos cloud install --gcp --customer-id <your-customer-uuid> \\
-  --project-id my-prod-proj > nomos.tf`}</Code>
-      <Callout tone="warn">
-        <strong className="text-aegis-paper">No public Terraform mirror yet.</strong> The CLI
-        currently emits a snippet that references{' '}
-        <K>github.com/auto-nomos/terraform-{`{cloud}`}-nomos-bootstrap</K> — that repo does not
-        exist yet. For preview, change the <K>source</K> line of the generated snippet to a local
-        path that points at this repo&rsquo;s <K>infra/terraform/{`{cloud}`}-nomos-bootstrap/</K>{' '}
-        directory, e.g.{' '}
-        <K>source = &quot;../credential-broker/infra/terraform/azurerm-nomos-bootstrap&quot;</K>.
-        Pin a commit SHA once you&rsquo;ve copied the module out into your own infra repo so nothing
-        rolls forward without review.
-      </Callout>
-
-      <h4 className="mt-6 font-display text-[18px] text-aegis-paper">
-        Step 6 — Customer: review and apply the Terraform
+        Step 5 — Customer: run the Terraform
       </h4>
       <P>
-        <strong>Read the module before applying.</strong> The three modules each create a tightly
-        scoped IAM grant — defaults are intentionally read-only at the broadest documented scope.
+        Copy the block for your cloud from the{' '}
+        <a href="#cloud-terraform" className="underline">
+          Terraform section above
+        </a>
+        , fill in your IDs, then:
       </P>
-      <ul className="ml-6 list-disc space-y-1.5 marker:text-aegis-signal">
-        <li>
-          <strong className="text-aegis-paper">Azure</strong> (
-          <K>infra/terraform/azurerm-nomos-bootstrap/</K>) — App Registration + Service Principal +
-          Federated Identity Credential (issuer = your <K>OIDC_ISSUER_URL</K>, audience ={' '}
-          <K>api://AzureADTokenExchange</K>, subject = <K>customer/{`{cid}`}/agent/*</K>) + Reader
-          role assignment at subscription scope. Variables: <K>customer_id</K>,{' '}
-          <K>subscription_id</K>, <K>nomos_oidc_issuer</K> (override default to your issuer URL),{' '}
-          <K>resource_group_name</K> (narrow to one RG).
-        </li>
-        <li>
-          <strong className="text-aegis-paper">AWS</strong> (
-          <K>infra/terraform/aws-nomos-bootstrap/</K>) — IAM OIDC provider trusting your issuer +
-          IAM role with <K>sts:AssumeRoleWithWebIdentity</K> trust keyed on{' '}
-          <K>sub == customer/{`{cid}`}/agent/*</K> + <K>aws:iam::aws:policy/ReadOnlyAccess</K>{' '}
-          attached. Variables: <K>customer_id</K>, <K>region</K>, <K>nomos_oidc_issuer</K>,{' '}
-          <K>managed_policy_arns</K>, <K>additional_policy_json</K> (narrow further).
-        </li>
-        <li>
-          <strong className="text-aegis-paper">GCP</strong> (
-          <K>infra/terraform/google-nomos-bootstrap/</K>) — Workload Identity Pool + OIDC Provider
-          (with <K>attribute.customer == &quot;{`{cid}`}&quot;</K> condition so cross-customer cred
-          sharing is impossible) + service account granted <K>roles/viewer</K> + impersonation IAM
-          binding. Variables: <K>customer_id</K>, <K>project_id</K>, <K>nomos_oidc_issuer</K>,
-          <K>service_account_roles</K>.
-        </li>
-      </ul>
-      <Code lang="bash">{`terraform init
-terraform plan          # READ this carefully — it shows exactly what IAM lands
+      <Code lang="bash">{`terraform init && terraform plan   # review IAM before applying
 terraform apply
-terraform output paste_into_nomos_dashboard
-# {
-#   "app_object_id"   = "..."
-#   "app_client_id"   = "..."
-#   "tenant_id"       = "..."
-#   "subscription_id" = "..."
-# }`}</Code>
+terraform output paste_into_nomos_dashboard`}</Code>
 
       <h4 className="mt-6 font-display text-[18px] text-aegis-paper">
-        Step 7 — Customer: paste outputs into the dashboard
+        Step 6 — Customer: paste outputs into the dashboard
       </h4>
       <P>
-        Open <K>/app/cloud</K>, click the connector card (Azure / AWS / GCP), and paste each
-        Terraform output into the matching field. The wizard calls <K>cloudConnections.create</K> on
-        the control plane, kicks off a verify probe, and redirects you to the list view. Watch the
-        status badge flip from <K>pending</K> to <K>verified</K> — that means we successfully minted
-        an ID token, exchanged it with the cloud&rsquo;s STS, and made a real probe call.
+        Open <K>/app/cloud</K>, click your cloud&rsquo;s connect card, and paste the output values
+        into the form. The wizard kicks off a verify probe — badge flips <K>pending</K> {'->'}{' '}
+        <K>verified</K> once the ID token exchange and probe call succeed.
       </P>
-      <ul className="ml-6 list-disc space-y-1.5 marker:text-aegis-signal">
+      <ul className="ml-6 list-disc space-y-1 marker:text-aegis-signal">
         <li>
-          Azure: <K>app_object_id</K>, <K>app_client_id</K>, <K>tenant_id</K>,{' '}
-          <K>subscription_id</K>.
+          <a href="/app/cloud/connect/azure" className="underline">
+            Azure
+          </a>
+          {': '}
+          <K>app_object_id</K>, <K>app_client_id</K>, <K>tenant_id</K>, <K>subscription_id</K>
         </li>
         <li>
-          AWS: <K>role_arn</K>, <K>account_id</K>, <K>region</K>.
+          <a href="/app/cloud/connect/aws" className="underline">
+            AWS
+          </a>
+          {': '}
+          <K>role_arn</K>, <K>account_id</K>, <K>region</K>
         </li>
         <li>
-          GCP: <K>wif_provider</K>, <K>service_account_email</K>, <K>project_id</K>.
+          <a href="/app/cloud/connect/gcp" className="underline">
+            GCP
+          </a>
+          {': '}
+          <K>wif_provider</K>, <K>service_account_email</K>, <K>project_id</K>
         </li>
       </ul>
 
       <h4 className="mt-6 font-display text-[18px] text-aegis-paper">
-        Step 8 — Customer: write a Cedar policy and make the first call
+        Step 7 — Customer: write a Cedar policy
       </h4>
       <P>
-        Go to <K>/app/policies</K>, click <strong>New policy</strong>, attach it to your app, and
-        paste something narrow — for example, allow only resource-group listing in one Azure
-        subscription:
+        Open <K>/app/policies</K>, click <strong>New policy</strong>, attach to your app. Start
+        narrow:
       </P>
       <Code lang="cedar">{`permit (
   principal,
@@ -1352,12 +1426,15 @@ terraform output paste_into_nomos_dashboard
 ) when {
   resource.subscription_id == "00000000-0000-0000-0000-000000000000"
 };`}</Code>
+
+      <h4 className="mt-6 font-display text-[18px] text-aegis-paper">
+        Step 8 — Customer: mint a UCAN and make the first call
+      </h4>
       <P>
-        Mint a UCAN (dashboard <strong>Apps → API keys → Mint UCAN</strong> or via SDK), making sure{' '}
-        <K>meta.cloud_connection_id</K> is the UUID of the row you just created. Then your agent /
-        curl works end-to-end:
+        Mint a UCAN (dashboard <strong>Apps &rarr; API keys &rarr; Mint UCAN</strong> or via SDK)
+        with <K>meta.cloud_connection_id</K> set to the connection&rsquo;s UUID. Then:
       </P>
-      <Code lang="bash">{`curl -s https://pdp.<your-host>/v1/proxy \\
+      <Code lang="bash">{`curl -s https://pdp.auto-nomos.com/v1/proxy \\
   -H "authorization: Bearer $UCAN" \\
   -H "content-type: application/json" \\
   -d '{
@@ -1368,8 +1445,8 @@ terraform output paste_into_nomos_dashboard
       "path": "/subscriptions/00000000-.../resourcegroups?api-version=2021-04-01"
     }
   }'
-# → 200 OK with the upstream ARM response.
-# Open /app/audit — three cloud rows linked to one receipt id.`}</Code>
+# 200 OK with upstream ARM JSON.
+# /app/audit shows three cloud rows under one receipt id.`}</Code>
 
       <h3 className="mt-10 font-display text-[22px] text-aegis-paper">
         Permissions — three layers, in order
@@ -1558,10 +1635,10 @@ when {
       </h3>
       <ul className="ml-6 list-disc space-y-1.5 marker:text-aegis-signal">
         <li>
-          <strong className="text-aegis-paper">Preview today:</strong> issuer hosted at{' '}
-          <K>id.auto-nomos.com</K> (use your own Worker URL for now); public mirror of Terraform
-          modules at <K>github.com/auto-nomos/terraform-*</K>; in-cloud sidecar variant (
-          <K>--in-cloud</K>) — module emits a snippet, no production module yet.
+          <strong className="text-aegis-paper">Preview today:</strong> public Terraform registry
+          mirror at <K>github.com/auto-nomos/terraform-*</K> (use local-path source for now); AWS
+          KMS-backed signing for the issuer (currently dev RS256 key in env); in-cloud sidecar
+          variant (<K>--in-cloud</K>) — module emits a snippet, no production module yet.
         </li>
         <li>
           <strong className="text-aegis-paper">Stable wire format:</strong>{' '}

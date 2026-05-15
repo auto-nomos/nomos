@@ -16,6 +16,7 @@ import { Label } from '../../../../../components/ui/label';
 import { trpc } from '../../../../../lib/trpc';
 
 const TF_MODULE_PATH = 'infra/terraform/aws-nomos-bootstrap';
+const GUIDE_URL = '/app/guide/cloud';
 
 export default function AwsConnectPage() {
   const router = useRouter();
@@ -51,24 +52,35 @@ export default function AwsConnectPage() {
     }
   }
 
-  const tfvarsSnippet = `# Save as nomos.tf inside the directory where you cloned
-# the Nomos repo, or copy infra/terraform/aws-nomos-bootstrap/ into
-# your own Terraform repo and adjust the source path accordingly.
+  const tfvarsSnippet = `# nomos-aws.tf — copy into your Terraform root, then: terraform init && terraform apply
+# Full walkthrough at /app/guide/cloud (Terraform section → Steps 5–6)
 
-module "nomos" {
-  # Preview: no public mirror yet. Use a local path to this repo's module:
+terraform {
+  required_providers {
+    aws = { source = "hashicorp/aws", version = "~> 5.0" }
+    tls = { source = "hashicorp/tls", version = "~> 4.0" }
+  }
+}
+provider "aws" { region = "${region}" }
+
+module "nomos_aws" {
+  # Local-path source (no public registry mirror yet). Copy the dir into your own infra repo:
   source = "../credential-broker/infra/terraform/aws-nomos-bootstrap"
+  # Pin for prod: source = "git::https://github.com/varendra007/agent-credential-broker.git//infra/terraform/aws-nomos-bootstrap?ref=<SHA>"
 
   customer_id       = "<your-nomos-customer-id>"  # from /app/settings/workspace
   region            = "${region}"
-  nomos_oidc_issuer = "https://<your-issuer-host>"  # the URL of the OIDC issuer you deployed
+  nomos_oidc_issuer = "https://id.auto-nomos.com"
+
+  # Optional: narrow permissions
+  # managed_policy_arns = ["arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess"]
 }
 
-output "nomos_paste_into_dashboard" {
+output "paste_into_nomos_dashboard" {
   value = {
-    role_arn   = module.nomos.role_arn
-    account_id = module.nomos.account_id
-    region     = module.nomos.region
+    role_arn   = module.nomos_aws.role_arn
+    account_id = module.nomos_aws.account_id
+    region     = module.nomos_aws.region
   }
 }`;
 
@@ -83,15 +95,13 @@ output "nomos_paste_into_dashboard" {
           IAM OIDC trust with <code>sts:AssumeRoleWithWebIdentity</code>. Nomos mints OIDC ID
           tokens; STS exchanges them for short-lived AccessKey/SecretKey/SessionToken.
         </p>
-        <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-amber-900 dark:text-amber-200">
-          <strong>Preview.</strong> The OIDC issuer at <code>id.auto-nomos.com</code> is not
-          deployed yet and there is no public Terraform mirror. Before running the snippet below you
-          must deploy <code>apps/oidc-issuer</code> (Cloudflare Worker) and set{' '}
-          <code>nomos_oidc_issuer</code> to its URL. See the{' '}
-          <Link href="/app/guide/cloud" className="underline">
+        <div className="rounded-md border border-blue-500/30 bg-blue-500/5 p-3 text-xs text-blue-900 dark:text-blue-200">
+          OIDC issuer live at <code>id.auto-nomos.com</code>. Full setup walkthrough — Terraform,
+          env vars, Cedar policy, first call — at{' '}
+          <Link href={GUIDE_URL} className="underline">
             Cloud IAM guide
           </Link>{' '}
-          (Step 1) for the deploy commands.
+          (Terraform section + Steps 5–8).
         </div>
       </header>
 

@@ -16,6 +16,7 @@ import { Label } from '../../../../../components/ui/label';
 import { trpc } from '../../../../../lib/trpc';
 
 const TF_MODULE_PATH = 'infra/terraform/azurerm-nomos-bootstrap';
+const GUIDE_URL = '/app/guide/cloud';
 
 export default function AzureConnectPage() {
   const router = useRouter();
@@ -52,27 +53,39 @@ export default function AzureConnectPage() {
     }
   }
 
-  const tfvarsSnippet = `# Save as nomos.tf alongside the module checkout, or copy
-# infra/terraform/azurerm-nomos-bootstrap/ into your own Terraform repo
-# and adjust the source path.
+  const tfvarsSnippet = `# nomos-azure.tf — copy into your Terraform root, then: terraform init && terraform apply
+# Full walkthrough at /app/guide/cloud (Terraform section → Steps 5–6)
 
-module "nomos" {
-  # Preview: no public mirror yet. Local-path source to this repo's module:
+terraform {
+  required_providers {
+    azurerm = { source = "hashicorp/azurerm", version = "~> 4.0" }
+    azuread = { source = "hashicorp/azuread", version = "~> 3.0" }
+  }
+}
+provider "azurerm" {
+  features {}
+  subscription_id = "${subscriptionId || '<subscription-id>'}"
+}
+
+module "nomos_azure" {
+  # Local-path source (no public registry mirror yet). Copy the dir into your own infra repo:
   source = "../credential-broker/infra/terraform/azurerm-nomos-bootstrap"
+  # Pin for prod: source = "git::https://github.com/varendra007/agent-credential-broker.git//infra/terraform/azurerm-nomos-bootstrap?ref=<SHA>"
 
   customer_id       = "<your-nomos-customer-id>"  # from /app/settings/workspace
   subscription_id   = "${subscriptionId || '<subscription-id>'}"
-  nomos_oidc_issuer = "https://<your-issuer-host>"  # the URL of the OIDC issuer you deployed
-  # Optional: narrow Reader role assignment to one RG instead of subscription scope.
+  nomos_oidc_issuer = "https://id.auto-nomos.com"
+
+  # Optional: narrow Reader to one resource group
   # resource_group_name = "rg-agent-sandbox"
 }
 
-output "nomos_paste_into_dashboard" {
+output "paste_into_nomos_dashboard" {
   value = {
-    app_object_id   = module.nomos.app_object_id
-    app_client_id   = module.nomos.app_client_id
-    tenant_id       = module.nomos.tenant_id
-    subscription_id = module.nomos.subscription_id
+    app_object_id   = module.nomos_azure.app_object_id
+    app_client_id   = module.nomos_azure.app_client_id
+    tenant_id       = module.nomos_azure.tenant_id
+    subscription_id = module.nomos_azure.subscription_id
   }
 }`;
 
@@ -87,15 +100,13 @@ output "nomos_paste_into_dashboard" {
           Federated credential on an App Registration. Nomos mints OIDC ID tokens; AAD trusts them
           via the federated credential trust block created by the Terraform module.
         </p>
-        <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-amber-900 dark:text-amber-200">
-          <strong>Preview.</strong> The OIDC issuer at <code>id.auto-nomos.com</code> is not
-          deployed yet and there is no public Terraform mirror. Before running the snippet below you
-          must deploy <code>apps/oidc-issuer</code> (Cloudflare Worker) and set{' '}
-          <code>nomos_oidc_issuer</code> to its URL. See the{' '}
-          <Link href="/app/guide/cloud" className="underline">
+        <div className="rounded-md border border-blue-500/30 bg-blue-500/5 p-3 text-xs text-blue-900 dark:text-blue-200">
+          OIDC issuer live at <code>id.auto-nomos.com</code>. Full setup walkthrough — Terraform,
+          env vars, Cedar policy, first call — at{' '}
+          <Link href={GUIDE_URL} className="underline">
             Cloud IAM guide
           </Link>{' '}
-          (Step 1) for the deploy commands.
+          (Terraform section + Steps 5–8).
         </div>
       </header>
 
@@ -125,7 +136,7 @@ output "nomos_paste_into_dashboard" {
         <CardHeader>
           <CardTitle>2. Paste the Terraform outputs</CardTitle>
           <CardDescription>
-            All four fields come from <code>terraform output</code>.
+            All four fields from <code>terraform output paste_into_nomos_dashboard</code>.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

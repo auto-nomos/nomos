@@ -52,17 +52,14 @@ export default function CloudAccountsPage() {
           Federated cloud IAM. Your AWS / Azure / GCP trusts a Nomos-operated OIDC issuer; Nomos
           mints short-lived credentials per agent request. No long-lived secrets stored.
         </p>
-        <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-amber-900 dark:text-amber-200">
-          <strong>Preview.</strong> The default issuer at{' '}
-          <code className="font-mono">id.auto-nomos.com</code> is not deployed yet and there is no
-          public Terraform mirror. To run end-to-end against a real cloud tenant today, deploy
-          <code className="font-mono"> apps/oidc-issuer</code> (Cloudflare Worker), set{' '}
-          <code className="font-mono">OIDC_ISSUER_URL</code> in the control plane, and use the
-          local-path Terraform source from <code className="font-mono">infra/terraform/</code>. See{' '}
+        <div className="rounded-md border border-blue-500/30 bg-blue-500/5 p-3 text-xs text-blue-900 dark:text-blue-200">
+          OIDC issuer live at <code className="font-mono">id.auto-nomos.com</code>. Terraform
+          modules at <code className="font-mono">infra/terraform/</code> in the repo. For the full
+          setup walkthrough — Terraform blocks, env vars, Cedar policy, first call — see{' '}
           <Link href="/app/guide/cloud" className="underline">
             the Cloud IAM guide
-          </Link>{' '}
-          for the eight-step walkthrough.
+          </Link>
+          .
         </div>
       </header>
 

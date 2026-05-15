@@ -16,6 +16,7 @@ import { Label } from '../../../../../components/ui/label';
 import { trpc } from '../../../../../lib/trpc';
 
 const TF_MODULE_PATH = 'infra/terraform/google-nomos-bootstrap';
+const GUIDE_URL = '/app/guide/cloud';
 
 export default function GcpConnectPage() {
   const router = useRouter();
@@ -51,24 +52,37 @@ export default function GcpConnectPage() {
     }
   }
 
-  const tfvarsSnippet = `# Save as nomos.tf alongside the module checkout, or copy
-# infra/terraform/google-nomos-bootstrap/ into your own Terraform repo
-# and adjust the source path.
+  const tfvarsSnippet = `# nomos-gcp.tf — copy into your Terraform root, then: terraform init && terraform apply
+# Full walkthrough at /app/guide/cloud (Terraform section → Steps 5–6)
 
-module "nomos" {
-  # Preview: no public mirror yet. Local-path source to this repo's module:
+terraform {
+  required_providers {
+    google = { source = "hashicorp/google", version = "~> 6.0" }
+  }
+}
+provider "google" {
+  project = "${projectId || '<project-id>'}"
+  region  = "us-central1"
+}
+
+module "nomos_gcp" {
+  # Local-path source (no public registry mirror yet). Copy the dir into your own infra repo:
   source = "../credential-broker/infra/terraform/google-nomos-bootstrap"
+  # Pin for prod: source = "git::https://github.com/varendra007/agent-credential-broker.git//infra/terraform/google-nomos-bootstrap?ref=<SHA>"
 
   customer_id       = "<your-nomos-customer-id>"  # from /app/settings/workspace
   project_id        = "${projectId || '<project-id>'}"
-  nomos_oidc_issuer = "https://<your-issuer-host>"  # the URL of the OIDC issuer you deployed
+  nomos_oidc_issuer = "https://id.auto-nomos.com"
+
+  # Optional: narrow permissions
+  # service_account_roles = ["roles/storage.objectViewer"]
 }
 
-output "nomos_paste_into_dashboard" {
+output "paste_into_nomos_dashboard" {
   value = {
-    wif_provider          = module.nomos.wif_provider
-    service_account_email = module.nomos.service_account_email
-    project_id            = module.nomos.project_id
+    wif_provider          = module.nomos_gcp.wif_provider
+    service_account_email = module.nomos_gcp.service_account_email
+    project_id            = module.nomos_gcp.project_id
   }
 }`;
 
@@ -83,15 +97,13 @@ output "nomos_paste_into_dashboard" {
           Workload Identity Federation pool + SA impersonation. Two-hop: federation token from STS →
           impersonation token from <code>iamcredentials.googleapis.com</code>.
         </p>
-        <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-amber-900 dark:text-amber-200">
-          <strong>Preview.</strong> The OIDC issuer at <code>id.auto-nomos.com</code> is not
-          deployed yet and there is no public Terraform mirror. Before running the snippet below you
-          must deploy <code>apps/oidc-issuer</code> (Cloudflare Worker) and set{' '}
-          <code>nomos_oidc_issuer</code> to its URL. See the{' '}
-          <Link href="/app/guide/cloud" className="underline">
+        <div className="rounded-md border border-blue-500/30 bg-blue-500/5 p-3 text-xs text-blue-900 dark:text-blue-200">
+          OIDC issuer live at <code>id.auto-nomos.com</code>. Full setup walkthrough — Terraform,
+          env vars, Cedar policy, first call — at{' '}
+          <Link href={GUIDE_URL} className="underline">
             Cloud IAM guide
           </Link>{' '}
-          (Step 1) for the deploy commands.
+          (Terraform section + Steps 5–8).
         </div>
       </header>
 
