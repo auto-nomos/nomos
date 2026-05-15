@@ -10,17 +10,13 @@
  * `@auto-nomos/policy-builder` on the fly.
  */
 import { parseToIr } from '@auto-nomos/policy-builder';
-import type {
-  ActionGraph,
-  ActionGraphEdge,
-  ActionGraphNode,
-  SpanStatus,
-} from '@auto-nomos/shared-types';
+import type { ActionGraph, SpanStatus } from '@auto-nomos/shared-types';
 import { TRPCError } from '@trpc/server';
 import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import * as schema from '../../db/schema.js';
 import { router, withPermission } from '../index.js';
+import { type DeriveAgentRow, type DeriveSpanRow, deriveSpanTree } from './_deriveSpanTree.js';
 
 const WindowDays = z.number().int().min(1).max(30).default(7);
 
@@ -626,10 +622,13 @@ export const observabilityRouter = router({
     }),
 
   /**
-   * Action graph — answer "what did each agent actually do, and what did
-   * that trigger next?" Returns one node per participating agent + one node
-   * per span. Edges connect agents to their spans (kind=invokes) and chain
-   * span → next-agent's first span when delegation occurred (kind=handoff).
+   * Action graph — forward-flowing conversation tree of tool calls.
+   *
+   * Returns one node per span; the effective parent is the first of
+   * `parent_span_id`, `parent_receipt_id`-resolved span, or the most-recent
+   * prior span by the same agent (sequential fallback). `rootSpanId` groups
+   * spans into conversations and the agent identity travels on each span so
+   * the canvas does not need a separate agent node.
    *
    * Window defaults to 60 minutes; capped at 24h so the React Flow canvas
    * stays usable.
@@ -701,81 +700,31 @@ export const observabilityRouter = router({
                 ),
               );
 
-      const spansPerAgent = new Map<string, number>();
-      for (const s of spans) {
-        spansPerAgent.set(s.agent_id, (spansPerAgent.get(s.agent_id) ?? 0) + 1);
-      }
+      const deriveSpans: DeriveSpanRow[] = spans.map((s) => ({
+        id: s.id,
+        agentId: s.agent_id,
+        parentSpanId: s.parent_span_id,
+        receiptId: s.receipt_id,
+        parentReceiptId: s.parent_receipt_id,
+        toolName: s.tool_name,
+        status: s.status as SpanStatus,
+        httpStatus: s.http_status,
+        latencyMs: s.latency_ms,
+        startedAt: s.started_at instanceof Date ? s.started_at.toISOString() : String(s.started_at),
+      }));
+      const deriveAgents: DeriveAgentRow[] = agentRows.map((a) => ({
+        id: a.id,
+        name: a.name,
+        did: a.did,
+        depth: a.depth ?? null,
+      }));
 
-      const nodes: ActionGraphNode[] = [];
-      for (const a of agentRows) {
-        nodes.push({
-          kind: 'agent',
-          id: a.id,
-          label: a.name,
-          did: a.did,
-          depth: a.depth ?? null,
-          spanCount: spansPerAgent.get(a.id) ?? 0,
-        });
-      }
-      for (const s of spans) {
-        nodes.push({
-          kind: 'span',
-          id: s.id,
-          agentId: s.agent_id,
-          toolName: s.tool_name,
-          status: s.status as SpanStatus,
-          latencyMs: s.latency_ms,
-          httpStatus: s.http_status,
-          startedAt:
-            s.started_at instanceof Date ? s.started_at.toISOString() : String(s.started_at),
-        });
-      }
-
-      // Build receipt→span lookup for handoff edges. A span's
-      // audit_events.parent_receipt_id points at the receipt that triggered
-      // *this* authorize; we resolve that to a previous span if it exists in
-      // the window.
-      const spanByReceipt = new Map<string, string>();
-      for (const s of spans) {
-        spanByReceipt.set(s.receipt_id, s.id);
-      }
-
-      const edges: ActionGraphEdge[] = [];
-      for (const s of spans) {
-        edges.push({
-          id: `${s.agent_id}->${s.id}`,
-          from: s.agent_id,
-          to: s.id,
-          kind: 'invokes',
-        });
-        // Handoff: parent receipt's span → this span (cross-agent only;
-        // same-agent re-invokes are not handoffs, just sequential calls).
-        if (s.parent_receipt_id) {
-          const parentSpan = spanByReceipt.get(s.parent_receipt_id);
-          if (parentSpan) {
-            edges.push({
-              id: `${parentSpan}=>${s.id}`,
-              from: parentSpan,
-              to: s.id,
-              kind: 'handoff',
-            });
-          }
-        }
-        // Explicit parent_span_id from MCP emitter (preferred when present
-        // and the parent is in-window).
-        if (s.parent_span_id) {
-          edges.push({
-            id: `${s.parent_span_id}~>${s.id}`,
-            from: s.parent_span_id,
-            to: s.id,
-            kind: 'handoff',
-          });
-        }
-      }
+      const tree = deriveSpanTree(deriveSpans, deriveAgents);
 
       return {
-        nodes,
-        edges,
+        nodes: tree.nodes,
+        edges: tree.edges,
+        agents: tree.agents,
         windowMinutes: input.sinceMinutes,
         spanCount: spans.length,
       };

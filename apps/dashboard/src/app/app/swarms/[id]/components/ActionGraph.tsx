@@ -1,5 +1,6 @@
 'use client';
 
+import type { ActionGraph as ActionGraphData, AgentGraphNode } from '@auto-nomos/shared-types';
 import dagre from '@dagrejs/dagre';
 import {
   Background,
@@ -11,9 +12,10 @@ import {
   Position,
   ReactFlow,
   ReactFlowProvider,
+  useReactFlow,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { Bot, Wrench } from 'lucide-react';
+import { Sparkles, Wrench } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { Badge } from '../../../../../components/ui/badge';
 import {
@@ -35,30 +37,22 @@ import { shortId } from '../../../../../lib/utils';
 import { SpanDetail } from './SpanDetail';
 
 const POLL_MS = 5_000;
-const NODE_W_AGENT = 220;
-const NODE_H_AGENT = 64;
-const NODE_W_SPAN = 200;
-const NODE_H_SPAN = 80;
-
-type AgentData = {
-  kind: 'agent';
-  label: string;
-  did: string;
-  spanCount: number;
-};
+const NODE_W = 220;
+const NODE_H = 88;
+const GROUP_GAP = 56;
 
 type SpanData = {
-  kind: 'span';
   toolName: string;
   status: 'success' | 'failure' | 'timeout' | 'denied';
   latencyMs: number;
   httpStatus: number | null;
+  agentLabel: string;
+  agentDid: string;
+  agentColor: string;
+  spawnsCount: number;
 };
 
-const nodeTypes = {
-  agent: AgentNode,
-  span: SpanNode,
-};
+const nodeTypes = { span: SpanNode };
 
 export function ActionGraph({ swarmId, agentId }: { swarmId?: string; agentId?: string }) {
   const [openSpan, setOpenSpan] = useState<string | null>(null);
@@ -72,11 +66,18 @@ export function ActionGraph({ swarmId, agentId }: { swarmId?: string; agentId?: 
   );
 
   const layout = useMemo(() => {
-    if (!q.data) return { nodes: [], edges: [] };
+    if (!q.data)
+      return {
+        nodes: [],
+        edges: [],
+        conversations: [],
+        agents: {} as Record<string, AgentGraphNode>,
+      };
     return buildLayout(q.data);
   }, [q.data]);
 
   const empty = !q.data || layout.nodes.length === 0;
+  const agentsList = Object.values(layout.agents);
 
   return (
     <Card>
@@ -89,8 +90,8 @@ export function ActionGraph({ swarmId, agentId }: { swarmId?: string; agentId?: 
           </span>
         </CardTitle>
         <CardDescription>
-          What each agent actually did, not just what it was allowed to do. Agents on the left, tool
-          calls flowing right. Click a span node to inspect.
+          Each conversation flows left to right. Forks mark sub-agent spawns. Click any span to
+          inspect.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -99,28 +100,37 @@ export function ActionGraph({ swarmId, agentId }: { swarmId?: string; agentId?: 
             No tool calls in the last 60 minutes. Drive a flow to see the graph populate.
           </div>
         ) : (
-          <div className="h-[480px] w-full overflow-hidden rounded-md border bg-background">
-            <ReactFlowProvider>
-              <ReactFlow
-                nodes={layout.nodes}
-                edges={layout.edges}
-                nodeTypes={nodeTypes}
-                fitView
-                minZoom={0.4}
-                maxZoom={1.5}
-                proOptions={{ hideAttribution: true }}
-                nodesDraggable={false}
-                nodesConnectable={false}
-                elementsSelectable
-                onNodeClick={(_, node) => {
-                  if (node.type === 'span') {
-                    setOpenSpan(node.id);
-                  }
-                }}
-              >
-                <Background variant={BackgroundVariant.Dots} gap={20} size={1} />
-              </ReactFlow>
-            </ReactFlowProvider>
+          <div className="space-y-3">
+            {agentsList.length > 0 ? (
+              <div className="flex flex-wrap items-center gap-2 text-xs">
+                <span className="text-muted-foreground">Agents:</span>
+                {agentsList.map((a) => (
+                  <span
+                    key={a.id}
+                    className="inline-flex items-center gap-1.5 rounded-full border bg-background px-2 py-0.5"
+                  >
+                    <span
+                      className="inline-block h-2 w-2 rounded-full"
+                      style={{ backgroundColor: a.color }}
+                    />
+                    <span className="font-medium">{a.label}</span>
+                    <span className="font-mono text-[10px] text-muted-foreground">
+                      {shortId(a.did)}
+                    </span>
+                  </span>
+                ))}
+              </div>
+            ) : null}
+            <div className="h-[480px] w-full overflow-hidden rounded-md border bg-background">
+              <ReactFlowProvider>
+                <Canvas
+                  nodes={layout.nodes}
+                  edges={layout.edges}
+                  conversations={layout.conversations}
+                  onSpanClick={(id) => setOpenSpan(id)}
+                />
+              </ReactFlowProvider>
+            </div>
           </div>
         )}
       </CardContent>
@@ -140,20 +150,73 @@ export function ActionGraph({ swarmId, agentId }: { swarmId?: string; agentId?: 
   );
 }
 
-function AgentNode({ data }: NodeProps) {
-  const d = data as AgentData;
+interface Conversation {
+  rootSpanId: string;
+  rootTool: string;
+  rootAgentLabel: string;
+  rootColor: string;
+  startedAt: string;
+  nodeIds: string[];
+}
+
+function Canvas({
+  nodes,
+  edges,
+  conversations,
+  onSpanClick,
+}: {
+  nodes: Node[];
+  edges: Edge[];
+  conversations: Conversation[];
+  onSpanClick: (id: string) => void;
+}) {
+  const flow = useReactFlow();
+
   return (
-    <div className="rounded-md border-2 border-aegis-iris/60 bg-aegis-iris/10 px-3 py-2 shadow-sm">
-      <Handle type="source" position={Position.Right} className="!bg-aegis-iris" />
-      <div className="flex items-center gap-2">
-        <Bot className="h-4 w-4 text-aegis-iris" />
-        <span className="text-sm font-medium">{d.label}</span>
-      </div>
-      <div className="mt-1 font-mono text-[10px] text-muted-foreground">{shortId(d.did)}</div>
-      <div className="mt-1 text-[10px] uppercase tracking-wider text-aegis-mute">
-        {d.spanCount} call{d.spanCount === 1 ? '' : 's'}
-      </div>
-    </div>
+    <>
+      {conversations.length > 1 ? (
+        <div className="flex flex-wrap gap-1.5 border-b bg-muted/30 px-2 py-1.5 text-[11px]">
+          {conversations.map((c) => (
+            <button
+              type="button"
+              key={c.rootSpanId}
+              onClick={() =>
+                flow.fitView({
+                  nodes: c.nodeIds.map((id) => ({ id })),
+                  duration: 350,
+                  padding: 0.15,
+                })
+              }
+              className="inline-flex items-center gap-1.5 rounded border bg-background px-1.5 py-0.5 hover:bg-accent"
+            >
+              <span
+                className="inline-block h-2 w-2 rounded-full"
+                style={{ backgroundColor: c.rootColor }}
+              />
+              <span className="font-mono">{c.rootTool}</span>
+              <span className="text-muted-foreground">· {relativeTime(c.startedAt)}</span>
+            </button>
+          ))}
+        </div>
+      ) : null}
+      <ReactFlow
+        nodes={nodes}
+        edges={edges}
+        nodeTypes={nodeTypes}
+        fitView
+        minZoom={0.4}
+        maxZoom={1.5}
+        proOptions={{ hideAttribution: true }}
+        nodesDraggable={false}
+        nodesConnectable={false}
+        elementsSelectable
+        onNodeClick={(_, node) => {
+          if (node.type === 'span') onSpanClick(node.id);
+        }}
+      >
+        <Background variant={BackgroundVariant.Dots} gap={20} size={1} />
+      </ReactFlow>
+    </>
   );
 }
 
@@ -161,116 +224,195 @@ function SpanNode({ data }: NodeProps) {
   const d = data as SpanData;
   const tone =
     d.status === 'success'
-      ? 'border-aegis-signal/60 bg-aegis-signal/10'
+      ? 'border-aegis-signal/60 bg-aegis-signal/5'
       : d.status === 'denied'
-        ? 'border-aegis-amber/60 bg-aegis-amber/10'
-        : 'border-aegis-coral/60 bg-aegis-coral/10';
+        ? 'border-aegis-amber/60 bg-aegis-amber/5'
+        : d.status === 'failure' || d.status === 'timeout'
+          ? 'border-aegis-coral/60 bg-aegis-coral/5'
+          : 'border-aegis-mute/60 bg-background';
   return (
-    <div className={`rounded-md border-2 px-3 py-2 shadow-sm ${tone}`}>
+    <div
+      className={`relative overflow-hidden rounded-md border-2 shadow-sm ${tone}`}
+      style={{ width: NODE_W }}
+    >
       <Handle type="target" position={Position.Left} />
       <Handle type="source" position={Position.Right} />
-      <div className="flex items-center gap-2">
-        <Wrench className="h-3.5 w-3.5" />
-        <code className="text-xs">{d.toolName}</code>
-      </div>
-      <div className="mt-1 flex items-center gap-2">
-        <Badge
-          variant={
-            d.status === 'success' ? 'default' : d.status === 'denied' ? 'secondary' : 'destructive'
-          }
-          className="px-1.5 py-0 text-[9px] uppercase"
-        >
-          {d.status}
-        </Badge>
-        <span className="font-mono text-[10px] text-muted-foreground">{d.latencyMs}ms</span>
-        {d.httpStatus !== null ? (
-          <span className="font-mono text-[10px] text-muted-foreground">{d.httpStatus}</span>
-        ) : null}
+      <span
+        aria-hidden
+        className="absolute inset-y-0 left-0 w-1"
+        style={{ backgroundColor: d.agentColor }}
+      />
+      <div className="space-y-1 px-3 py-2 pl-4">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex min-w-0 items-center gap-1.5">
+            <Wrench className="h-3.5 w-3.5 flex-shrink-0" />
+            <code className="truncate text-xs">{d.toolName}</code>
+          </div>
+          {d.spawnsCount > 1 ? (
+            <span
+              className="inline-flex items-center gap-0.5 rounded bg-aegis-iris/15 px-1 py-0.5 text-[9px] font-medium text-aegis-iris"
+              title={`spawns ${d.spawnsCount} sub-agents`}
+            >
+              <Sparkles className="h-2.5 w-2.5" />
+              spawns {d.spawnsCount}
+            </span>
+          ) : null}
+        </div>
+        <div className="flex items-center gap-2">
+          <Badge
+            variant={
+              d.status === 'success'
+                ? 'default'
+                : d.status === 'denied'
+                  ? 'secondary'
+                  : 'destructive'
+            }
+            className="px-1.5 py-0 text-[9px] uppercase"
+          >
+            {d.status}
+          </Badge>
+          <span className="font-mono text-[10px] text-muted-foreground">{d.latencyMs}ms</span>
+          {d.httpStatus !== null ? (
+            <span className="font-mono text-[10px] text-muted-foreground">{d.httpStatus}</span>
+          ) : null}
+        </div>
+        <div className="flex items-center gap-1.5 text-[10px]">
+          <span
+            className="inline-block h-1.5 w-1.5 rounded-full"
+            style={{ backgroundColor: d.agentColor }}
+          />
+          <span className="truncate text-muted-foreground">
+            {d.agentLabel} · <span className="font-mono">{shortId(d.agentDid)}</span>
+          </span>
+        </div>
       </div>
     </div>
   );
 }
 
-function buildLayout(data: {
-  nodes: Array<
-    | {
-        kind: 'agent';
-        id: string;
-        label: string;
-        did: string;
-        depth: number | null;
-        spanCount: number;
-      }
-    | {
-        kind: 'span';
-        id: string;
-        agentId: string;
-        toolName: string;
-        status: 'success' | 'failure' | 'timeout' | 'denied';
-        latencyMs: number;
-        httpStatus: number | null;
-        startedAt: string;
-      }
-  >;
-  edges: Array<{ id: string; from: string; to: string; kind: 'invokes' | 'handoff' }>;
-}): { nodes: Node[]; edges: Edge[] } {
-  const g = new dagre.graphlib.Graph();
-  g.setGraph({ rankdir: 'LR', nodesep: 24, ranksep: 56, marginx: 16, marginy: 16 });
-  g.setDefaultEdgeLabel(() => ({}));
+function buildLayout(data: ActionGraphData): {
+  nodes: Node[];
+  edges: Edge[];
+  conversations: Conversation[];
+  agents: Record<string, AgentGraphNode>;
+} {
+  if (data.nodes.length === 0) {
+    return { nodes: [], edges: [], conversations: [], agents: data.agents };
+  }
 
+  // Group spans by rootSpanId so each conversation gets its own dagre pass.
+  const byRoot = new Map<string, ActionGraphData['nodes']>();
   for (const n of data.nodes) {
-    g.setNode(
-      n.id,
-      n.kind === 'agent'
-        ? { width: NODE_W_AGENT, height: NODE_H_AGENT }
-        : { width: NODE_W_SPAN, height: NODE_H_SPAN },
-    );
+    const arr = byRoot.get(n.rootSpanId) ?? [];
+    arr.push(n);
+    byRoot.set(n.rootSpanId, arr);
   }
+  const edgesByRoot = new Map<string, ActionGraphData['edges']>();
+  const rootOf = new Map<string, string>();
+  for (const n of data.nodes) rootOf.set(n.id, n.rootSpanId);
   for (const e of data.edges) {
-    g.setEdge(e.from, e.to);
+    const root = rootOf.get(e.to) ?? rootOf.get(e.from);
+    if (!root) continue;
+    const arr = edgesByRoot.get(root) ?? [];
+    arr.push(e);
+    edgesByRoot.set(root, arr);
   }
-  dagre.layout(g);
 
-  const nodes: Node[] = data.nodes.map((n) => {
-    const pos = g.node(n.id);
-    if (n.kind === 'agent') {
-      return {
-        id: n.id,
-        type: 'agent',
-        position: { x: pos.x - NODE_W_AGENT / 2, y: pos.y - NODE_H_AGENT / 2 },
-        data: {
-          kind: 'agent',
-          label: n.label,
-          did: n.did,
-          spanCount: n.spanCount,
-        } satisfies AgentData,
-      };
+  // Tally cross-agent children per span to show "spawns N" badge.
+  const spawnsByParent = new Map<string, number>();
+  for (const e of data.edges) {
+    if (e.kind === 'spawn') {
+      spawnsByParent.set(e.from, (spawnsByParent.get(e.from) ?? 0) + 1);
     }
+  }
+
+  // Order conversations by their root's startedAt (oldest first).
+  const rootStart = (rootId: string): number => {
+    const root = data.nodes.find((n) => n.id === rootId);
+    return root ? Date.parse(root.startedAt) : 0;
+  };
+  const roots = [...byRoot.keys()].sort((a, b) => rootStart(a) - rootStart(b));
+
+  const flowNodes: Node[] = [];
+  const conversations: Conversation[] = [];
+  let yOffset = 0;
+
+  for (const root of roots) {
+    const subNodes = byRoot.get(root) ?? [];
+    const subEdges = edgesByRoot.get(root) ?? [];
+
+    const g = new dagre.graphlib.Graph();
+    g.setGraph({ rankdir: 'LR', nodesep: 28, ranksep: 64, marginx: 16, marginy: 16 });
+    g.setDefaultEdgeLabel(() => ({}));
+    for (const n of subNodes) g.setNode(n.id, { width: NODE_W, height: NODE_H });
+    for (const e of subEdges) {
+      if (g.hasNode(e.from) && g.hasNode(e.to)) g.setEdge(e.from, e.to);
+    }
+    dagre.layout(g);
+
+    let maxY = 0;
+    for (const n of subNodes) {
+      const pos = g.node(n.id);
+      const y = pos.y - NODE_H / 2 + yOffset;
+      maxY = Math.max(maxY, y + NODE_H);
+      flowNodes.push({
+        id: n.id,
+        type: 'span',
+        position: { x: pos.x - NODE_W / 2, y },
+        data: {
+          toolName: n.toolName,
+          status: n.status,
+          latencyMs: n.latencyMs,
+          httpStatus: n.httpStatus,
+          agentLabel: n.agentLabel,
+          agentDid: n.agentDid,
+          agentColor: n.agentColor,
+          spawnsCount: spawnsByParent.get(n.id) ?? 0,
+        } satisfies SpanData,
+      });
+    }
+
+    const rootNode = subNodes.find((n) => n.id === root);
+    if (rootNode) {
+      conversations.push({
+        rootSpanId: root,
+        rootTool: rootNode.toolName,
+        rootAgentLabel: rootNode.agentLabel,
+        rootColor: rootNode.agentColor,
+        startedAt: rootNode.startedAt,
+        nodeIds: subNodes.map((n) => n.id),
+      });
+    }
+
+    yOffset = maxY + GROUP_GAP;
+  }
+
+  const flowEdges: Edge[] = data.edges.map((e) => {
+    const child = data.nodes.find((n) => n.id === e.to);
+    const color = e.kind === 'spawn' && child ? child.agentColor : undefined;
     return {
-      id: n.id,
-      type: 'span',
-      position: { x: pos.x - NODE_W_SPAN / 2, y: pos.y - NODE_H_SPAN / 2 },
-      data: {
-        kind: 'span',
-        toolName: n.toolName,
-        status: n.status,
-        latencyMs: n.latencyMs,
-        httpStatus: n.httpStatus,
-      } satisfies SpanData,
+      id: e.id,
+      source: e.from,
+      target: e.to,
+      type: 'smoothstep',
+      animated: e.kind === 'spawn',
+      style:
+        e.kind === 'spawn'
+          ? { stroke: color, strokeWidth: 2 }
+          : e.kind === 'sequential'
+            ? { stroke: 'rgb(148 163 184 / 0.35)', strokeWidth: 1 }
+            : { stroke: 'rgb(148 163 184 / 0.7)', strokeWidth: 1.5 },
     };
   });
 
-  const edges: Edge[] = data.edges.map((e) => ({
-    id: e.id,
-    source: e.from,
-    target: e.to,
-    type: 'smoothstep',
-    style:
-      e.kind === 'handoff'
-        ? { stroke: 'rgb(165 180 252)', strokeDasharray: '4 3' }
-        : { stroke: 'rgb(148 163 184 / 0.7)' },
-    animated: e.kind === 'handoff',
-  }));
+  return { nodes: flowNodes, edges: flowEdges, conversations, agents: data.agents };
+}
 
-  return { nodes, edges };
+function relativeTime(iso: string): string {
+  const t = Date.parse(iso);
+  if (Number.isNaN(t)) return '';
+  const delta = Date.now() - t;
+  if (delta < 60_000) return `${Math.max(1, Math.floor(delta / 1000))}s ago`;
+  if (delta < 3_600_000) return `${Math.floor(delta / 60_000)}m ago`;
+  return `${Math.floor(delta / 3_600_000)}h ago`;
 }

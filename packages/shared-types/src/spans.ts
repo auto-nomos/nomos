@@ -60,25 +60,33 @@ export interface Span {
 }
 
 /**
- * Action graph node — either an agent (a participant in the chain) or a span
- * (a tool call event). Agents anchor the graph; spans hang off their agent and
- * connect forward to the next-agent's first span when delegation occurred.
+ * Action graph — forward-flowing conversation tree.
+ *
+ * Each node is a span (tool call). Spans link to an effective parent so the
+ * tree branches when an agent spawns a sub-agent. Agent identity travels on
+ * the span (color + label + DID); a sidecar `agents` map drives the legend.
+ *
+ * Conversation = connected component rooted at a span with no parent in the
+ * window. `rootSpanId` is set on every span for cheap grouping in the UI.
  */
-export type ActionGraphNodeKind = 'agent' | 'span';
-
 export interface AgentGraphNode {
-  kind: 'agent';
   id: string;
   label: string;
   did: string;
   depth: number | null;
   spanCount: number;
+  color: string;
 }
 
 export interface SpanGraphNode {
   kind: 'span';
   id: string;
   agentId: string;
+  agentDid: string;
+  agentLabel: string;
+  agentColor: string;
+  effectiveParentId: string | null;
+  rootSpanId: string;
   toolName: string;
   status: SpanStatus;
   latencyMs: number;
@@ -86,9 +94,9 @@ export interface SpanGraphNode {
   startedAt: string;
 }
 
-export type ActionGraphNode = AgentGraphNode | SpanGraphNode;
+export type ActionGraphNode = SpanGraphNode;
 
-export type ActionGraphEdgeKind = 'invokes' | 'handoff';
+export type ActionGraphEdgeKind = 'parent' | 'sequential' | 'spawn';
 
 export interface ActionGraphEdge {
   id: string;
@@ -100,6 +108,7 @@ export interface ActionGraphEdge {
 export interface ActionGraph {
   nodes: ActionGraphNode[];
   edges: ActionGraphEdge[];
+  agents: Record<string, AgentGraphNode>;
   windowMinutes: number;
   spanCount: number;
 }

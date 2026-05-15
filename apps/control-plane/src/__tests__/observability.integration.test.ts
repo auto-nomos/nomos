@@ -114,6 +114,32 @@ describe.skipIf(!RUN)('observability router (requires postgres)', () => {
     });
   }
 
+  async function emitSpan(
+    customerId: string,
+    agentId: string,
+    toolName: string,
+    startedAt: Date,
+    overrides: Partial<typeof schema.agentSpans.$inferInsert> = {},
+  ): Promise<{ id: string; receiptId: string }> {
+    const receiptId = `rcpt-${Math.random().toString(36).slice(2)}`;
+    const [row] = await db.drizzle
+      .insert(schema.agentSpans)
+      .values({
+        customerId,
+        agentId,
+        receiptId,
+        toolName,
+        status: 'success',
+        requestArgsHash: 'a'.repeat(64),
+        startedAt,
+        endedAt: new Date(startedAt.getTime() + 5),
+        latencyMs: 5,
+        ...overrides,
+      })
+      .returning({ id: schema.agentSpans.id, receiptId: schema.agentSpans.receiptId });
+    return { id: row!.id, receiptId: row!.receiptId };
+  }
+
   beforeAll(async () => {
     db = createDb({ DATABASE_URL: TEST_URL });
     try {
@@ -258,6 +284,66 @@ describe.skipIf(!RUN)('observability router (requires postgres)', () => {
     await emit(bob.customerId, b.did, { command: '/bob/only' });
     const inv = await client(alice.cookie).observability.agentInventory.query({ windowDays: 7 });
     expect(inv.some((r) => r.agentId === b.id)).toBe(false);
+  });
+
+  it('actionGraph builds a forward-flowing tree with sub-agent spawn fork', async () => {
+    // Conversation: root → child1 → child2 (all same agent, no explicit parent
+    // links → sequential fallback). child2 spawns a sub-agent that does one
+    // tool call via explicit parent_span_id.
+    const parent = await makeAgent(alice.customerId, `graph-parent-${Math.random()}`);
+    const sub = await makeAgent(alice.customerId, `graph-sub-${Math.random()}`);
+
+    const now = Date.now();
+    const root = await emitSpan(alice.customerId, parent.id, 'list_repos', new Date(now - 4_000));
+    const child1 = await emitSpan(
+      alice.customerId,
+      parent.id,
+      'list_commits',
+      new Date(now - 3_000),
+    );
+    const child2 = await emitSpan(
+      alice.customerId,
+      parent.id,
+      'create_branch',
+      new Date(now - 2_000),
+    );
+    const subCall = await emitSpan(alice.customerId, sub.id, 'edit_file', new Date(now - 1_000), {
+      parentSpanId: child2.id,
+    });
+
+    const graph = await client(alice.cookie).observability.actionGraph.query({
+      sinceMinutes: 60,
+    });
+
+    const ids = new Set(graph.nodes.map((n) => n.id));
+    expect(ids.has(root.id)).toBe(true);
+    expect(ids.has(child1.id)).toBe(true);
+    expect(ids.has(child2.id)).toBe(true);
+    expect(ids.has(subCall.id)).toBe(true);
+
+    // All four spans must share the same conversation root.
+    const roots = new Set(
+      graph.nodes
+        .filter((n) => ids.has(n.id) && [root.id, child1.id, child2.id, subCall.id].includes(n.id))
+        .map((n) => n.rootSpanId),
+    );
+    expect(roots.size).toBe(1);
+    expect([...roots][0]).toBe(root.id);
+
+    // Edge kinds: two sequential edges (root→child1, child1→child2) and one
+    // spawn edge (child2→subCall).
+    const ourEdges = graph.edges.filter((e) =>
+      [root.id, child1.id, child2.id, subCall.id].includes(e.to),
+    );
+    const sequentialCount = ourEdges.filter((e) => e.kind === 'sequential').length;
+    const spawnCount = ourEdges.filter((e) => e.kind === 'spawn').length;
+    expect(sequentialCount).toBe(2);
+    expect(spawnCount).toBe(1);
+
+    // agents map populated for both participants.
+    expect(graph.agents[parent.id]).toBeDefined();
+    expect(graph.agents[sub.id]).toBeDefined();
+    expect(graph.agents[parent.id]!.color).not.toBe(graph.agents[sub.id]!.color);
   });
 
   it('cross-tenant: alice cannot capabilityDiff bob agent (404)', async () => {
