@@ -1184,11 +1184,42 @@ function CloudIam() {
         .
       </Callout>
 
-      <h4 className="mt-6 font-display text-[18px] text-aegis-paper">Azure Terraform</h4>
+      <h4 className="mt-6 font-display text-[18px] text-aegis-paper">
+        Azure — what gets created and why
+      </h4>
       <P>
-        Creates: App Registration + Service Principal + Federated Identity Credential (issuer ={' '}
-        <K>id.auto-nomos.com</K>, audience = <K>api://AzureADTokenExchange</K>, subject ={' '}
-        <K>customer/{`{cid}`}/agent/*</K>) + Reader role at subscription scope.
+        Three Azure resources are required. You create them once per subscription; Nomos never
+        stores a client secret.
+      </P>
+      <ul className="mb-4 space-y-2 pl-4 text-sm text-aegis-mute [&>li]:list-disc [&>li]:marker:text-aegis-line-strong">
+        <li>
+          <K>azuread_application</K> + <K>azuread_service_principal</K> — Azure&apos;s identity
+          object for an external workload. Nomos agents authenticate <em>as</em> this SP. No
+          password or client secret is ever issued.
+        </li>
+        <li>
+          <K>azuread_application_federated_identity_credential</K> — the trust rule: &ldquo;when{' '}
+          <K>id.auto-nomos.com</K> presents a token with subject{' '}
+          <K>customer/{'<org-id>'}/agent/*</K>, accept it as this SP.&rdquo; Pure OIDC — nothing to
+          rotate or leak.
+        </li>
+        <li>
+          <K>azurerm_role_assignment</K> (Reader by default) — grants the SP permission to call
+          Azure APIs at subscription or resource-group scope. Without this, token exchange succeeds
+          but every API call returns 403.
+        </li>
+      </ul>
+
+      <h4 className="mt-6 font-display text-[18px] text-aegis-paper">
+        Azure — Terraform (recommended)
+      </h4>
+      <P>
+        One <K>terraform apply</K> creates all three resources and prints the four values you need.
+        Get your <K>customer_id</K> from{' '}
+        <a href="/app/settings/workspace" className="underline">
+          Settings → Workspace
+        </a>
+        ; your <K>subscription_id</K> from <K>az account show --query id -o tsv</K>.
       </P>
       <Code lang="hcl">{`# nomos-azure.tf — copy into your Terraform root
 terraform {
@@ -1227,6 +1258,42 @@ output "paste_into_nomos_dashboard" {
 terraform apply
 terraform output paste_into_nomos_dashboard
 # Paste the four values → /app/cloud/connect/azure`}</Code>
+
+      <h4 className="mt-6 font-display text-[18px] text-aegis-paper">
+        Azure — CLI alternative (no Terraform)
+      </h4>
+      <P>
+        Same three resources, created with <K>az</K> commands. Run <K>az login</K> first (or{' '}
+        <K>az login --use-device-code</K> if no browser is available).
+      </P>
+      <Code lang="bash">{`# 1. App Registration + Service Principal
+APP=$(az ad app create --display-name "nomos-agent-broker" \\
+      --query "{appId:appId,id:id}" -o json)
+APP_CLIENT_ID=$(echo $APP | jq -r .appId)
+APP_OBJ_ID=$(echo $APP | jq -r .id)
+SP_ID=$(az ad sp create --id $APP_CLIENT_ID --query "id" -o tsv)
+
+# 2. Federated Identity Credential — the OIDC trust block (no secrets)
+az ad app federated-credential create --id $APP_OBJ_ID --parameters '{
+  "name": "nomos-fic",
+  "issuer": "https://id.auto-nomos.com",
+  "subject": "customer/<your-customer-id>/agent/*",
+  "audiences": ["api://AzureADTokenExchange"]
+}'
+
+# 3. Reader role at subscription scope
+SUBSCRIPTION_ID=$(az account show --query id -o tsv)
+az role assignment create \\
+  --assignee $SP_ID \\
+  --role "Reader" \\
+  --scope "/subscriptions/$SUBSCRIPTION_ID"
+
+# 4. Print the four values → paste into /app/cloud/connect/azure
+TENANT_ID=$(az account show --query tenantId -o tsv)
+echo "app_object_id:   $APP_OBJ_ID"
+echo "app_client_id:   $APP_CLIENT_ID"
+echo "tenant_id:       $TENANT_ID"
+echo "subscription_id: $SUBSCRIPTION_ID"`}</Code>
 
       <h4 className="mt-6 font-display text-[18px] text-aegis-paper">AWS Terraform</h4>
       <P>

@@ -97,8 +97,9 @@ output "paste_into_nomos_dashboard" {
         </Link>
         <h1 className="text-2xl font-semibold tracking-tight">Connect Azure</h1>
         <p className="text-sm text-muted-foreground">
-          Federated credential on an App Registration. Nomos mints OIDC ID tokens; AAD trusts them
-          via the federated credential trust block created by the Terraform module.
+          Nomos brokers Azure calls without storing any secret. It mints a short-lived OIDC token
+          per agent request; Azure validates it via a federated credential trust and issues a
+          session credential (1–15 min TTL). Revoking the connection instantly cuts access.
         </p>
         <div className="rounded-md border border-blue-500/30 bg-blue-500/5 p-3 text-xs text-blue-900 dark:text-blue-200">
           OIDC issuer live at <code>id.auto-nomos.com</code>. Full setup walkthrough — Terraform,
@@ -112,10 +113,43 @@ output "paste_into_nomos_dashboard" {
 
       <Card>
         <CardHeader>
-          <CardTitle>1. Run the Terraform bootstrap</CardTitle>
+          <CardTitle className="text-base">What gets created — and why</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3 text-sm text-muted-foreground">
+          <div className="flex gap-3">
+            <span className="mt-0.5 shrink-0 font-mono text-xs text-aegis-mute">App Reg + SP</span>
+            <p>
+              Azure&apos;s identity object for an external workload. Nomos agents authenticate
+              <em> as</em> this Service Principal — no password, no client secret.
+            </p>
+          </div>
+          <div className="flex gap-3">
+            <span className="mt-0.5 shrink-0 font-mono text-xs text-aegis-mute">
+              Federated cred
+            </span>
+            <p>
+              The trust rule that tells Azure: &ldquo;when <code>id.auto-nomos.com</code> presents a
+              token with subject <code>customer/{'<your-org-id>'}/agent/*</code>, accept it as this
+              SP.&rdquo; Pure OIDC — no secrets to rotate or leak.
+            </p>
+          </div>
+          <div className="flex gap-3">
+            <span className="mt-0.5 shrink-0 font-mono text-xs text-aegis-mute">Reader role</span>
+            <p>
+              Grants the SP permission to call Azure APIs at subscription (or resource group) scope.
+              Without this the token exchange succeeds but every API call returns 403.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>1a. Run the Terraform bootstrap</CardTitle>
           <CardDescription>
-            Module source: <code>{TF_MODULE_PATH}</code> in this repo. Copy the directory into your
-            own Terraform repo and pin to a commit SHA before any production use.
+            Fastest path — one <code>terraform apply</code> creates all three resources and outputs
+            the four values you need. Module source: <code>{TF_MODULE_PATH}</code>. Copy it into
+            your own Terraform repo and pin to a commit SHA before any production use.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -123,20 +157,67 @@ output "paste_into_nomos_dashboard" {
             {tfvarsSnippet}
           </pre>
           <p className="mt-3 text-xs text-muted-foreground">
-            The module creates: <code>azuread_application</code>,{' '}
-            <code>azuread_service_principal</code>,{' '}
-            <code>azuread_application_federated_identity_credential</code> (with{' '}
-            <code>issuer = nomos_oidc_issuer</code>), and <code>azurerm_role_assignment</code> at
-            the chosen scope. Copy the outputs back here.
+            Run: <code>terraform init &amp;&amp; terraform apply</code>, then{' '}
+            <code>terraform output paste_into_nomos_dashboard</code> and paste the four values into
+            step 2 below.
           </p>
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
-          <CardTitle>2. Paste the Terraform outputs</CardTitle>
+          <CardTitle>1b. Alternative — Azure CLI (no Terraform required)</CardTitle>
           <CardDescription>
-            All four fields from <code>terraform output paste_into_nomos_dashboard</code>.
+            Creates the same three resources using <code>az</code> commands. Run{' '}
+            <code>az login</code> first (or <code>az login --use-device-code</code> if no browser).
+            Copy the four output values into step 2 below.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <pre className="overflow-auto rounded-md bg-zinc-900 p-3 font-mono text-xs leading-relaxed text-zinc-100">{`# 1. App Registration + Service Principal
+APP=$(az ad app create --display-name "nomos-agent-broker" \\
+      --query "{appId:appId,id:id}" -o json)
+APP_CLIENT_ID=$(echo $APP | jq -r .appId)
+APP_OBJ_ID=$(echo $APP | jq -r .id)
+SP_ID=$(az ad sp create --id $APP_CLIENT_ID --query "id" -o tsv)
+
+# 2. Federated Identity Credential (OIDC trust — no secrets)
+az ad app federated-credential create --id $APP_OBJ_ID --parameters '{
+  "name": "nomos-fic",
+  "issuer": "https://id.auto-nomos.com",
+  "subject": "customer/<your-customer-id>/agent/*",
+  "audiences": ["api://AzureADTokenExchange"]
+}'
+
+# 3. Reader role at subscription scope
+SUBSCRIPTION_ID=$(az account show --query id -o tsv)
+az role assignment create \\
+  --assignee $SP_ID \\
+  --role "Reader" \\
+  --scope "/subscriptions/$SUBSCRIPTION_ID"
+
+# 4. Print the four values to paste into Nomos
+TENANT_ID=$(az account show --query tenantId -o tsv)
+echo "app_object_id:   $APP_OBJ_ID"
+echo "app_client_id:   $APP_CLIENT_ID"
+echo "tenant_id:       $TENANT_ID"
+echo "subscription_id: $SUBSCRIPTION_ID"`}</pre>
+          <p className="text-xs text-muted-foreground">
+            Replace <code>{'<your-customer-id>'}</code> with your Nomos org ID from{' '}
+            <Link href="/app/settings/workspace" className="underline">
+              Settings → Workspace
+            </Link>
+            .
+          </p>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>2. Paste the four output values</CardTitle>
+          <CardDescription>
+            From <code>terraform output paste_into_nomos_dashboard</code> or the <code>echo</code>{' '}
+            commands in step 1b above.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -162,7 +243,7 @@ output "paste_into_nomos_dashboard" {
             <Label htmlFor="app_object_id">App registration object id</Label>
             <Input
               id="app_object_id"
-              placeholder="object-id from terraform output app_object_id"
+              placeholder="app_object_id from terraform output or echo command"
               value={appObjectId}
               onChange={(e) => setAppObjectId(e.target.value)}
             />
@@ -171,7 +252,7 @@ output "paste_into_nomos_dashboard" {
             <Label htmlFor="app_client_id">App registration client id (application id)</Label>
             <Input
               id="app_client_id"
-              placeholder="client-id from terraform output app_client_id"
+              placeholder="app_client_id from terraform output or echo command"
               value={appClientId}
               onChange={(e) => setAppClientId(e.target.value)}
             />
