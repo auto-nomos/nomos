@@ -5,7 +5,6 @@ import {
   BellRing,
   BookOpen,
   Boxes,
-  ChevronsUpDown,
   CircleDot,
   Cloud,
   Cog,
@@ -18,6 +17,7 @@ import {
   LogOut,
   Plug,
   ShieldCheck,
+  Users,
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
@@ -25,6 +25,7 @@ import { authClient, useSession } from '../../lib/auth-client';
 import { trpc } from '../../lib/trpc';
 import { cn } from '../../lib/utils';
 import { NomosLogo } from './logo';
+import { OrgSwitcher } from './org-switcher';
 
 interface NavItem {
   href: string;
@@ -75,6 +76,8 @@ const NAV_GROUPS: { id: string; label: string; items: NavItem[] }[] = [
     label: 'Account',
     items: [
       { href: '/app/billing', label: 'Billing', icon: Gauge, hint: 'usage + plan' },
+      { href: '/app/settings/members', label: 'Members', icon: Users, hint: 'team + roles' },
+      { href: '/app/settings/organization', label: 'Organization', icon: Cog, hint: 'name + slug' },
       { href: '/app/settings/security', label: 'Passkeys', icon: KeyRound, hint: 'step-up' },
       { href: '/app/settings/notifications', label: 'Notifications', icon: Layers },
       { href: '/app/guide/what-is-nomos', label: 'User guide', icon: BookOpen, hint: 'docs' },
@@ -247,7 +250,6 @@ function SidebarStatus() {
 
 function Topbar() {
   const session = useSession();
-  const customer = trpc.customers.get.useQuery();
   const pathname = usePathname();
   const router = useRouter();
 
@@ -261,17 +263,7 @@ function Topbar() {
   return (
     <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-aegis-line bg-aegis-ink/80 px-10 backdrop-blur">
       <div className="flex items-center gap-3">
-        <button
-          type="button"
-          className="group flex items-center gap-2 rounded-sm border border-aegis-line bg-aegis-surface-2 px-3 py-1.5 text-sm text-aegis-paper transition-colors hover:border-aegis-line-strong"
-          aria-label="Switch workspace"
-        >
-          <span className="grid h-5 w-5 place-items-center rounded-[3px] bg-aegis-signal-soft font-mono text-[10px] font-semibold text-aegis-signal">
-            {(customer.data?.name ?? 'W').slice(0, 1).toUpperCase()}
-          </span>
-          <span className="max-w-[180px] truncate">{customer.data?.name ?? 'Workspace'}</span>
-          <ChevronsUpDown className="h-3.5 w-3.5 text-aegis-faint group-hover:text-aegis-mute" />
-        </button>
+        <OrgSwitcher />
         <nav
           aria-label="Breadcrumb"
           className="hidden items-center gap-2 font-mono text-xs text-aegis-mute md:flex"
