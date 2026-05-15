@@ -76,6 +76,7 @@ const NAV_GROUPS: { id: string; label: string; items: NavItem[] }[] = [
     label: 'Account',
     items: [
       { href: '/app/billing', label: 'Billing', icon: Gauge, hint: 'usage + plan' },
+      { href: '/app/settings/workspace', label: 'Workspace', icon: Boxes, hint: 'org IDs + TF' },
       { href: '/app/settings/members', label: 'Members', icon: Users, hint: 'team + roles' },
       { href: '/app/settings/organization', label: 'Organization', icon: Cog, hint: 'name + slug' },
       { href: '/app/settings/security', label: 'Passkeys', icon: KeyRound, hint: 'step-up' },

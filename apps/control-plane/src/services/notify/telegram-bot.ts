@@ -20,6 +20,7 @@ import type { DrizzleClient } from '../../db/index.js';
 import {
   agents as agentsTable,
   customerTelegramLinks,
+  memberships,
   notificationPreferences,
   pushApprovals,
   telegramLinkTokens,
@@ -291,7 +292,7 @@ export function createTelegramBot(opts: TelegramBotOptions): TelegramBot {
       .leftJoin(agentsTable, eq(pushApprovals.agentId, agentsTable.id))
       .where(eq(pushApprovals.id, approvalId))
       .limit(1);
-    if (!row || !row.agentName) return;
+    if (!row?.agentName) return;
     try {
       await upsertGrant(opts.db, {
         customerId: row.customerId,
@@ -358,7 +359,7 @@ export function createTelegramBot(opts: TelegramBotOptions): TelegramBot {
         const text = u.message.text;
         const chat = u.message.chat;
         const startMatch = text.match(/^\/start\s+(\S+)/);
-        if (startMatch) return await handleStart(chat, startMatch[1]!);
+        if (startMatch) return await handleStart(chat, startMatch[1] ?? '');
         if (text === '/unlink') return await handleUnlink(chat);
         if (text === '/start' || text === '/help') {
           await sendMessage({
@@ -476,18 +477,36 @@ export function createTelegramBot(opts: TelegramBotOptions): TelegramBot {
   }
 
   async function sendToCustomer(customerId: string, text: string): Promise<void> {
-    const links = await opts.db
-      .select({ chatId: customerTelegramLinks.chatId })
-      .from(customerTelegramLinks)
-      .where(
-        and(
-          eq(customerTelegramLinks.customerId, customerId),
-          eq(customerTelegramLinks.enabled, true),
+    const [linkRows, prefRows] = await Promise.all([
+      opts.db
+        .select({ chatId: customerTelegramLinks.chatId })
+        .from(customerTelegramLinks)
+        .where(
+          and(
+            eq(customerTelegramLinks.customerId, customerId),
+            eq(customerTelegramLinks.enabled, true),
+          ),
         ),
-      );
+      // Settings page → notification_preferences pasted chat-ids. These
+      // aren't org-scoped, so we resolve via memberships to fan out to
+      // every member of this customer who opted in.
+      opts.db
+        .select({ chatId: notificationPreferences.telegramChatId })
+        .from(notificationPreferences)
+        .innerJoin(memberships, eq(memberships.userId, notificationPreferences.userId))
+        .where(
+          and(
+            eq(memberships.customerId, customerId),
+            eq(notificationPreferences.telegramEnabled, true),
+          ),
+        ),
+    ]);
+    const chatIds = new Set<string>();
+    for (const r of linkRows) chatIds.add(r.chatId);
+    for (const r of prefRows) if (r.chatId) chatIds.add(r.chatId);
     await Promise.all(
-      links.map((l) =>
-        sendMessage({ chatId: l.chatId, text }).catch((err) => {
+      [...chatIds].map((chatId) =>
+        sendMessage({ chatId, text }).catch((err) => {
           opts.logger.warn({ err, customerId }, 'telegram-bot: sendToCustomer failed for chat');
         }),
       ),
