@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { Button } from '../../components/ui/button';
 import {
   Card,
@@ -14,6 +14,27 @@ import { useSession } from '../../lib/auth-client';
 import { trpc } from '../../lib/trpc';
 
 export default function AcceptInvitePage() {
+  return (
+    <Suspense fallback={<AcceptInviteFallback />}>
+      <AcceptInviteInner />
+    </Suspense>
+  );
+}
+
+function AcceptInviteFallback() {
+  return (
+    <main className="grid min-h-screen place-items-center bg-background p-6">
+      <Card className="w-full max-w-md">
+        <CardHeader>
+          <CardTitle>Accept invitation</CardTitle>
+          <CardDescription>Loading…</CardDescription>
+        </CardHeader>
+      </Card>
+    </main>
+  );
+}
+
+function AcceptInviteInner() {
   const params = useSearchParams();
   const token = params.get('token') ?? '';
   const router = useRouter();
