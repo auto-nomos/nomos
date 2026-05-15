@@ -145,7 +145,14 @@ export function createAuth(deps: AuthDeps): Auth {
           after: async (createdUser) => {
             const customerName = inferCustomerName(createdUser.email);
             const customer = (
-              await db.insert(schema.customers).values({ name: customerName }).returning()
+              await db
+                .insert(schema.customers)
+                .values({
+                  name: customerName,
+                  displayName: customerName,
+                  slug: slugify(customerName, randomUUID()),
+                })
+                .returning()
             )[0];
             if (!customer) {
               throw new Error('failed to create default customer during sign-up');
@@ -161,6 +168,7 @@ export function createAuth(deps: AuthDeps): Auth {
                 userId: createdUser.id,
                 customerId: customer.id,
                 customerName,
+                slug: customer.slug,
               },
               'user signed up: customer + owner membership created',
             );
@@ -196,4 +204,13 @@ function inferCustomerName(email: string): string {
   if (!domain) return 'My Org';
   const head = domain.split('.')[0];
   return head && head.length > 0 ? head : 'My Org';
+}
+
+function slugify(displayName: string, uuid: string): string {
+  const base = displayName
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
+  const head = base.length > 0 ? base : 'org';
+  return `${head}-${uuid.slice(0, 6)}`;
 }

@@ -9,6 +9,7 @@
  * tables (memberships, revocations.revoked_by, push_approvals.decided_by)
  * reference Better-Auth's user.id (uuid).
  */
+import { randomUUID } from 'node:crypto';
 import { relations, sql } from 'drizzle-orm';
 import {
   boolean,
@@ -27,7 +28,14 @@ import {
 // ===== Enums =====
 
 export const planEnum = pgEnum('plan', ['free', 'pro', 'enterprise']);
-export const membershipRoleEnum = pgEnum('membership_role', ['owner', 'admin', 'member']);
+export const membershipRoleEnum = pgEnum('membership_role', [
+  'owner',
+  'admin',
+  'agent_manager',
+  'policy_author',
+  'auditor',
+  'member',
+]);
 export const agentStatusEnum = pgEnum('agent_status', ['active', 'disabled', 'deleted']);
 export const agentModeEnum = pgEnum('agent_mode', ['static', 'dynamic']);
 export const oauthConnectorEnum = pgEnum('oauth_connector', [
@@ -153,13 +161,35 @@ export const verification = pgTable('verification', {
 
 // ===== Application tables (per spec section 6) =====
 
-export const customers = pgTable('customers', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  name: text('name').notNull(),
-  plan: planEnum('plan').notNull().default('free'),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-});
+/**
+ * Tenant root. Historically called "customer" — surfaced as "organization" in
+ * dashboard + new APIs. `name` is the legacy column kept for back-compat;
+ * `display_name` is what users see, `slug` is the URL-safe handle.
+ */
+export const customers = pgTable(
+  'customers',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    name: text('name').notNull(),
+    /** Defaulted at the TS layer so existing insert sites that only pass
+     *  `name` keep compiling; Better-Auth signup hook overrides explicitly. */
+    displayName: text('display_name')
+      .notNull()
+      .$defaultFn(() => 'My Org'),
+    /** Globally unique URL handle; random suffix guarantees uniqueness even
+     *  when displayName collides. Defaulted at the TS layer for the same
+     *  back-compat reason as displayName. */
+    slug: text('slug')
+      .notNull()
+      .$defaultFn(() => `org-${randomUUID().slice(0, 8)}`),
+    plan: planEnum('plan').notNull().default('free'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    slugIdx: uniqueIndex('customers_slug_idx').on(t.slug),
+  }),
+);
 
 export const memberships = pgTable(
   'memberships',
@@ -177,6 +207,37 @@ export const memberships = pgTable(
   (t) => ({
     userCustomerIdx: uniqueIndex('memberships_user_customer_idx').on(t.userId, t.customerId),
     customerIdx: index('memberships_customer_idx').on(t.customerId),
+  }),
+);
+
+/**
+ * Pending email invites for org membership. Token is stored hashed; the raw
+ * token only ever appears in the invite link emailed to the recipient.
+ * Lifecycle: invited → accepted_at set when join succeeds, or revoked_at set
+ * when admin cancels. Expired rows are tombstoned by `expires_at`.
+ */
+export const orgInvites = pgTable(
+  'org_invites',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    customerId: uuid('customer_id')
+      .notNull()
+      .references(() => customers.id, { onDelete: 'cascade' }),
+    email: text('email').notNull(),
+    role: membershipRoleEnum('role').notNull(),
+    tokenHash: text('token_hash').notNull(),
+    invitedBy: uuid('invited_by')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    acceptedAt: timestamp('accepted_at', { withTimezone: true }),
+    revokedAt: timestamp('revoked_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    tokenIdx: uniqueIndex('org_invites_token_idx').on(t.tokenHash),
+    customerIdx: index('org_invites_customer_idx').on(t.customerId),
+    emailIdx: index('org_invites_email_idx').on(t.email),
   }),
 );
 
@@ -565,6 +626,13 @@ export const apiKeys = pgTable(
     keyHash: text('key_hash').notNull(),
     prefix: text('prefix').notNull(),
     name: text('name').notNull(),
+    /** Role bound to this key. Permission checks consult @auto-nomos/rbac
+     *  matrix the same way user sessions do. Backfilled to 'admin' by 0029.
+     *  Defaulted at the TS layer so callers that don't yet know about roles
+     *  keep compiling — until commit 8 adds role-aware mint UI. */
+    role: membershipRoleEnum('role')
+      .notNull()
+      .$defaultFn(() => 'admin'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     revokedAt: timestamp('revoked_at', { withTimezone: true }),
     /** Last MCP client that used this key. Populated by api-key-auth
@@ -725,11 +793,17 @@ export const customersRelations = relations(customers, ({ many }) => ({
   oauthConnections: many(oauthConnections),
   apiKeys: many(apiKeys),
   mcpServers: many(mcpServers),
+  orgInvites: many(orgInvites),
 }));
 
 export const membershipsRelations = relations(memberships, ({ one }) => ({
   user: one(user, { fields: [memberships.userId], references: [user.id] }),
   customer: one(customers, { fields: [memberships.customerId], references: [customers.id] }),
+}));
+
+export const orgInvitesRelations = relations(orgInvites, ({ one }) => ({
+  customer: one(customers, { fields: [orgInvites.customerId], references: [customers.id] }),
+  invitedByUser: one(user, { fields: [orgInvites.invitedBy], references: [user.id] }),
 }));
 
 export const agentsRelations = relations(agents, ({ one, many }) => ({

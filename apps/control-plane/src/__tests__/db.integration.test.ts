@@ -36,9 +36,10 @@ describe.skipIf(!RUN)('db migration smoke (requires postgres)', () => {
     await db.pool.end();
   });
 
-  it('all 29 tables exist (24 application + 4 Better-Auth + passkey)', async () => {
+  it('all 33 tables exist (26 application + 4 Better-Auth + passkey + cloud x2)', async () => {
     // Sprint MAOS-A/B added `swarms` + `agent_chain_approvals` (2 tables).
-    // Observability v2 added `agent_spans`.
+    // Observability v2 added `agent_spans`. Cloud IAM M0 added
+    // `cloud_connections` + `oidc_issuer_keys`. Org RBAC added `org_invites`.
     const result = await db.pool.query<{ table_name: string }>(
       `SELECT table_name FROM information_schema.tables
        WHERE table_schema = 'public' AND table_type = 'BASE TABLE'
@@ -56,6 +57,7 @@ describe.skipIf(!RUN)('db migration smoke (requires postgres)', () => {
       'audit_events',
       'audit_roots',
       'chain_context_facts',
+      'cloud_connections',
       'customer_telegram_links',
       'customers',
       'envelopes',
@@ -63,6 +65,8 @@ describe.skipIf(!RUN)('db migration smoke (requires postgres)', () => {
       'memberships',
       'notification_preferences',
       'oauth_connections',
+      'oidc_issuer_keys',
+      'org_invites',
       'passkey',
       'policies',
       'push_approvals',
