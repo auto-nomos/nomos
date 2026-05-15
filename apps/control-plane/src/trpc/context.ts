@@ -1,3 +1,4 @@
+import { expandRolePermissions, type Role } from '@auto-nomos/rbac';
 import { eq } from 'drizzle-orm';
 import type { Auth } from '../auth/index.js';
 import type { CredsCache } from '../cloud/creds-cache.js';
@@ -57,6 +58,18 @@ export interface Context {
    * (dashboard).
    */
   customerId: string | null;
+  /**
+   * Membership row backing `customerId`. `role` drives the permission gate
+   * applied by `withPermission(resource, action)` in trpc/index.ts. Null when
+   * the request has no session or the user lacks any membership.
+   */
+  membership: { customerId: string; role: Role } | null;
+  /**
+   * Pre-expanded permission bundle for `membership.role`. Mirrors the matrix
+   * in @auto-nomos/rbac so callers can ask `permissions.agents?.includes('read')`
+   * without re-importing the matrix on every check. Null when no membership.
+   */
+  permissions: ReturnType<typeof expandRolePermissions> | null;
 }
 
 /**
@@ -69,6 +82,8 @@ export async function createContext(req: Request, deps: ContextDeps): Promise<Co
   const session = await deps.auth.api.getSession({ headers: req.headers });
 
   let customerId: string | null = null;
+  let membership: Context['membership'] = null;
+  let permissions: Context['permissions'] = null;
   let userPayload: Context['session'] = null;
 
   if (session?.user) {
@@ -81,10 +96,14 @@ export async function createContext(req: Request, deps: ContextDeps): Promise<Co
       token: session.session.token,
     };
 
-    const membership = await deps.db.drizzle.query.memberships.findFirst({
+    const row = await deps.db.drizzle.query.memberships.findFirst({
       where: eq(schema.memberships.userId, session.user.id),
     });
-    customerId = membership?.customerId ?? null;
+    if (row) {
+      customerId = row.customerId;
+      membership = { customerId: row.customerId, role: row.role as Role };
+      permissions = expandRolePermissions(membership.role);
+    }
   }
 
   return {
@@ -100,5 +119,7 @@ export async function createContext(req: Request, deps: ContextDeps): Promise<Co
     cloudVerifyPoll: deps.cloudVerifyPoll ?? null,
     session: userPayload,
     customerId,
+    membership,
+    permissions,
   };
 }
