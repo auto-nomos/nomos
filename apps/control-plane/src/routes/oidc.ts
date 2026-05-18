@@ -55,12 +55,19 @@ export function createOidcRoutes(deps: OidcDeps): Hono {
     });
   });
 
-  app.get('/oidc/jwks.json', async (c) => {
+  const jwksHandler = async (c: Parameters<Parameters<typeof app.get>[1]>[0]) => {
     const keys = await deps.keyStore.getPublishedKeys();
     return c.json({
       keys: keys.map((k) => ({ ...k.publicJwk, alg: k.alg })),
     });
-  });
+  };
+  app.get('/oidc/jwks.json', jwksHandler);
+  // Alias matching the path advertised in the discovery doc (jwks_uri).
+  // Cloudflare Worker at id.auto-nomos.com is supposed to rewrite this to
+  // /oidc/jwks.json but in case the Worker is bypassed or missing we still
+  // serve the same JWKS here. Azure AD's federated credential trust fetches
+  // this URL to validate the signature on the assertion JWT.
+  app.get('/jwks.json', jwksHandler);
 
   // ----- internal mint -----
 
