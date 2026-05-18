@@ -51,6 +51,8 @@ export default function OpenGraphImage() {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
         <div
           style={{
+            display: 'flex',
+            flexWrap: 'wrap',
             fontSize: 82,
             lineHeight: 1.05,
             letterSpacing: '-0.025em',
@@ -58,19 +60,22 @@ export default function OpenGraphImage() {
             maxWidth: 1040,
           }}
         >
-          Cloud keys, agent swarms, live audit —{' '}
+          <span>Cloud keys, agent swarms, live audit —&nbsp;</span>
           <span style={{ color: '#bfff00' }}>one control plane.</span>
         </div>
         <div
           style={{
+            display: 'flex',
             fontSize: 26,
             lineHeight: 1.4,
             color: '#9ca3af',
             maxWidth: 980,
           }}
         >
-          Federated OIDC for AWS, Azure, GCP. UCAN delegation across multi-agent swarms.
-          Hash-chained audit you can replay.
+          <span>
+            Federated OIDC for AWS, Azure, GCP. UCAN delegation across multi-agent swarms.
+            Hash-chained audit you can replay.
+          </span>
         </div>
       </div>
       <div
