@@ -421,12 +421,17 @@ async function callProxy(command: string, ucan: string): Promise<{ status: numbe
   // the per-action schema. armWrite expects POST/PATCH/PUT + api-version;
   // armDelete expects DELETE + api-version. For data-plane (POST query
   // body), use a stub query.
-  const method =
-    cls === 'destructive' && command.endsWith('/delete')
-      ? 'DELETE'
-      : cls === 'read'
-        ? 'GET'
-        : 'POST';
+  // Schema picks method by command tier: read=GET, data=POST (body),
+  // destructive=DELETE (every entry in DESTRUCTIVE uses armDelete regardless
+  // of verb token), everything else POST.
+  const inDestructive = (DESTRUCTIVE as readonly string[]).includes(command);
+  const inData = (DATA as readonly string[]).includes(command);
+  const method = inDestructive
+    ? 'DELETE'
+    : cls === 'read'
+      ? 'GET'
+      : 'POST';
+  void inData;
   const apiCall = probe
     ? { method: 'GET' as const, path: probe.path, query: probe.query }
     : {
@@ -483,6 +488,8 @@ function interpretProxyBody(
     notes = `cloud_call_failed providerStatus=${b.providerStatus ?? '?'}`;
   } else if (status === 200 && upstreamSuccess) {
     notes = `ARM ${upstreamStatus}`;
+  } else if (status === 200 && upstreamStatus !== null) {
+    notes = `broker→ARM ${upstreamStatus} (Reader role limit or resource absent)`;
   } else if (status === 403 && decisionAllow === false) {
     notes = `PDP deny: ${decisionReason ?? '?'}`;
   } else if (status === 400) {
@@ -586,7 +593,12 @@ async function main(): Promise<void> {
     schemaRecognised: results.filter((r) => r.schemaRecognised).length,
     mintOk: results.filter((r) => r.mintOk).length,
     armSuccess: results.filter((r) => r.upstreamSuccess).length,
+    brokerForwarded: results.filter(
+      (r) => r.decisionAllow === true && r.upstreamStatus !== null,
+    ).length,
     cosignerBlocked: results.filter((r) => r.cosignerBlocked).length,
+    schemaViolation: results.filter((r) => r.notes.startsWith('schema_violation')).length,
+    pdpDeny: results.filter((r) => r.notes.startsWith('PDP deny')).length,
     destructiveCosignerCorrect: results.filter(
       (r) => r.classification === 'destructive' && r.cosignerBlocked,
     ).length,
@@ -645,8 +657,12 @@ function renderMarkdown(
   lines.push(`| Total actions registered | ${stats.total} |`);
   lines.push(`| Recognised by PDP | ${stats.schemaRecognised} |`);
   lines.push(`| UCAN minted successfully | ${stats.mintOk} |`);
-  lines.push(`| ARM 2xx (real federation + Reader role) | ${stats.armSuccess} |`);
+  lines.push(`| Broker forwarded to ARM (Cedar allowed, federation handshake completed) | ${stats.brokerForwarded} |`);
+  lines.push(`| └─ ARM 2xx | ${stats.armSuccess} |`);
+  lines.push(`| └─ ARM 4xx (Reader role limit or resource absent — broker did its job) | ${stats.brokerForwarded - stats.armSuccess} |`);
   lines.push(`| Cosigner-gated by risk rules | ${stats.cosignerBlocked} |`);
+  lines.push(`| Schema violation (rejected pre-Cedar) | ${stats.schemaViolation} |`);
+  lines.push(`| PDP deny (Cedar-level) | ${stats.pdpDeny} |`);
   lines.push(
     `| Destructive actions with correct cosigner gate | ${stats.destructiveCosignerCorrect} / ${DESTRUCTIVE.length} |`,
   );
