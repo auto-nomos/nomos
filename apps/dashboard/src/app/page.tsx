@@ -72,14 +72,15 @@ function Hero() {
             <span className="pulse" />
             <span>Nomos · v0.1.x · open beta</span>
           </div>
-          <h1 className="display mt-7 max-w-[16ch] text-[56px] text-aegis-paper md:text-[80px] lg:text-[92px]">
-            Cloud keys, agent swarms, live audit
-            <br />— one <em>control plane</em>.
+          <h1 className="display mt-7 max-w-[12ch] text-[64px] text-aegis-paper md:text-[96px] lg:text-[112px]">
+            Agents need <em>guardrails</em>.
+            <br />
+            Not guesswork.
           </h1>
-          <p className="mt-9 max-w-[640px] text-lg leading-relaxed text-aegis-mute md:text-xl">
-            Nomos issues short-lived cloud credentials, attenuates UCANs across multi-agent swarms,
-            and streams every decision into a hash-chained audit you can replay. No long-lived
-            secrets, no out-of-band logging.
+          <p className="mt-9 max-w-[600px] text-lg leading-relaxed text-aegis-mute md:text-xl">
+            Scoped permissions, signed actions, replayable audit. Nomos is the control plane between
+            your AI agents and the world — every action authorized, every scope narrowed, every
+            decision witnessed.
           </p>
           <div className="mt-10 flex flex-wrap items-center gap-3">
             <Link
@@ -98,13 +99,13 @@ function Hero() {
             </Link>
           </div>
           <div className="mt-12 flex flex-wrap items-center gap-x-7 gap-y-3 font-mono text-[11px] uppercase tracking-[0.18em] text-aegis-faint">
-            <span>Federated OIDC</span>
+            <span>Scoped permissions</span>
             <span aria-hidden>·</span>
             <span>UCAN delegation</span>
             <span aria-hidden>·</span>
             <span>Cedar policies</span>
             <span aria-hidden>·</span>
-            <span>Hash-chained audit</span>
+            <span>Live audit</span>
           </div>
         </div>
         <aside className="hidden lg:col-span-4 lg:block">
@@ -117,31 +118,57 @@ function Hero() {
 }
 
 function HeroPanel() {
+  const feed: {
+    ts: string;
+    act: 'allow' | 'step-up' | 'deny';
+    det: string;
+    tone: 'signal' | 'amber' | 'coral';
+  }[] = [
+    { ts: '14:22:08', act: 'allow', det: 'release-bot · issue.create', tone: 'signal' },
+    { ts: '14:22:08', act: 'step-up', det: 'release-bot · repo.transfer', tone: 'amber' },
+    { ts: '14:22:07', act: 'allow', det: 'support-bot · message.send', tone: 'signal' },
+    { ts: '14:22:06', act: 'deny', det: 'fin-bot · charge.refund', tone: 'coral' },
+    { ts: '14:22:05', act: 'allow', det: 'planner → writer · ucan-mint', tone: 'signal' },
+    { ts: '14:22:03', act: 'allow', det: 'support-bot · page.read', tone: 'signal' },
+  ];
   return (
     <div className="corners relative h-full min-h-[440px] rounded-sm border border-aegis-line bg-aegis-surface/50 p-7 backdrop-blur">
-      <div className="eyebrow">live mint · id.auto-nomos.com</div>
-      <div className="mt-5 flex items-baseline gap-3">
-        <span className="font-display text-[44px] leading-none text-aegis-paper">azure</span>
-        <span className="rounded-sm border border-aegis-signal/40 bg-aegis-signal/10 px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.18em] text-aegis-signal">
-          sts · 14m left
-        </span>
+      <div className="flex items-baseline justify-between">
+        <div className="eyebrow">live feed · workspace</div>
+        <span className="font-mono text-[10px] text-aegis-faint">↓ tail</span>
       </div>
-      <dl className="mt-7 space-y-3 font-mono text-[11px] text-aegis-mute">
-        <Row label="subject" value="agent:release-bot" />
-        <Row label="audience" value="api://AzureADTokenExchange" />
-        <Row label="scope" value="storage.write" />
-        <Row label="ttl" value="900s" tone="signal" />
-        <Row label="kid" value="0x4d2c…ae71" tone="paper" />
-      </dl>
-      <div className="mt-7 border-t border-aegis-line pt-5">
-        <div className="eyebrow mb-3">federation</div>
-        <ol className="space-y-2 text-sm text-aegis-paper">
-          <Step ok>issuer · id.auto-nomos.com</Step>
-          <Step ok>tenant trust · acme-prod</Step>
-          <Step ok>mint · provider-native</Step>
-        </ol>
+      <ul className="mt-5 divide-y divide-aegis-line/60 font-mono text-[11px]">
+        {feed.map((r) => (
+          <li
+            key={`${r.ts}-${r.det}`}
+            className="grid grid-cols-[68px_60px_1fr] items-center gap-3 py-2.5"
+          >
+            <span className="text-aegis-faint">{r.ts}</span>
+            <span
+              className={
+                r.tone === 'signal'
+                  ? 'text-aegis-signal'
+                  : r.tone === 'coral'
+                    ? 'text-aegis-coral'
+                    : 'text-aegis-amber'
+              }
+            >
+              {r.act}
+            </span>
+            <span className="truncate text-aegis-paper">{r.det}</span>
+          </li>
+        ))}
+      </ul>
+      <div className="mt-6 border-t border-aegis-line pt-5">
+        <div className="eyebrow mb-3">7d window</div>
+        <dl className="space-y-2.5 font-mono text-[11px] text-aegis-mute">
+          <Row label="decisions" value="14,922" tone="paper" />
+          <Row label="allow" value="92%" tone="signal" />
+          <Row label="step-up" value="6%" />
+          <Row label="deny" value="2%" />
+        </dl>
       </div>
-      <div className="mt-7 flex items-center justify-between border-t border-aegis-line pt-4">
+      <div className="mt-6 flex items-center justify-between border-t border-aegis-line pt-4">
         <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-aegis-faint">
           chain head
         </span>
@@ -170,21 +197,6 @@ function Row({
       <dt className="uppercase tracking-[0.18em] text-aegis-faint">{label}</dt>
       <dd className={toneClass}>{value}</dd>
     </div>
-  );
-}
-
-function Step({ ok, children }: { ok?: boolean; children: React.ReactNode }) {
-  return (
-    <li className="flex items-center gap-2.5 font-mono text-xs">
-      <span
-        className={`grid h-4 w-4 place-items-center rounded-full ${
-          ok ? 'bg-aegis-signal/20 text-aegis-signal' : 'bg-aegis-coral/20 text-aegis-coral'
-        }`}
-      >
-        ·
-      </span>
-      <span className="text-aegis-paper">{children}</span>
-    </li>
   );
 }
 
