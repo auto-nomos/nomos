@@ -56,8 +56,9 @@ const CONTROL_PLANE = (process.env.CONTROL_PLANE_URL ?? 'https://api.auto-nomos.
 const PDP = (process.env.PDP_URL ?? 'https://pdp.auto-nomos.com').replace(/\/+$/, '');
 const AGENT_NAME = process.env.E2E_TEST_AGENT_NAME ?? 'e2e-azure-mutate';
 
-const CHILD_RG = `${SANDBOX_RG}-child-${Date.now()}`;
-const CHILD_REGION = process.env.NOMOS_AZURE_REGION ?? 'eastus2';
+const NSG_NAME = `nomos-sandbox-nsg-${Date.now()}`;
+const NSG_REGION = process.env.NOMOS_AZURE_REGION ?? 'eastus2';
+const ARM_API = '2023-11-01';
 
 function req(name: string): string {
   const v = process.env[name];
@@ -231,7 +232,12 @@ async function callProxy(
       request: {
         ucan,
         command,
-        resource: { subscription_id: AZURE_SUB, resource_group: CHILD_RG },
+        resource: {
+          subscription_id: AZURE_SUB,
+          resource_group: SANDBOX_RG,
+          resource_type: 'Microsoft.Resources/subscriptions/resourceGroups',
+          name: SANDBOX_RG,
+        },
         context: { command, ...context },
       },
       apiCall,
@@ -240,51 +246,51 @@ async function callProxy(
   return { status: res.status, body: await res.json() };
 }
 
+function rgArmPath(): string {
+  return `/subscriptions/${AZURE_SUB}/resourceGroups/${SANDBOX_RG}`;
+}
+
 async function caseCreate(ctx: { apiKey: string }): Promise<boolean> {
-  console.log('--- 1. create child RG (create_resource_group is non-destructive) ---');
-  const jwt = await mintUcan(ctx.apiKey, '/azure/resource_groups/create');
-  const r = await callProxy('/azure/resource_groups/create', jwt, {
-    method: 'PUT',
-    path: `/subscriptions/${AZURE_SUB}/resourceGroups/${CHILD_RG}`,
+  console.log('--- 1. PATCH sandbox RG tags (update_resource_group is non-destructive) ---');
+  const jwt = await mintUcan(ctx.apiKey, '/azure/resource_groups/update');
+  const r = await callProxy('/azure/resource_groups/update', jwt, {
+    method: 'PATCH',
+    path: rgArmPath(),
     query: { 'api-version': '2021-04-01' },
-    body: { location: CHILD_REGION, tags: { harness: 'prod-azure-mutate', purpose: 'e2e' } },
+    body: { tags: { harness: 'prod-azure-mutate', step: 'step1', ts: String(Date.now()) } },
   });
-  const b = r.body as {
-    allow?: boolean;
-    upstream?: { status?: number };
-    error_code?: string;
-  };
+  const b = r.body as { upstream?: { status?: number }; error_code?: string };
   if (r.status === 200 && b.upstream?.status && b.upstream.status >= 200 && b.upstream.status < 300) {
-    pass('create: ARM 2xx', `status=${b.upstream.status}`);
+    pass('patch1: ARM 2xx', `status=${b.upstream.status}`);
     return true;
   }
-  fail('create: expected ARM 2xx', `status=${r.status} body=${JSON.stringify(b).slice(0, 300)}`);
+  fail('patch1: expected ARM 2xx', `status=${r.status} body=${JSON.stringify(b).slice(0, 1500)}`);
   return false;
 }
 
 async function caseTag(ctx: { apiKey: string }): Promise<void> {
-  console.log('--- 2. tag the child RG (update_resource_group is non-destructive) ---');
+  console.log('--- 2. PATCH sandbox RG tags again (idempotent non-destructive) ---');
   const jwt = await mintUcan(ctx.apiKey, '/azure/resource_groups/update');
   const r = await callProxy('/azure/resource_groups/update', jwt, {
     method: 'PATCH',
-    path: `/subscriptions/${AZURE_SUB}/resourceGroups/${CHILD_RG}`,
+    path: rgArmPath(),
     query: { 'api-version': '2021-04-01' },
-    body: { tags: { harness: 'prod-azure-mutate', step: 'tagged' } },
+    body: { tags: { harness: 'prod-azure-mutate', step: 'step2', ts: String(Date.now()) } },
   });
   const b = r.body as { upstream?: { status?: number } };
   if (r.status === 200 && b.upstream?.status && b.upstream.status >= 200 && b.upstream.status < 300) {
-    pass('tag: ARM 2xx', `status=${b.upstream.status}`);
+    pass('patch2: ARM 2xx', `status=${b.upstream.status}`);
   } else {
-    fail('tag: expected ARM 2xx', `status=${r.status} body=${JSON.stringify(b).slice(0, 300)}`);
+    fail('patch2: expected ARM 2xx', `status=${r.status} body=${JSON.stringify(b).slice(0, 1500)}`);
   }
 }
 
 async function caseDeleteCosignerGate(ctx: { apiKey: string }): Promise<string | null> {
-  console.log('--- 3a. delete child RG without cosigner — expect cosigner_required ---');
+  console.log('--- 3a. delete sandbox RG without cosigner — expect cosigner_required ---');
   const jwt = await mintUcan(ctx.apiKey, '/azure/resource_groups/delete');
   const r = await callProxy('/azure/resource_groups/delete', jwt, {
     method: 'DELETE',
-    path: `/subscriptions/${AZURE_SUB}/resourceGroups/${CHILD_RG}`,
+    path: rgArmPath(),
     query: { 'api-version': '2021-04-01' },
   });
   const b = r.body as { error_code?: string; decision?: { reason?: string } };
@@ -297,14 +303,15 @@ async function caseDeleteCosignerGate(ctx: { apiKey: string }): Promise<string |
 }
 
 async function fallbackCliDelete(): Promise<void> {
-  console.log(`\n  Manual cleanup (broker delete blocked by missing cosigner):`);
-  console.log(`    az group delete --name ${CHILD_RG} --yes --no-wait`);
+  console.log(`\n  Cosigner gate fired — RG ${SANDBOX_RG} stays alive (no approval issued).`);
+  console.log(`  Manual destroy if you want to recycle the sandbox:`);
+  console.log(`    terraform destroy   # inside examples/azure-sandbox`);
 }
 
 async function main(): Promise<void> {
   console.log(`CONTROL_PLANE=${CONTROL_PLANE}  PDP=${PDP}  ORG=${ORG_ID}`);
   console.log(`SANDBOX_CONN_ID=${SANDBOX_CONN_ID}  AZURE_SUB=${AZURE_SUB}`);
-  console.log(`CHILD_RG=${CHILD_RG}  REGION=${CHILD_REGION}`);
+  console.log(`SANDBOX_RG=${SANDBOX_RG}  (testing PATCH-tags + DELETE on this RG)`);
   console.log('');
 
   let ctx: Awaited<ReturnType<typeof setup>>;
