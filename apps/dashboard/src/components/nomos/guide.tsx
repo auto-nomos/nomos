@@ -1195,10 +1195,14 @@ function CloudIam() {
           password or client secret is ever issued.
         </li>
         <li>
-          <K>azuread_application_federated_identity_credential</K> — the trust rule: &ldquo;when{' '}
-          <K>id.auto-nomos.com</K> presents a token with subject{' '}
-          <K>customer/{'<org-id>'}/agent/*</K>, accept it as this SP.&rdquo; Pure OIDC — nothing to
-          rotate or leak.
+          <K>azuread_application_federated_identity_credential</K> — one trust rule per agent_id,
+          each saying: &ldquo;when <K>id.auto-nomos.com</K> presents a token with subject{' '}
+          <K>
+            customer/{'<org-id>'}/agent/{'<agent-id>'}
+          </K>
+          , accept it as this SP.&rdquo; Pure OIDC — nothing to rotate or leak. Azure requires{' '}
+          <strong>exact</strong> subject matches (wildcards are not supported) and caps the total at{' '}
+          <strong>20 per app</strong>.
         </li>
         <li>
           <K>azurerm_role_assignment</K> (Reader by default) — grants the SP permission to call
@@ -1234,9 +1238,15 @@ module "nomos_azure" {
   # Pin <SHA> to a specific commit for reproducible production deploys.
   source = "git::https://github.com/varendra007/nomos-terraforms.git//azurerm-nomos-bootstrap?ref=main"
 
-  customer_id       = "<your-customer-id>"    # from /app/settings/workspace
-  subscription_id   = "<your-subscription-id>"
-  nomos_oidc_issuer = "https://id.auto-nomos.com"   # live; override only for self-hosted issuer
+  customer_id     = "<your-customer-id>"    # from /app/settings/workspace
+  subscription_id = "<your-subscription-id>"
+
+  # One federated credential per agent_id. "verify-poll" is always added so
+  # /app/cloud "Verify now" works. Append each real agent_id below as you
+  # create agents in Nomos. Azure caps total FICs at 20 per app.
+  additional_agent_ids = [
+    # "agt_01H9XYZ...",
+  ]
 
   # Optional:
   # resource_group_name  = "rg-my-workload"   # narrow Reader to one RG instead of sub
@@ -1270,13 +1280,20 @@ APP_CLIENT_ID=$(echo $APP | jq -r .appId)
 APP_OBJ_ID=$(echo $APP | jq -r .id)
 SP_ID=$(az ad sp create --id $APP_CLIENT_ID --query "id" -o tsv)
 
-# 2. Federated Identity Credential — the OIDC trust block (no secrets)
+# 2. Federated Identity Credential (one per agent_id; "verify-poll" is required)
 az ad app federated-credential create --id $APP_OBJ_ID --parameters '{
-  "name": "nomos-fic",
+  "name": "nomos-verify-poll",
   "issuer": "https://id.auto-nomos.com",
-  "subject": "customer/<your-customer-id>/agent/*",
+  "subject": "customer/<your-customer-id>/agent/verify-poll",
   "audiences": ["api://AzureADTokenExchange"]
 }'
+# Repeat for each real agent (Azure cap: 20 federated creds per app):
+# az ad app federated-credential create --id $APP_OBJ_ID --parameters '{
+#   "name": "nomos-agt_01HXYZ",
+#   "issuer": "https://id.auto-nomos.com",
+#   "subject": "customer/<your-customer-id>/agent/agt_01HXYZ...",
+#   "audiences": ["api://AzureADTokenExchange"]
+# }'
 
 # 3. Reader role at subscription scope
 SUBSCRIPTION_ID=$(az account show --query id -o tsv)
@@ -1291,6 +1308,17 @@ echo "app_object_id:   $APP_OBJ_ID"
 echo "app_client_id:   $APP_CLIENT_ID"
 echo "tenant_id:       $TENANT_ID"
 echo "subscription_id: $SUBSCRIPTION_ID"`}</Code>
+
+      <Callout tone="warn">
+        <strong className="text-aegis-paper">Azure FIC quirks.</strong> Subject must be an{' '}
+        <em>exact</em> string match — <K>customer/.../agent/*</K> is treated as a literal asterisk
+        and fails token exchange with 401 (<K>aad_token_exchange_failed_401</K>). Microsoft&apos;s
+        flexible-FIC <K>claimsMatchingExpression</K> is also blocked for custom OIDC issuers — it
+        returns <K>Expression is not supported for applications in this cloud &apos;Public&apos;</K>
+        . Result: one federated credential per agent_id, with a hard cap of 20 per App Registration.
+        For larger fleets, deploy the module twice (two apps) or split agents across multiple
+        subscriptions.
+      </Callout>
 
       <h4 className="mt-6 font-display text-[18px] text-aegis-paper">AWS Terraform</h4>
       <P>
@@ -1436,7 +1464,12 @@ psql "$DATABASE_URL" -c "\\dt cloud_connections oidc_issuer_keys"   # verify`}</
       </h4>
       <P>
         Open <K>/app/settings/workspace</K> — UUID is in the workspace card. Every Terraform module
-        needs it (federated subject is pinned to <K>customer/{`{cid}`}/agent/*</K>).
+        needs it. Each federated credential subject embeds it as{' '}
+        <K>
+          customer/{`{cid}`}/agent/{`{agent_id}`}
+        </K>{' '}
+        (AWS + GCP accept <K>{`agent/*`}</K> as a StringLike/regex wildcard; Azure requires one
+        credential per exact agent_id and caps at 20).
       </P>
 
       <h4 className="mt-6 font-display text-[18px] text-aegis-paper">
@@ -1681,11 +1714,15 @@ when {
         </li>
         <li>
           <strong className="text-aegis-paper">
-            Azure <K>AADSTS70021</K>:
+            Azure <K>aad_token_exchange_failed_401</K> / <K>AADSTS70021</K>:
           </strong>{' '}
-          subject mismatch. The federated credential subject must be{' '}
-          <K>customer/{`{cid}`}/agent/*</K> (wildcard); legacy subjects without the wildcard work
-          for one agent only. Re-run terraform with the latest module.
+          subject mismatch. The FIC subject must be the <em>exact</em> string{' '}
+          <K>
+            customer/{`{cid}`}/agent/{`{agent_id}`}
+          </K>{' '}
+          — Azure does not accept wildcards. Add an extra{' '}
+          <K>azuread_application_federated_identity_credential</K> for the missing agent_id (or
+          append to <K>additional_agent_ids</K> in the bootstrap module) and re-apply.
         </li>
         <li>
           <strong className="text-aegis-paper">

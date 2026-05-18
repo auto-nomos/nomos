@@ -72,9 +72,16 @@ module "nomos_azure" {
   # Pin <SHA> to a specific commit for reproducible production deploys.
   source = "git::https://github.com/varendra007/nomos-terraforms.git//azurerm-nomos-bootstrap?ref=main"
 
-  customer_id       = "<your-nomos-customer-id>"  # from /app/settings/workspace
-  subscription_id   = "${subscriptionId || '<subscription-id>'}"
-  nomos_oidc_issuer = "https://id.auto-nomos.com"
+  customer_id     = "<your-nomos-customer-id>"  # from /app/settings/workspace
+  subscription_id = "${subscriptionId || '<subscription-id>'}"
+
+  # One federated credential is created per agent_id. The "verify-poll" id
+  # is always included so the dashboard "Verify now" button works. Add
+  # real agent ids here as you create agents in Nomos. Azure caps the
+  # total at 20 federated credentials per app.
+  additional_agent_ids = [
+    # "agt_01H9XYZ...",
+  ]
 
   # Optional: narrow Reader to one resource group
   # resource_group_name = "rg-agent-sandbox"
@@ -125,12 +132,17 @@ output "paste_into_nomos_dashboard" {
           </div>
           <div className="flex gap-3">
             <span className="mt-0.5 shrink-0 font-mono text-xs text-aegis-mute">
-              Federated cred
+              Federated creds
             </span>
             <p>
-              The trust rule that tells Azure: &ldquo;when <code>id.auto-nomos.com</code> presents a
-              token with subject <code>customer/{'<your-org-id>'}/agent/*</code>, accept it as this
-              SP.&rdquo; Pure OIDC — no secrets to rotate or leak.
+              One trust rule per agent_id. Each says: &ldquo;when <code>id.auto-nomos.com</code>{' '}
+              presents a token with subject{' '}
+              <code>
+                customer/{'<org-id>'}/agent/{'<agent-id>'}
+              </code>
+              , accept it as this SP.&rdquo; Pure OIDC — no secrets to rotate or leak. Azure caps
+              these at 20 per app and requires an <em>exact</em> subject string (wildcards not
+              supported).
             </p>
           </div>
           <div className="flex gap-3">
@@ -182,12 +194,21 @@ APP_OBJ_ID=$(echo $APP | jq -r .id)
 SP_ID=$(az ad sp create --id $APP_CLIENT_ID --query "id" -o tsv)
 
 # 2. Federated Identity Credential (OIDC trust — no secrets)
+#    One FIC per agent_id. "verify-poll" is required so /app/cloud
+#    "Verify now" succeeds. Add one block per real agent (max 20 total).
 az ad app federated-credential create --id $APP_OBJ_ID --parameters '{
-  "name": "nomos-fic",
+  "name": "nomos-verify-poll",
   "issuer": "https://id.auto-nomos.com",
-  "subject": "customer/<your-customer-id>/agent/*",
+  "subject": "customer/<your-customer-id>/agent/verify-poll",
   "audiences": ["api://AzureADTokenExchange"]
 }'
+# Repeat for each agent_id that should call Azure through Nomos:
+# az ad app federated-credential create --id $APP_OBJ_ID --parameters '{
+#   "name": "nomos-agt_01HXYZ",
+#   "issuer": "https://id.auto-nomos.com",
+#   "subject": "customer/<your-customer-id>/agent/agt_01HXYZ...",
+#   "audiences": ["api://AzureADTokenExchange"]
+# }'
 
 # 3. Reader role at subscription scope
 SUBSCRIPTION_ID=$(az account show --query id -o tsv)
@@ -208,6 +229,34 @@ echo "subscription_id: $SUBSCRIPTION_ID"`}</pre>
               Settings → Workspace
             </Link>
             .
+          </p>
+        </CardContent>
+      </Card>
+
+      <Card className="border-amber-500/30 bg-amber-500/5">
+        <CardHeader>
+          <CardTitle className="text-base text-amber-200">
+            Important — Azure federated credential limits
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2 text-sm text-amber-100/80">
+          <p>
+            Azure federated credentials require an <strong>exact</strong> subject string — wildcards
+            (<code>customer/.../agent/*</code>) are <em>not</em> supported and will silently fail
+            token exchange with a 401.
+          </p>
+          <p>
+            Microsoft&apos;s flexible-FIC <code>claimsMatchingExpression</code> is also blocked for
+            custom OIDC issuers like <code>id.auto-nomos.com</code> — it returns{' '}
+            <code>
+              Expression is not supported for applications in this cloud &apos;Public&apos;
+            </code>
+            .
+          </p>
+          <p>
+            Result: one federated credential per agent_id. Azure caps the total at{' '}
+            <strong>20 per app registration</strong>. Need more? Deploy this module a second time
+            (separate app) or split agents across subscriptions.
           </p>
         </CardContent>
       </Card>
