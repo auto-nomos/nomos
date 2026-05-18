@@ -187,6 +187,49 @@ export const SshConstraint = z.object({
   path_prefix: z.string().min(1).optional(),
 });
 
+/**
+ * Azure variant. `subscription_id` pins the subscription; `resource_group`
+ * narrows to one RG; `resource_type` narrows to one ARM namespace (e.g.
+ * "Microsoft.Compute/virtualMachines"); `name` pins to a specific resource.
+ * `tenant_id` lets a policy that owns multiple Entra tenants discriminate.
+ * Chain attenuation only allows narrowing (parent must be a prefix-superset).
+ */
+export const AzureConstraint = z.object({
+  provider: z.literal('azure'),
+  tenant_id: z.string().min(1).optional(),
+  subscription_id: z.string().min(1).optional(),
+  resource_group: z.string().min(1).optional(),
+  resource_type: z.string().min(1).optional(),
+  name: z.string().min(1).optional(),
+});
+
+/**
+ * AWS variant. `account_id` pins the AWS account; `region` narrows to one
+ * region; `service` narrows to one AWS service (e.g. "s3", "ec2"); `arn`
+ * pins to one specific resource. Chain attenuation narrows only.
+ */
+export const AwsConstraint = z.object({
+  provider: z.literal('aws'),
+  account_id: z.string().min(1).optional(),
+  region: z.string().min(1).optional(),
+  service: z.string().min(1).optional(),
+  arn: z.string().min(1).optional(),
+});
+
+/**
+ * GCP variant. `project_id` pins the project; `location` narrows to one
+ * region/zone; `service` narrows to one GCP service (e.g. "storage",
+ * "compute"); `resource_id` pins to one specific resource. Chain
+ * attenuation narrows only.
+ */
+export const GcpConstraint = z.object({
+  provider: z.literal('gcp'),
+  project_id: z.string().min(1).optional(),
+  location: z.string().min(1).optional(),
+  service: z.string().min(1).optional(),
+  resource_id: z.string().min(1).optional(),
+});
+
 export const ResourceConstraint = z.discriminatedUnion('provider', [
   FilesystemConstraint,
   GithubConstraint,
@@ -202,6 +245,9 @@ export const ResourceConstraint = z.discriminatedUnion('provider', [
   GoogleTasksConstraint,
   GoogleContactsConstraint,
   SshConstraint,
+  AzureConstraint,
+  AwsConstraint,
+  GcpConstraint,
 ]);
 
 export type FilesystemConstraint = z.infer<typeof FilesystemConstraint>;
@@ -218,6 +264,9 @@ export type GoogleDocsConstraint = z.infer<typeof GoogleDocsConstraint>;
 export type GoogleSheetsConstraint = z.infer<typeof GoogleSheetsConstraint>;
 export type GoogleTasksConstraint = z.infer<typeof GoogleTasksConstraint>;
 export type GoogleContactsConstraint = z.infer<typeof GoogleContactsConstraint>;
+export type AzureConstraint = z.infer<typeof AzureConstraint>;
+export type AwsConstraint = z.infer<typeof AwsConstraint>;
+export type GcpConstraint = z.infer<typeof GcpConstraint>;
 export type ResourceConstraint = z.infer<typeof ResourceConstraint>;
 
 export const UcanPayload = z

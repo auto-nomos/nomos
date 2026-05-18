@@ -44,6 +44,31 @@ export function constraintCovers(parent: ResourceConstraint, child: ResourceCons
     }
     return true;
   }
+  if (parent.provider === 'azure' && child.provider === 'azure') {
+    if (parent.tenant_id !== undefined && child.tenant_id !== parent.tenant_id) return false;
+    if (parent.subscription_id !== undefined && child.subscription_id !== parent.subscription_id)
+      return false;
+    if (parent.resource_group !== undefined && child.resource_group !== parent.resource_group)
+      return false;
+    if (parent.resource_type !== undefined && child.resource_type !== parent.resource_type)
+      return false;
+    if (parent.name !== undefined && child.name !== parent.name) return false;
+    return true;
+  }
+  if (parent.provider === 'aws' && child.provider === 'aws') {
+    if (parent.account_id !== undefined && child.account_id !== parent.account_id) return false;
+    if (parent.region !== undefined && child.region !== parent.region) return false;
+    if (parent.service !== undefined && child.service !== parent.service) return false;
+    if (parent.arn !== undefined && child.arn !== parent.arn) return false;
+    return true;
+  }
+  if (parent.provider === 'gcp' && child.provider === 'gcp') {
+    if (parent.project_id !== undefined && child.project_id !== parent.project_id) return false;
+    if (parent.location !== undefined && child.location !== parent.location) return false;
+    if (parent.service !== undefined && child.service !== parent.service) return false;
+    if (parent.resource_id !== undefined && child.resource_id !== parent.resource_id) return false;
+    return true;
+  }
   return false;
 }
 
@@ -85,6 +110,63 @@ export function constraintMatchesResource(
     if (constraint.path_prefix !== undefined) {
       const path = resource.path;
       if (typeof path !== 'string' || !path.startsWith(constraint.path_prefix)) return false;
+    }
+    return true;
+  }
+  if (constraint.provider === 'azure') {
+    if (constraint.subscription_id !== undefined) {
+      const v = resource.subscription_id;
+      if (typeof v !== 'string' || v !== constraint.subscription_id) return false;
+    }
+    if (constraint.resource_group !== undefined) {
+      const v = resource.resource_group;
+      if (typeof v !== 'string' || v !== constraint.resource_group) return false;
+    }
+    if (constraint.resource_type !== undefined) {
+      const v = resource.resource_type;
+      if (typeof v !== 'string' || v !== constraint.resource_type) return false;
+    }
+    if (constraint.name !== undefined) {
+      const v = resource.name;
+      if (typeof v !== 'string' || v !== constraint.name) return false;
+    }
+    return true;
+  }
+  if (constraint.provider === 'aws') {
+    if (constraint.account_id !== undefined) {
+      const v = resource.account_id;
+      if (typeof v !== 'string' || v !== constraint.account_id) return false;
+    }
+    if (constraint.region !== undefined) {
+      const v = resource.region;
+      if (typeof v !== 'string' || v !== constraint.region) return false;
+    }
+    if (constraint.service !== undefined) {
+      const v = resource.service;
+      if (typeof v !== 'string' || v !== constraint.service) return false;
+    }
+    if (constraint.arn !== undefined) {
+      const v = resource.arn;
+      if (typeof v !== 'string' || v !== constraint.arn) return false;
+    }
+    return true;
+  }
+  if (constraint.provider === 'gcp') {
+    if (constraint.project_id !== undefined) {
+      const v = resource.project_id;
+      if (typeof v !== 'string' || v !== constraint.project_id) return false;
+    }
+    if (constraint.location !== undefined) {
+      const v = resource.location;
+      if (typeof v !== 'string' || v !== constraint.location) return false;
+    }
+    if (constraint.service !== undefined) {
+      const v = resource.service;
+      if (typeof v !== 'string' || v !== constraint.service) return false;
+    }
+    if (constraint.resource_id !== undefined) {
+      const v = resource.resource_id;
+      if (typeof v !== 'string' || v !== constraint.resource_id) return false;
     }
     return true;
   }
