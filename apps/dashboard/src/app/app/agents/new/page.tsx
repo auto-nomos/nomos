@@ -21,6 +21,10 @@ export default function NewAgentPage() {
   const [requireApproval, setRequireApproval] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const utils = trpc.useUtils();
+  const cloudConns = trpc.cloudConnections.list.useQuery();
+  const hasAzure = (cloudConns.data ?? []).some(
+    (c) => c.connector === 'azure' && c.bootstrapStatus === 'verified',
+  );
   const create = trpc.agents.create.useMutation({
     onSuccess: (agent) => {
       utils.agents.list.invalidate();
@@ -39,6 +43,23 @@ export default function NewAgentPage() {
           creation.
         </p>
       </header>
+
+      {hasAzure && (
+        <Card className="border-amber-500/30 bg-amber-500/5">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm">One extra step for Azure</CardTitle>
+            <CardDescription className="text-xs">
+              You have a verified Azure cloud connection. After this app is created, you&apos;ll
+              need to register a federated identity credential (FIC) for it in Azure — Azure
+              requires exact-match FICs per agent (no wildcards). The next page shows the exact
+              <code className="mx-1 font-mono">az</code> /
+              <code className="mx-1 font-mono">terraform</code> command pre-filled with this
+              app&apos;s id. Until you run it, this app will get
+              <code className="ml-1 font-mono">AADSTS700213</code> on every Azure call.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      )}
       <Card>
         <form
           onSubmit={(e) => {

@@ -258,6 +258,15 @@ echo "subscription_id: $SUBSCRIPTION_ID"`}</pre>
             <strong>20 per app registration</strong>. Need more? Deploy this module a second time
             (separate app) or split agents across subscriptions.
           </p>
+          <p className="border-t border-amber-500/20 pt-2 mt-2">
+            <strong>Each app you register on Nomos needs its own FIC.</strong> Every time you create
+            a new app at <code>/app/agents/new</code>, register a credential matching
+            <code className="mx-1">customer/&lt;cid&gt;/agent/&lt;agent_id&gt;</code> in this same
+            App Registration. The app detail page surfaces the exact{' '}
+            <code>az ad app federated-credential create</code> command pre-filled — just copy-paste
+            it. Skipping this step results in{' '}
+            <code>AADSTS700213: No matching federated identity record</code>.
+          </p>
         </CardContent>
       </Card>
 

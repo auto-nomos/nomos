@@ -1,6 +1,6 @@
 'use client';
 
-import { Copy, KeyRound, ShieldCheck, Trash2 } from 'lucide-react';
+import { Cloud, Copy, KeyRound, ShieldCheck, Trash2 } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { use, useEffect, useState } from 'react';
 import { AgentAuditPanel } from '../../../../components/agent-audit-panel';
@@ -53,6 +53,10 @@ export default function AgentDetailPage({ params }: { params: Promise<{ id: stri
   const envelopes = trpc.envelopes.list.useQuery({ agentId: id });
   const grants = trpc.grants.list.useQuery({ agentId: id });
   const audit = trpc.audit.list.useQuery({ agent: agent?.did, limit: 50 }, { enabled: !!agent });
+  const cloudConns = trpc.cloudConnections.list.useQuery();
+  const azureConns = (cloudConns.data ?? []).filter(
+    (c) => c.connector === 'azure' && c.bootstrapStatus === 'verified',
+  );
 
   const [revealedKey, setRevealedKey] = useState<string | null>(null);
   const [keyName, setKeyName] = useState('default');
@@ -134,6 +138,15 @@ export default function AgentDetailPage({ params }: { params: Promise<{ id: stri
         </div>
         <p className="font-mono text-xs text-muted-foreground">{agent.did}</p>
       </header>
+
+      {azureConns.length > 0 && (
+        <AzureFicCard
+          agentId={id}
+          agentName={agent.name}
+          customerId={agent.customerId}
+          connections={azureConns}
+        />
+      )}
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
@@ -569,5 +582,122 @@ function RevealedKeyDialog({ secret, onClose }: { secret: string | null; onClose
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+/**
+ * Azure federation requires one exact-match FIC per agent_id (no wildcards,
+ * flexible-FIC blocked for custom issuers). We can't auto-provision because
+ * Nomos doesn't hold Azure write creds — surface the exact `az` / Terraform
+ * command the customer has to run with their own Azure auth so this isn't a
+ * silent footgun the first time their agent hits /azure/* and gets
+ * AADSTS700213.
+ */
+function AzureFicCard({
+  agentId,
+  agentName,
+  customerId,
+  connections,
+}: {
+  agentId: string;
+  agentName: string;
+  customerId: string;
+  connections: Array<{
+    id: string;
+    externalId: string;
+    tenantId: string | null;
+    accountId: string;
+  }>;
+}) {
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  function copyText(key: string, text: string): void {
+    void navigator.clipboard.writeText(text).then(() => {
+      setCopiedKey(key);
+      setTimeout(() => setCopiedKey(null), 2000);
+    });
+  }
+  return (
+    <Card className="border-amber-500/30 bg-amber-500/5">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <Cloud className="h-4 w-4 text-amber-500" /> Azure: register this app&apos;s federated
+          credential
+        </CardTitle>
+        <CardDescription>
+          Azure requires <strong>one exact-match federated identity credential per agent</strong>{' '}
+          (wildcards not allowed, and Microsoft blocks flexible-FIC for custom OIDC issuers). Until
+          you register a credential whose subject matches{' '}
+          <code className="font-mono text-xs">
+            customer/{customerId}/agent/{agentId}
+          </code>
+          , this app will receive <code className="font-mono text-xs">AADSTS700213</code> on every
+          Azure call. Run one of the snippets below in your tenant.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {connections.map((conn) => {
+          const ficName = `nomos-${agentName.replace(/[^a-zA-Z0-9-]/g, '-').slice(0, 60)}-${agentId.slice(0, 8)}`;
+          const cli = `az ad app federated-credential create \\
+  --id ${conn.externalId} \\
+  --parameters '{
+    "name": "${ficName}",
+    "issuer": "https://id.auto-nomos.com",
+    "subject": "customer/${customerId}/agent/${agentId}",
+    "audiences": ["api://AzureADTokenExchange"]
+  }'`;
+          const tf = `# In your nomos-terraforms module (apply with the rest of additional_agent_ids):
+additional_agent_ids = [
+  "${agentId}",
+  # ...
+]`;
+          return (
+            <div key={conn.id} className="space-y-3">
+              <div className="text-xs text-muted-foreground">
+                Connection <code className="font-mono">{conn.accountId}</code>{' '}
+                {conn.tenantId ? (
+                  <>
+                    · tenant <code className="font-mono">{conn.tenantId}</code>
+                  </>
+                ) : null}
+              </div>
+
+              <div className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                    Azure CLI (one-shot)
+                  </p>
+                  <Button size="sm" variant="ghost" onClick={() => copyText(`cli-${conn.id}`, cli)}>
+                    <Copy className="h-3 w-3" />{' '}
+                    {copiedKey === `cli-${conn.id}` ? 'Copied!' : 'Copy'}
+                  </Button>
+                </div>
+                <pre className="overflow-x-auto rounded-md border bg-muted p-3 font-mono text-xs">
+                  {cli}
+                </pre>
+              </div>
+
+              <div className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                    Terraform (preferred, batches with other agents)
+                  </p>
+                  <Button size="sm" variant="ghost" onClick={() => copyText(`tf-${conn.id}`, tf)}>
+                    <Copy className="h-3 w-3" />{' '}
+                    {copiedKey === `tf-${conn.id}` ? 'Copied!' : 'Copy'}
+                  </Button>
+                </div>
+                <pre className="overflow-x-auto rounded-md border bg-muted p-3 font-mono text-xs">
+                  {tf}
+                </pre>
+              </div>
+            </div>
+          );
+        })}
+        <p className="text-xs text-muted-foreground">
+          Cap: Azure allows 20 federated credentials per App Registration. If you create more than
+          20 agents, deploy the bootstrap module a second time with a separate App Registration.
+        </p>
+      </CardContent>
+    </Card>
   );
 }

@@ -1714,15 +1714,19 @@ when {
         </li>
         <li>
           <strong className="text-aegis-paper">
-            Azure <K>aad_token_exchange_failed_401</K> / <K>AADSTS70021</K>:
+            Azure <K>aad_token_exchange_failed_401</K> / <K>AADSTS70021</K> / <K>AADSTS700213</K>:
           </strong>{' '}
-          subject mismatch. The FIC subject must be the <em>exact</em> string{' '}
+          subject mismatch — no FIC registered for this app.{' '}
+          <strong>
+            Every app you register on Nomos needs its own FIC on the Azure App Registration.
+          </strong>{' '}
+          The FIC subject must be the <em>exact</em> string{' '}
           <K>
             customer/{`{cid}`}/agent/{`{agent_id}`}
           </K>{' '}
-          — Azure does not accept wildcards. Add an extra{' '}
-          <K>azuread_application_federated_identity_credential</K> for the missing agent_id (or
-          append to <K>additional_agent_ids</K> in the bootstrap module) and re-apply.
+          — Azure does not accept wildcards. The Nomos app detail page surfaces the exact{' '}
+          <K>az ad app federated-credential create</K> command pre-filled; or append the agent_id to{' '}
+          <K>additional_agent_ids</K> in the bootstrap module and re-apply Terraform.
         </li>
         <li>
           <strong className="text-aegis-paper">
