@@ -1,13 +1,19 @@
 import {
+  Activity,
+  AlertTriangle,
   ArrowRight,
   ArrowUpRight,
   Boxes,
-  Cpu,
+  Cloud,
   FileLock2,
+  GitBranch,
+  GitGraph,
   Hash,
   KeyRound,
+  Network,
   ShieldCheck,
   Sparkles,
+  Users,
   Workflow,
 } from 'lucide-react';
 import Link from 'next/link';
@@ -16,16 +22,21 @@ import { PublicShell } from '../components/nomos/public-shell';
 /* ======================================================================
    Nomos — homepage
    ----------------------------------------------------------------------
-   Editorial marketing landing. Composed of nine vertical bands:
+   Editorial marketing landing built around three product pillars:
+   federated cloud IAM, multi-agent swarms, and live monitoring.
+   Twelve vertical bands:
      1. Editorial hero
      2. Live tickrow (capabilities at a glance)
      3. "How it works" — three-act pipeline
-     4. Integration marquee (auto-scrolling, CSS-only)
-     5. Security pillars (4 columns)
-     6. Code preview (left) + decision log (right)
-     7. Use-cases grid
-     8. Reading list (links into docs)
-     9. Bottom CTA banner
+     4. Cloud IAM (federated OIDC)
+     5. Multi-agent swarms (UCAN delegation)
+     6. Live monitoring (audit-chain-driven observability)
+     7. Integration marquee
+     8. Security pillars
+     9. Code preview + decision log
+    10. Use-cases grid
+    11. Reading list
+    12. Bottom CTA banner
    The shape of the page is unusual: each band runs full-bleed but the
    inner rail is 1280px max. We keep large negative space and let the
    chartreuse accent appear only where it carries meaning.
@@ -37,6 +48,9 @@ export default function HomePage() {
       <Hero />
       <CapabilityTickRow />
       <HowItWorks />
+      <CloudIAM />
+      <Swarms />
+      <Monitoring />
       <IntegrationMarquee />
       <SecurityPillars />
       <CodeAndDecisions />
@@ -58,15 +72,14 @@ function Hero() {
             <span className="pulse" />
             <span>Nomos · v0.1.x · open beta</span>
           </div>
-          <h1 className="display mt-7 max-w-[12ch] text-[64px] text-aegis-paper md:text-[96px] lg:text-[112px]">
-            Agents act.
-            <br />
-            You stay <em>in control</em>.
+          <h1 className="display mt-7 max-w-[16ch] text-[56px] text-aegis-paper md:text-[80px] lg:text-[92px]">
+            Cloud keys, agent swarms, live audit
+            <br />— one <em>control plane</em>.
           </h1>
-          <p className="mt-9 max-w-[600px] text-lg leading-relaxed text-aegis-mute md:text-xl">
-            Nomos is an authorization layer for AI agents. Your agents never hold raw OAuth tokens,
-            never bypass policy, never act without an audit entry. Cryptographic delegation, Cedar
-            policy, and step-up approvals — wired together as one runtime.
+          <p className="mt-9 max-w-[640px] text-lg leading-relaxed text-aegis-mute md:text-xl">
+            Nomos issues short-lived cloud credentials, attenuates UCANs across multi-agent swarms,
+            and streams every decision into a hash-chained audit you can replay. No long-lived
+            secrets, no out-of-band logging.
           </p>
           <div className="mt-10 flex flex-wrap items-center gap-3">
             <Link
@@ -85,11 +98,11 @@ function Hero() {
             </Link>
           </div>
           <div className="mt-12 flex flex-wrap items-center gap-x-7 gap-y-3 font-mono text-[11px] uppercase tracking-[0.18em] text-aegis-faint">
+            <span>Federated OIDC</span>
+            <span aria-hidden>·</span>
             <span>UCAN delegation</span>
             <span aria-hidden>·</span>
             <span>Cedar policies</span>
-            <span aria-hidden>·</span>
-            <span>WebAuthn step-up</span>
             <span aria-hidden>·</span>
             <span>Hash-chained audit</span>
           </div>
@@ -106,27 +119,26 @@ function Hero() {
 function HeroPanel() {
   return (
     <div className="corners relative h-full min-h-[440px] rounded-sm border border-aegis-line bg-aegis-surface/50 p-7 backdrop-blur">
-      <div className="eyebrow">live decision · #14922</div>
+      <div className="eyebrow">live mint · id.auto-nomos.com</div>
       <div className="mt-5 flex items-baseline gap-3">
-        <span className="font-display text-[44px] leading-none text-aegis-paper">allow</span>
+        <span className="font-display text-[44px] leading-none text-aegis-paper">azure</span>
         <span className="rounded-sm border border-aegis-signal/40 bg-aegis-signal/10 px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.18em] text-aegis-signal">
-          step-up + cosigner
+          sts · 14m left
         </span>
       </div>
       <dl className="mt-7 space-y-3 font-mono text-[11px] text-aegis-mute">
-        <Row label="agent" value="release-bot" />
-        <Row label="action" value="/github/issue/create" />
-        <Row label="resource" value="repo:acme/website" />
-        <Row label="latency" value="3.8 ms" tone="signal" />
-        <Row label="audit-seq" value="0x4d2c…ae71" tone="paper" />
+        <Row label="subject" value="agent:release-bot" />
+        <Row label="audience" value="api://AzureADTokenExchange" />
+        <Row label="scope" value="storage.write" />
+        <Row label="ttl" value="900s" tone="signal" />
+        <Row label="kid" value="0x4d2c…ae71" tone="paper" />
       </dl>
       <div className="mt-7 border-t border-aegis-line pt-5">
-        <div className="eyebrow mb-3">policy chain</div>
+        <div className="eyebrow mb-3">federation</div>
         <ol className="space-y-2 text-sm text-aegis-paper">
-          <Step ok>tenant · acme</Step>
-          <Step ok>cedar · grant present</Step>
-          <Step ok>UCAN · within scope</Step>
-          <Step ok>cosigner · passkey ✓</Step>
+          <Step ok>issuer · id.auto-nomos.com</Step>
+          <Step ok>tenant trust · acme-prod</Step>
+          <Step ok>mint · provider-native</Step>
         </ol>
       </div>
       <div className="mt-7 flex items-center justify-between border-t border-aegis-line pt-4">
@@ -181,9 +193,9 @@ function Step({ ok, children }: { ok?: boolean; children: React.ReactNode }) {
 function CapabilityTickRow() {
   const items: { kpi: string; label: string; sub: string }[] = [
     { kpi: '4ms', label: 'p50 decision', sub: 'in-region PDP' },
-    { kpi: '20+', label: 'policy templates', sub: 'across 7 SaaS' },
-    { kpi: '0', label: 'tokens stored', sub: 'on agent disk' },
-    { kpi: '7y', label: 'audit retention', sub: 'signed Parquet' },
+    { kpi: '3', label: 'cloud providers', sub: 'Azure, AWS, GCP' },
+    { kpi: '0', label: 'long-lived secrets', sub: 'on agent disk' },
+    { kpi: '∞', label: 'UCAN depth', sub: 'scope only narrows' },
   ];
   return (
     <section className="border-y border-aegis-line bg-aegis-surface/40">
@@ -212,9 +224,9 @@ function HowItWorks() {
     {
       n: '01',
       label: 'Connect',
-      title: 'OAuth without ever touching the agent.',
-      body: 'Operators connect SaaS once. Nomos stores the refresh token encrypted, never exposes it. Agents see only short-lived bearer tokens minted per call.',
-      icon: Cpu,
+      title: 'Cloud and SaaS, once.',
+      body: 'Connect cloud accounts and SaaS once. Cloud trusts the Nomos OIDC issuer; SaaS refresh tokens stay encrypted server-side. Agents see only short-lived, scoped credentials minted per call.',
+      icon: Cloud,
     },
     {
       n: '02',
@@ -226,8 +238,8 @@ function HowItWorks() {
     {
       n: '03',
       label: 'Run',
-      title: 'PDP gates every call. Audit signs every line.',
-      body: 'PDP evaluates intent, mints UCAN, swaps for a real OAuth token, proxies. Each decision lands in a signed hash-chained audit log a verifier can independently re-walk.',
+      title: 'PDP gates every call. Audit signs every chain.',
+      body: 'PDP evaluates intent, mints UCAN, swaps for a real OAuth token, proxies. Each decision lands in a signed hash-chained audit log a verifier can independently re-walk — across single agents and swarms alike.',
       icon: Workflow,
     },
   ];
@@ -275,7 +287,258 @@ function HowItWorks() {
   );
 }
 
-/* ─── 4. Integration marquee ────────────────────────────────────────── */
+/* ─── 4. Cloud IAM ──────────────────────────────────────────────────── */
+
+function CloudIAM() {
+  const providers: {
+    name: string;
+    body: string;
+    href: string;
+  }[] = [
+    {
+      name: 'Azure',
+      body: 'Workload identity federation. Write capability validated 2026-05-18.',
+      href: '/app/cloud/connect/azure',
+    },
+    {
+      name: 'AWS',
+      body: 'STS AssumeRoleWithWebIdentity. Role per agent, session per call.',
+      href: '/app/cloud/connect/aws',
+    },
+    {
+      name: 'GCP',
+      body: 'Workload Identity Pools. ID token → access token, per request.',
+      href: '/app/cloud/connect/gcp',
+    },
+  ];
+  return (
+    <section className="mx-auto max-w-[1280px] px-6 py-32 md:px-10">
+      <div className="grid grid-cols-12 gap-10">
+        <div className="col-span-12 lg:col-span-4">
+          <div className="eyebrow flex items-center gap-3">
+            <Cloud className="h-4 w-4 text-aegis-signal" aria-hidden />
+            cloud iam
+          </div>
+          <h2 className="display mt-5 text-[56px] leading-[1.02] text-aegis-paper">
+            Federated keys.
+            <br />
+            <em>Zero</em> long-lived secrets.
+          </h2>
+          <p className="mt-6 max-w-[420px] text-base leading-relaxed text-aegis-mute">
+            Your AWS, Azure, and GCP trust a Nomos-operated OIDC issuer. Agents request a token;
+            Nomos mints provider-native, short-lived, scoped credentials. Nothing to rotate. Nothing
+            to leak.
+          </p>
+          <Link
+            href="/app/cloud"
+            className="group mt-8 inline-flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.18em] text-aegis-signal hover:text-aegis-paper"
+          >
+            Connect a cloud
+            <ArrowUpRight className="h-4 w-4 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+          </Link>
+        </div>
+        <div className="col-span-12 lg:col-span-8">
+          <ul className="divide-y divide-aegis-line border-y border-aegis-line">
+            {providers.map((p) => (
+              <li
+                key={p.name}
+                className="grid grid-cols-12 items-center gap-5 py-8 transition-colors hover:bg-aegis-surface/30"
+              >
+                <div className="col-span-2 lg:col-span-1">
+                  <KeyRound className="h-6 w-6 text-aegis-paper" aria-hidden />
+                </div>
+                <div className="col-span-7 lg:col-span-8">
+                  <div className="font-display text-[28px] leading-tight text-aegis-paper">
+                    {p.name}
+                  </div>
+                  <p className="mt-2 text-sm leading-relaxed text-aegis-mute">{p.body}</p>
+                </div>
+                <div className="col-span-3 lg:col-span-3 text-right">
+                  <Link
+                    href={p.href}
+                    className="group inline-flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.18em] text-aegis-mute hover:text-aegis-signal"
+                  >
+                    connect
+                    <ArrowUpRight className="h-3.5 w-3.5 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+                  </Link>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ─── 5. Swarms ─────────────────────────────────────────────────────── */
+
+function Swarms() {
+  const frameworks: { name: string; body: string; icon: typeof Workflow }[] = [
+    {
+      name: 'LangGraph',
+      body: 'Subgraph nodes inherit the parent UCAN.',
+      icon: Workflow,
+    },
+    {
+      name: 'CrewAI',
+      body: 'Crew → agent delegation traced in PDP.',
+      icon: Users,
+    },
+    {
+      name: 'AutoGen',
+      body: 'GroupChat hand-offs as signed mints.',
+      icon: GitBranch,
+    },
+    {
+      name: 'Claude sub-agents',
+      body: 'Each sub-agent gets a scoped chain.',
+      icon: Sparkles,
+    },
+  ];
+  return (
+    <section className="border-y border-aegis-line bg-aegis-surface/30">
+      <div className="mx-auto grid max-w-[1280px] grid-cols-12 gap-10 px-6 py-32 md:px-10">
+        <div className="col-span-12">
+          <div className="eyebrow flex items-center gap-3">
+            <Network className="h-4 w-4 text-aegis-signal" aria-hidden />
+            multi-agent swarms
+          </div>
+          <h2 className="display mt-5 max-w-[20ch] text-[56px] leading-[1.02] text-aegis-paper">
+            Trees that <em>delegate</em>. Scope only narrows.
+          </h2>
+          <p className="mt-6 max-w-[680px] text-base leading-relaxed text-aegis-mute">
+            A swarm is a tree of Apps. The root mints a child UCAN; every descendant carries the
+            chain as proof. The PDP enforces attenuation — a child can never get back what the
+            parent gave up.
+          </p>
+        </div>
+        <div className="col-span-12 lg:col-span-7">
+          <div className="corners relative h-full rounded-sm border border-aegis-line bg-aegis-ink p-7">
+            <div className="eyebrow">ucan chain · attenuated</div>
+            <pre className="mt-5 overflow-x-auto font-mono text-[12px] leading-[1.9] text-aegis-paper">
+              {`root: planner-agent           kid 0x4d2c
+ ├─ writer:branch             scope ⊆ planner
+ ├─ researcher:branch         scope ⊆ planner
+ │   └─ scraper:leaf          scope ⊆ researcher
+ └─ release:branch            step-up required`}
+            </pre>
+            <div className="mt-6 flex items-center justify-between border-t border-aegis-line pt-4">
+              <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-aegis-faint">
+                wire format
+              </span>
+              <span className="font-mono text-[10px] text-aegis-paper">
+                NOMOS_PARENT_UCAN_CHAIN
+              </span>
+            </div>
+          </div>
+        </div>
+        <div className="col-span-12 lg:col-span-5">
+          <div className="grid h-full grid-cols-1 gap-px bg-aegis-line sm:grid-cols-2">
+            {frameworks.map((f) => (
+              <div
+                key={f.name}
+                className="bg-aegis-ink p-6 transition-colors hover:bg-aegis-surface/60"
+              >
+                <f.icon className="h-5 w-5 text-aegis-signal" aria-hidden />
+                <div className="eyebrow mt-4">framework</div>
+                <h3 className="display mt-2 text-[22px] leading-tight text-aegis-paper">
+                  {f.name}
+                </h3>
+                <p className="mt-2 font-mono text-[11px] leading-relaxed text-aegis-mute">
+                  {f.body}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="col-span-12">
+          <Link
+            href="/app/swarms"
+            className="group inline-flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.18em] text-aegis-signal hover:text-aegis-paper"
+          >
+            Wire a swarm
+            <ArrowUpRight className="h-4 w-4 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+          </Link>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ─── 6. Monitoring ─────────────────────────────────────────────────── */
+
+function Monitoring() {
+  const tiles: {
+    icon: typeof Activity;
+    label: string;
+    title: string;
+    body: string;
+  }[] = [
+    {
+      icon: Activity,
+      label: 'decisions',
+      title: 'Allow / Deny / Step-up.',
+      body: 'Per-workspace breakdown over 1h / 24h / 7d. Signal, coral, amber — at a glance.',
+    },
+    {
+      icon: GitGraph,
+      label: 'action graph',
+      title: 'Swarm call flows.',
+      body: 'Reconstructed from UCAN chains. Click a node, see the policy decision that gated the edge.',
+    },
+    {
+      icon: AlertTriangle,
+      label: 'anomalies',
+      title: 'Badges, not pages.',
+      body: 'Out-of-pattern scopes, novel resources, denied retries — surfaced inline, never paged.',
+    },
+  ];
+  return (
+    <section className="mx-auto max-w-[1280px] px-6 py-32 md:px-10">
+      <div className="grid grid-cols-12 gap-10">
+        <div className="col-span-12 lg:col-span-4">
+          <div className="eyebrow flex items-center gap-3">
+            <Activity className="h-4 w-4 text-aegis-signal" aria-hidden />
+            live monitoring
+          </div>
+          <h2 className="display mt-5 text-[56px] leading-[1.02] text-aegis-paper">
+            Every call, <em>replayable</em>.
+            <br />
+            No new instrumentation.
+          </h2>
+          <p className="mt-6 max-w-[420px] text-base leading-relaxed text-aegis-mute">
+            Allow / Deny / Step-up breakdowns, an ActionTimeline of every PDP decision, an
+            ActionGraph of swarm call flows, and anomaly badges — all polled from the same
+            hash-chained audit your verifier walks offline.
+          </p>
+          <Link
+            href="/app/monitoring"
+            className="group mt-8 inline-flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.18em] text-aegis-signal hover:text-aegis-paper"
+          >
+            Open monitoring
+            <ArrowUpRight className="h-4 w-4 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+          </Link>
+        </div>
+        <div className="col-span-12 grid grid-cols-1 gap-px bg-aegis-line lg:col-span-8">
+          {tiles.map((t) => (
+            <div
+              key={t.title}
+              className="bg-aegis-ink p-8 transition-colors hover:bg-aegis-surface/60"
+            >
+              <t.icon className="h-6 w-6 text-aegis-signal" aria-hidden />
+              <div className="eyebrow mt-5">{t.label}</div>
+              <h3 className="display mt-2 text-[26px] leading-tight text-aegis-paper">{t.title}</h3>
+              <p className="mt-3 text-sm leading-relaxed text-aegis-mute">{t.body}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ─── 7. Integration marquee ────────────────────────────────────────── */
 
 function IntegrationMarquee() {
   const integrations = [
@@ -332,9 +595,9 @@ function SecurityPillars() {
   const pillars = [
     {
       icon: KeyRound,
-      label: 'No raw secrets',
+      label: 'No long-lived keys',
       title: 'Tokens never reach your agent.',
-      body: 'PDP swaps a UCAN for a real bearer at the moment of call, scoped to one action, expiring in seconds.',
+      body: 'STS / WIF / OIDC federation for cloud. Per-call UCAN for SaaS. Nothing on agent disk to rotate.',
     },
     {
       icon: FileLock2,
@@ -351,7 +614,7 @@ function SecurityPillars() {
     {
       icon: Hash,
       label: 'Audit you can replay',
-      title: 'Hash chain + signed roots.',
+      title: 'Hash chain + signed roots — replayable.',
       body: 'Every decision is a hash-chained record. A daily Ed25519 signature anchors the chain. Open-source verifier CLI.',
     },
   ];
@@ -451,7 +714,7 @@ await aegis.call('/github/issue/create', {
                 {
                   ts: '14:22:07.802',
                   act: 'allow',
-                  det: 'support-bot · /slack/message/send',
+                  det: 'release-bot · /aws/sts/assume',
                   tone: 'signal',
                 },
                 {
@@ -463,7 +726,7 @@ await aegis.call('/github/issue/create', {
                 {
                   ts: '14:22:05.220',
                   act: 'allow',
-                  det: 'release-bot · /linear/issue/list',
+                  det: 'planner → writer · ucan-mint',
                   tone: 'signal',
                 },
                 {
@@ -512,18 +775,18 @@ function UseCases() {
   const cases = [
     {
       icon: Boxes,
-      title: 'Internal copilots',
-      body: 'Your engineers ship a copilot that files Linear issues from Slack. Nomos ensures it can’t accidentally email customers from the same scope.',
+      title: 'Platform teams',
+      body: 'Hand engineering teams a cloud account they can ship to without leaking long-lived keys. STS, WIF, and OIDC federation, per-agent.',
     },
     {
       icon: Workflow,
-      title: 'Vertical AI agents',
-      body: 'Sales, support, finance — each agent gets a least-scope grant. Step-up kicks in for refunds, transfers, contract changes.',
+      title: 'Agent framework authors',
+      body: 'LangGraph, CrewAI, AutoGen, Claude sub-agents. UCAN chains travel with your graph for free — scope only narrows downstream.',
     },
     {
       icon: Sparkles,
-      title: 'Customer-facing assistants',
-      body: 'Multi-tenant by default. Each customer sees only their own envelopes. Cross-tenant invariants are tested at every release.',
+      title: 'Security & compliance',
+      body: 'Replay any decision from the signed audit. SOC2 evidence is a CLI call. Cross-tenant invariants tested at every release.',
     },
   ];
   return (
@@ -566,22 +829,22 @@ function ReadingList() {
       sub: 'Why agents need a credential broker.',
     },
     {
+      href: '/docs#cloud-iam',
+      label: 'Cloud IAM',
+      sub: 'Federated OIDC, per-provider setup.',
+    },
+    {
+      href: '/docs#swarms',
+      label: 'Multi-agent swarms',
+      sub: 'UCAN chains across LangGraph, CrewAI, AutoGen.',
+    },
+    {
       href: '/docs#policies',
       label: 'Policy authoring',
       sub: 'Cedar text + visual builder, side-by-side.',
     },
-    {
-      href: '/docs#step-up',
-      label: 'Step-up & passkeys',
-      sub: 'How high-stakes actions are gated.',
-    },
     { href: '/docs#audit', label: 'Audit chain', sub: 'Hash chain, daily roots, R2 archive.' },
     { href: '/security', label: 'Security posture', sub: 'Crypto, tenancy, secret handling.' },
-    {
-      href: '/integrations',
-      label: 'Integration matrix',
-      sub: 'Every supported SaaS, every action.',
-    },
   ];
   return (
     <section className="border-y border-aegis-line bg-aegis-surface/30">

@@ -107,7 +107,9 @@ function PublicFooter() {
         </div>
 
         <FooterColumn label="Product">
-          <FooterLink href="/docs">Documentation</FooterLink>
+          <FooterLink href="/docs#cloud-iam">Cloud IAM</FooterLink>
+          <FooterLink href="/docs#swarms">Multi-agent swarms</FooterLink>
+          <FooterLink href="/docs#monitoring">Live monitoring</FooterLink>
           <FooterLink href="/integrations">Integrations</FooterLink>
           <FooterLink href="/pricing">Pricing</FooterLink>
           <FooterLink href="/security">Security</FooterLink>
@@ -117,6 +119,7 @@ function PublicFooter() {
         <FooterColumn label="Build">
           <FooterLink href="/docs#quickstart">Quickstart</FooterLink>
           <FooterLink href="/docs#sdk">SDK reference</FooterLink>
+          <FooterLink href="/docs#cloud-setup">Cloud federation setup</FooterLink>
           <FooterLink href="/docs#policies">Policy authoring</FooterLink>
           <FooterLink href="/docs#audit">Audit chain</FooterLink>
         </FooterColumn>
