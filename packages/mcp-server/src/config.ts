@@ -15,6 +15,7 @@ export const SUPPORTED_INTEGRATIONS = [
   'google_tasks',
   'filesystem',
   'ssh',
+  'azure',
 ] as const;
 export type IntegrationId = (typeof SUPPORTED_INTEGRATIONS)[number];
 

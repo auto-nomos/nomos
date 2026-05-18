@@ -114,6 +114,10 @@
     "./ssh": {
       "types": "./dist/ssh/index.d.ts",
       "import": "./dist/ssh/index.js"
+    },
+    "./azure": {
+      "types": "./dist/azure/index.d.ts",
+      "import": "./dist/azure/index.js"
     }
   },
   "files": [

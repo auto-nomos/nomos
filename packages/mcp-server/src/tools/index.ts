@@ -1,4 +1,5 @@
 import type { IntegrationId } from '../config.js';
+import { azureTools } from './azure.js';
 import { filesystemTools } from './filesystem.js';
 import { githubTools } from './github.js';
 import { googleTools } from './google.js';
@@ -30,6 +31,7 @@ const REGISTRY: Partial<Record<IntegrationId, ToolDefinition[]>> = {
   google_tasks: googleTasksTools,
   filesystem: filesystemTools,
   ssh: sshTools,
+  azure: azureTools,
 };
 
 export function toolsFor(integrations: readonly IntegrationId[]): ToolDefinition[] {
