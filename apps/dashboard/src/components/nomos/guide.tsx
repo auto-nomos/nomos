@@ -1232,7 +1232,7 @@ provider "azurerm" {
 
 module "nomos_azure" {
   # Pin <SHA> to a specific commit for reproducible production deploys.
-  source = "git::https://github.com/varendra007/agent-credential-broker.git//infra/terraform/azurerm-nomos-bootstrap?ref=main"
+  source = "git::https://github.com/varendra007/nomos-terraforms.git//azurerm-nomos-bootstrap?ref=main"
 
   customer_id       = "<your-customer-id>"    # from /app/settings/workspace
   subscription_id   = "<your-subscription-id>"
@@ -1310,7 +1310,7 @@ provider "aws" { region = "us-east-1" }
 
 module "nomos_aws" {
   # Pin <SHA> to a specific commit for reproducible production deploys.
-  source = "git::https://github.com/varendra007/agent-credential-broker.git//infra/terraform/aws-nomos-bootstrap?ref=main"
+  source = "git::https://github.com/varendra007/nomos-terraforms.git//aws-nomos-bootstrap?ref=main"
 
   customer_id       = "<your-customer-id>"    # from /app/settings/workspace
   region            = "us-east-1"
@@ -1352,7 +1352,7 @@ provider "google" {
 
 module "nomos_gcp" {
   # Pin <SHA> to a specific commit for reproducible production deploys.
-  source = "git::https://github.com/varendra007/agent-credential-broker.git//infra/terraform/google-nomos-bootstrap?ref=main"
+  source = "git::https://github.com/varendra007/nomos-terraforms.git//google-nomos-bootstrap?ref=main"
 
   customer_id       = "<your-customer-id>"    # from /app/settings/workspace
   project_id        = "<your-project-id>"
