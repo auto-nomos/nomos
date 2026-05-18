@@ -1,5 +1,10 @@
 # Azure broker capability benchmark
 
+> **Looking for the user-facing Azure docs?** See [`docs/azure/`](./azure/README.md)
+> for getting-started, concepts, permissions, action reference, use cases,
+> API reference, MCP integration, and troubleshooting. This file is the
+> raw benchmark snapshot — every row reflects a real prod call.
+
 Snapshot 2026-05-18 against prod (`https://pdp.auto-nomos.com`, org
 `Nomos-dev-testing`, subscription Pay-as-you-go).
 
