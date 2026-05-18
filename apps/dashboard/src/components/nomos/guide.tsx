@@ -1176,12 +1176,9 @@ function CloudIam() {
         — <K>nomos_oidc_issuer</K> defaults to it in every module.
       </P>
       <Callout tone="info">
-        <strong className="text-aegis-paper">No public registry mirror yet.</strong> Use the
-        local-path <K>source</K> shown below, or pin to a commit SHA:{' '}
-        <K>
-          {`git::https://github.com/varendra007/agent-credential-broker.git//infra/terraform/<module>?ref=<SHA>`}
-        </K>
-        .
+        Modules are sourced directly from GitHub — no local clone needed. Replace <K>ref=main</K>{' '}
+        with a specific commit SHA for reproducible production deploys. A public Terraform registry
+        mirror at <K>registry.terraform.io/auto-nomos</K> is planned for a future release.
       </Callout>
 
       <h4 className="mt-6 font-display text-[18px] text-aegis-paper">
@@ -1234,8 +1231,8 @@ provider "azurerm" {
 }
 
 module "nomos_azure" {
-  source = "../credential-broker/infra/terraform/azurerm-nomos-bootstrap"
-  # Pin for prod: source = "git::https://github.com/varendra007/agent-credential-broker.git//infra/terraform/azurerm-nomos-bootstrap?ref=<SHA>"
+  # Pin <SHA> to a specific commit for reproducible production deploys.
+  source = "git::https://github.com/varendra007/agent-credential-broker.git//infra/terraform/azurerm-nomos-bootstrap?ref=main"
 
   customer_id       = "<your-customer-id>"    # from /app/settings/workspace
   subscription_id   = "<your-subscription-id>"
@@ -1312,8 +1309,8 @@ terraform {
 provider "aws" { region = "us-east-1" }
 
 module "nomos_aws" {
-  source = "../credential-broker/infra/terraform/aws-nomos-bootstrap"
-  # Pin for prod: source = "git::https://github.com/varendra007/agent-credential-broker.git//infra/terraform/aws-nomos-bootstrap?ref=<SHA>"
+  # Pin <SHA> to a specific commit for reproducible production deploys.
+  source = "git::https://github.com/varendra007/agent-credential-broker.git//infra/terraform/aws-nomos-bootstrap?ref=main"
 
   customer_id       = "<your-customer-id>"    # from /app/settings/workspace
   region            = "us-east-1"
@@ -1354,8 +1351,8 @@ provider "google" {
 }
 
 module "nomos_gcp" {
-  source = "../credential-broker/infra/terraform/google-nomos-bootstrap"
-  # Pin for prod: source = "git::https://github.com/varendra007/agent-credential-broker.git//infra/terraform/google-nomos-bootstrap?ref=<SHA>"
+  # Pin <SHA> to a specific commit for reproducible production deploys.
+  source = "git::https://github.com/varendra007/agent-credential-broker.git//infra/terraform/google-nomos-bootstrap?ref=main"
 
   customer_id       = "<your-customer-id>"    # from /app/settings/workspace
   project_id        = "<your-project-id>"

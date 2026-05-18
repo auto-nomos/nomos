@@ -11,26 +11,10 @@
 # This monorepo copy is the source of truth during M1; we publish to the
 # public repo once M1 lands on main.
 
-terraform {
-  required_version = ">= 1.5"
-  required_providers {
-    azurerm = {
-      source  = "hashicorp/azurerm"
-      version = "~> 4.0"
-    }
-    azuread = {
-      source  = "hashicorp/azuread"
-      version = "~> 3.0"
-    }
-  }
-}
-
 provider "azurerm" {
   features {}
   subscription_id = var.subscription_id
 }
-
-provider "azuread" {}
 
 variable "nomos_oidc_issuer" {
   description = "Public URL of the Nomos OIDC issuer. Pinned via the dashboard wizard."
@@ -133,8 +117,9 @@ resource "azuread_application_federated_identity_credential" "nomos" {
 #
 # `fic_claims_match` defaults to matching any agent under this customer.
 resource "azapi_resource" "nomos_fic" {
-  count     = var.use_flexible_fic ? 1 : 0
-  type      = "Microsoft.Graph/applications/federatedIdentityCredentials@v1.0"
+  count                    = var.use_flexible_fic ? 1 : 0
+  schema_validation_enabled = false
+  type                     = "Microsoft.Graph/applications/federatedIdentityCredentials@v1.0"
   name      = "nomos-fic-${var.customer_id}"
   parent_id = "applications/${azuread_application.nomos.object_id}"
 

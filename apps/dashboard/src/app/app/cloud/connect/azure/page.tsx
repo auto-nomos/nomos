@@ -68,9 +68,9 @@ provider "azurerm" {
 }
 
 module "nomos_azure" {
-  # Local-path source (no public registry mirror yet). Copy the dir into your own infra repo:
-  source = "../credential-broker/infra/terraform/azurerm-nomos-bootstrap"
-  # Pin for prod: source = "git::https://github.com/varendra007/agent-credential-broker.git//infra/terraform/azurerm-nomos-bootstrap?ref=<SHA>"
+  # Fetches the module directly from GitHub — no local clone needed.
+  # Pin <SHA> to a specific commit for reproducible production deploys.
+  source = "git::https://github.com/varendra007/agent-credential-broker.git//infra/terraform/azurerm-nomos-bootstrap?ref=main"
 
   customer_id       = "<your-nomos-customer-id>"  # from /app/settings/workspace
   subscription_id   = "${subscriptionId || '<subscription-id>'}"
