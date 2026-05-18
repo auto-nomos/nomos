@@ -33,6 +33,19 @@ const DESTRUCTIVE_VERBS = [
   'invoke',
   'scale',
   'redeploy',
+  // Additions for broader Azure coverage:
+  'purge', // KV purge — bypasses soft-delete recovery.
+  'regenerate_key', // Storage/Cosmos key rotation invalidates existing creds.
+  'deallocate', // VM deallocate releases public IPs.
+  'reimage', // VMSS reimage drops local state.
+  'remove_rule', // NSG rule removal can break network reachability.
+  'detach_disk', // Disk detach can corrupt running VM.
+  'capture', // Captures an image including possibly sensitive data.
+  'uninstall_extension', // Extension uninstall can remove guard agents.
+  'cancel_run',
+  'cancel',
+  'power_off',
+  'slot_swap', // Swap can mis-route prod traffic.
 ];
 
 // Read verbs that should never trip the rule even if they happen to
