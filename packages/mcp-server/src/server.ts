@@ -46,6 +46,8 @@ function integrationLabel(id: IntegrationId): string {
       return 'Filesystem';
     case 'ssh':
       return 'SSH / SFTP';
+    case 'azure':
+      return 'Azure';
   }
 }
 
