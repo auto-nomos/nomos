@@ -267,7 +267,7 @@ async function caseStepupDeny(ctx: { stepUpId: string }): Promise<void> {
   } else {
     fail('deny: still in pending', JSON.stringify(stillPending));
   }
-  const history = await trpc<Array<{ id: string; state: string }>>('stepup.listHistory', 'POST', {
+  const history = await trpc<Array<{ id: string; state: string }>>('stepup.listHistory', 'GET', {
     state: ['denied'],
     limit: 20,
   });
