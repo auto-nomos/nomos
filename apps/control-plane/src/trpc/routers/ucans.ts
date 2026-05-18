@@ -31,6 +31,7 @@ export const ucansRouter = router({
         command: z.string().regex(COMMAND_RE),
         policyId: z.string().uuid().optional(),
         oauthConnectionId: z.string().uuid().optional(),
+        cloudConnectionId: z.string().uuid().optional(),
         ttlSeconds: z
           .number()
           .int()
@@ -55,6 +56,7 @@ export const ucansRouter = router({
             command: input.command,
             policyId: input.policyId,
             oauthConnectionId: input.oauthConnectionId,
+            cloudConnectionId: input.cloudConnectionId,
             ttlSeconds: input.ttlSeconds,
             nonce: input.nonce,
             ...(input.contextHints ? { contextHints: input.contextHints } : {}),
@@ -68,12 +70,17 @@ export const ucansRouter = router({
         return { cid: result.cid, jwt: result.jwt, expiresAt: result.expiresAt };
       } catch (err) {
         if (err instanceof MintError) {
-          const code =
-            err.code === 'agent_not_found' || err.code === 'agent_not_active'
+          const code: 'NOT_FOUND' | 'FORBIDDEN' | 'PRECONDITION_FAILED' | 'BAD_REQUEST' =
+            err.code === 'agent_not_found' ||
+            err.code === 'policy_not_found' ||
+            err.code === 'oauth_connection_not_found' ||
+            err.code === 'cloud_connection_not_found'
               ? 'NOT_FOUND'
-              : err.code === 'policy_not_found' || err.code === 'oauth_connection_not_found'
-                ? 'NOT_FOUND'
-                : 'FORBIDDEN';
+              : err.code === 'cloud_connection_not_verified'
+                ? 'PRECONDITION_FAILED'
+                : err.code === 'connection_kind_conflict'
+                  ? 'BAD_REQUEST'
+                  : 'FORBIDDEN';
           throw new TRPCError({ code, message: err.message });
         }
         throw err;

@@ -32,7 +32,10 @@ const MintBodySchema = z.object({
   commands: z.array(z.string().regex(COMMAND_RE)).min(1).max(16),
   ttlSeconds: z.number().int().positive().max(MAX_TTL_SECONDS).optional(),
   oauthConnectionId: z.string().uuid().optional(),
+  cloudConnectionId: z.string().uuid().optional(),
 });
+
+const CLOUD_CONNECTORS = new Set(['azure', 'aws', 'gcp']);
 
 export interface MintUcanRouteDeps {
   db: Db;
@@ -89,8 +92,48 @@ export function createMintUcanRoutes(
       }
       const ttlSeconds = parsed.data.ttlSeconds ?? DEFAULT_TTL_SECONDS;
 
-      let connectionResolver: (command: string) => Promise<string | undefined>;
-      if (parsed.data.oauthConnectionId) {
+      if (parsed.data.oauthConnectionId && parsed.data.cloudConnectionId) {
+        return c.json(
+          {
+            error: 'oauthConnectionId and cloudConnectionId are mutually exclusive',
+            error_code: 'connection_kind_conflict',
+          },
+          400,
+        );
+      }
+
+      type ResolvedConnection =
+        | { kind: 'oauth'; id: string }
+        | { kind: 'cloud'; id: string }
+        | { kind: 'none' };
+
+      let connectionResolver: (command: string) => Promise<ResolvedConnection>;
+
+      if (parsed.data.cloudConnectionId) {
+        const conn = await deps.db.drizzle.query.cloudConnections.findFirst({
+          where: and(
+            eq(schema.cloudConnections.id, parsed.data.cloudConnectionId),
+            eq(schema.cloudConnections.customerId, customerId),
+          ),
+        });
+        if (!conn) {
+          return c.json(
+            { error: 'cloud connection not found', error_code: 'cloud_connection_not_found' },
+            404,
+          );
+        }
+        if (conn.bootstrapStatus !== 'verified') {
+          return c.json(
+            {
+              error: `cloud connection bootstrap_status=${conn.bootstrapStatus}; run verifyNow first`,
+              error_code: 'cloud_connection_not_verified',
+            },
+            412,
+          );
+        }
+        const fixed = parsed.data.cloudConnectionId;
+        connectionResolver = async () => ({ kind: 'cloud', id: fixed });
+      } else if (parsed.data.oauthConnectionId) {
         const conn = await deps.db.drizzle.query.oauthConnections.findFirst({
           where: and(
             eq(schema.oauthConnections.id, parsed.data.oauthConnectionId),
@@ -104,20 +147,42 @@ export function createMintUcanRoutes(
           );
         }
         const fixed = parsed.data.oauthConnectionId;
-        connectionResolver = async () => fixed;
+        connectionResolver = async () => ({ kind: 'oauth', id: fixed });
       } else {
-        // Infer connector from the command's first segment, then look up the
-        // customer's single connection for that connector.
-        const cache = new Map<string, string | undefined | 'ambiguous'>();
+        // Infer from command's first segment: /azure|/aws|/gcp → cloud,
+        // else → oauth. Look up the customer's single connection for the
+        // inferred kind+connector.
+        const cache = new Map<string, ResolvedConnection | 'ambiguous'>();
         connectionResolver = async (command) => {
           const connectorRaw = command.split('/')[1];
-          if (!connectorRaw) return undefined;
+          if (!connectorRaw) return { kind: 'none' };
           const cached = cache.get(connectorRaw);
           if (cached !== undefined) {
             if (cached === 'ambiguous') {
               throw new ConnectorAmbiguous(connectorRaw);
             }
             return cached;
+          }
+          if (CLOUD_CONNECTORS.has(connectorRaw)) {
+            const conns = await deps.db.drizzle.query.cloudConnections.findMany({
+              where: and(
+                eq(schema.cloudConnections.customerId, customerId),
+                // biome-ignore lint/suspicious/noExplicitAny: enum cast for query
+                eq(schema.cloudConnections.connector, connectorRaw as any),
+              ),
+            });
+            const verified = conns.filter((c) => c.bootstrapStatus === 'verified');
+            if (verified.length === 0) {
+              cache.set(connectorRaw, { kind: 'none' });
+              return { kind: 'none' };
+            }
+            if (verified.length > 1) {
+              cache.set(connectorRaw, 'ambiguous');
+              throw new ConnectorAmbiguous(connectorRaw);
+            }
+            const resolved: ResolvedConnection = { kind: 'cloud', id: verified[0]!.id };
+            cache.set(connectorRaw, resolved);
+            return resolved;
           }
           // Cast is safe: the enum check happens by virtue of the query
           // returning zero rows for unknown connectors.
@@ -129,30 +194,31 @@ export function createMintUcanRoutes(
             ),
           });
           if (conns.length === 0) {
-            cache.set(connectorRaw, undefined);
-            return undefined;
+            cache.set(connectorRaw, { kind: 'none' });
+            return { kind: 'none' };
           }
           if (conns.length > 1) {
             cache.set(connectorRaw, 'ambiguous');
             throw new ConnectorAmbiguous(connectorRaw);
           }
-          const id = conns[0]!.id;
-          cache.set(connectorRaw, id);
-          return id;
+          const resolved: ResolvedConnection = { kind: 'oauth', id: conns[0]!.id };
+          cache.set(connectorRaw, resolved);
+          return resolved;
         };
       }
 
       const ucans: Array<{ command: string; jwt: string; cid: string; expiresAt: string }> = [];
       for (const command of parsed.data.commands) {
-        let oauthConnectionId: string | undefined;
+        let resolved: ResolvedConnection;
         try {
-          oauthConnectionId = await connectionResolver(command);
+          resolved = await connectionResolver(command);
         } catch (err) {
           if (err instanceof ConnectorAmbiguous) {
+            const isCloud = CLOUD_CONNECTORS.has(err.connector);
             return c.json(
               {
-                error: `multiple oauth connections for connector ${err.connector}; pass oauthConnectionId explicitly`,
-                error_code: 'oauth_connection_ambiguous',
+                error: `multiple ${isCloud ? 'cloud' : 'oauth'} connections for connector ${err.connector}; pass ${isCloud ? 'cloudConnectionId' : 'oauthConnectionId'} explicitly`,
+                error_code: isCloud ? 'cloud_connection_ambiguous' : 'oauth_connection_ambiguous',
                 connector: err.connector,
               },
               409,
@@ -167,7 +233,8 @@ export function createMintUcanRoutes(
               customerId,
               agentId,
               command,
-              ...(oauthConnectionId ? { oauthConnectionId } : {}),
+              ...(resolved.kind === 'oauth' ? { oauthConnectionId: resolved.id } : {}),
+              ...(resolved.kind === 'cloud' ? { cloudConnectionId: resolved.id } : {}),
               ttlSeconds,
               nonce: `${Date.now()}-${command}`,
             },
@@ -185,14 +252,17 @@ export function createMintUcanRoutes(
           });
         } catch (err) {
           if (err instanceof MintError) {
-            return c.json(
-              { error: err.message, error_code: err.code, command },
-              err.code === 'agent_not_found' || err.code === 'oauth_connection_not_found'
+            const status =
+              err.code === 'agent_not_found' ||
+              err.code === 'oauth_connection_not_found' ||
+              err.code === 'cloud_connection_not_found'
                 ? 404
                 : err.code === 'agent_not_active'
                   ? 403
-                  : 400,
-            );
+                  : err.code === 'cloud_connection_not_verified'
+                    ? 412
+                    : 400;
+            return c.json({ error: err.message, error_code: err.code, command }, status);
           }
           throw err;
         }

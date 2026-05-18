@@ -24,6 +24,10 @@ export class MintError extends Error {
     | 'agent_not_active'
     | 'oauth_connection_not_found'
     | 'oauth_connection_other_customer'
+    | 'cloud_connection_not_found'
+    | 'cloud_connection_other_customer'
+    | 'cloud_connection_not_verified'
+    | 'connection_kind_conflict'
     | 'policy_not_found';
   constructor(code: MintError['code'], message: string) {
     super(message);
@@ -44,11 +48,19 @@ export interface MintInput {
    */
   policyId?: string;
   /**
-   * Optional OAuth connection id. Required for proxy-mode UCANs; without
-   * one, the PDP cannot route a `/v1/proxy/<command>` request to the
-   * upstream SaaS.
+   * Optional OAuth connection id. Required for OAuth proxy-mode UCANs;
+   * without one, the PDP cannot route a `/v1/proxy/<command>` request to
+   * the upstream SaaS. Mutually exclusive with `cloudConnectionId`.
    */
   oauthConnectionId?: string;
+  /**
+   * Optional Cloud connection id (Azure / AWS / GCP federation). Stamped
+   * into `meta.cloud_connection_id` so the PDP's /v1/proxy cloud branch
+   * routes the call through `/v1/internal/cloud/api-call/<id>` instead
+   * of an OAuth bearer adapter. Mutually exclusive with
+   * `oauthConnectionId`.
+   */
+  cloudConnectionId?: string;
   /** UCAN lifetime in seconds, capped at 7 days. */
   ttlSeconds: number;
   /** Caller-supplied nonce; surfaced into payload so the same (agent, command,
@@ -115,6 +127,13 @@ export async function mintUcan(input: MintInput, deps: MintDeps): Promise<MintRe
     }
   }
 
+  if (input.oauthConnectionId && input.cloudConnectionId) {
+    throw new MintError(
+      'connection_kind_conflict',
+      'oauthConnectionId and cloudConnectionId are mutually exclusive',
+    );
+  }
+
   if (input.oauthConnectionId) {
     const conn = await deps.db.query.oauthConnections.findFirst({
       where: eq(schema.oauthConnections.id, input.oauthConnectionId),
@@ -133,6 +152,30 @@ export async function mintUcan(input: MintInput, deps: MintDeps): Promise<MintRe
     }
   }
 
+  if (input.cloudConnectionId) {
+    const conn = await deps.db.query.cloudConnections.findFirst({
+      where: eq(schema.cloudConnections.id, input.cloudConnectionId),
+    });
+    if (!conn) {
+      throw new MintError(
+        'cloud_connection_not_found',
+        `cloud connection ${input.cloudConnectionId} not found`,
+      );
+    }
+    if (conn.customerId !== input.customerId) {
+      throw new MintError(
+        'cloud_connection_other_customer',
+        'cloud connection belongs to a different customer',
+      );
+    }
+    if (conn.bootstrapStatus !== 'verified') {
+      throw new MintError(
+        'cloud_connection_not_verified',
+        `cloud connection ${input.cloudConnectionId} bootstrap_status=${conn.bootstrapStatus}; run verifyNow first`,
+      );
+    }
+  }
+
   const nowMs = deps.now ? deps.now() : Date.now();
   const nowSec = Math.floor(nowMs / 1000);
   // D2 (Lane B): meta.customer_id makes the UCAN the authoritative source of
@@ -146,6 +189,7 @@ export async function mintUcan(input: MintInput, deps: MintDeps): Promise<MintRe
   };
   if (input.policyId) meta.policy_id = input.policyId;
   if (input.oauthConnectionId) meta.oauth_connection_id = input.oauthConnectionId;
+  if (input.cloudConnectionId) meta.cloud_connection_id = input.cloudConnectionId;
   if (input.contextHints && Object.keys(input.contextHints).length > 0) {
     meta.context_hints = input.contextHints;
   }

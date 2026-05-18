@@ -283,6 +283,126 @@ describe.skipIf(!RUN)('mintUcan service (requires postgres)', () => {
     });
   });
 
+  async function newCloudConnection(
+    customerId: string,
+    overrides: Partial<typeof schema.cloudConnections.$inferInsert> = {},
+  ): Promise<string> {
+    const [c] = await db.drizzle
+      .insert(schema.cloudConnections)
+      .values({
+        customerId,
+        connector: 'azure',
+        accountId: `sub-${Math.random()}`,
+        tenantId: `tenant-${Math.random()}`,
+        externalId: `app-${Math.random()}`,
+        bootstrapStatus: 'verified',
+        ...overrides,
+      })
+      .returning();
+    if (!c) throw new Error('cloud connection insert returned no row');
+    return c.id;
+  }
+
+  it('mints a valid UCAN with meta.cloud_connection_id when supplied', async () => {
+    const customerId = await newCustomer();
+    const agentId = await newAgent(customerId);
+    const connId = await newCloudConnection(customerId);
+
+    const result = await mintUcan(
+      {
+        customerId,
+        agentId,
+        command: '/azure/vm/list',
+        cloudConnectionId: connId,
+        ttlSeconds: 3600,
+        nonce: 'cloud-mint-1',
+      },
+      { db: db.drizzle, ...signing },
+    );
+
+    expect(result.payload.meta).toEqual({
+      agent_id: agentId,
+      customer_id: customerId,
+      cloud_connection_id: connId,
+      mode: 'static',
+    });
+  });
+
+  it('rejects mint with cloud_connection from a different customer', async () => {
+    const cidA = await newCustomer();
+    const cidB = await newCustomer();
+    const agentB = await newAgent(cidB);
+    const connA = await newCloudConnection(cidA);
+
+    await expect(
+      mintUcan(
+        {
+          customerId: cidB,
+          agentId: agentB,
+          command: '/azure/vm/list',
+          cloudConnectionId: connA,
+          ttlSeconds: 60,
+          nonce: 'cloud-cross-tenant',
+        },
+        { db: db.drizzle, ...signing },
+      ),
+    ).rejects.toMatchObject({ code: 'cloud_connection_other_customer' });
+  });
+
+  it('rejects mint when cloud_connection bootstrapStatus is not verified', async () => {
+    const customerId = await newCustomer();
+    const agentId = await newAgent(customerId);
+    const connId = await newCloudConnection(customerId, { bootstrapStatus: 'pending' });
+    await expect(
+      mintUcan(
+        {
+          customerId,
+          agentId,
+          command: '/azure/vm/list',
+          cloudConnectionId: connId,
+          ttlSeconds: 60,
+          nonce: 'cloud-not-verified',
+        },
+        { db: db.drizzle, ...signing },
+      ),
+    ).rejects.toMatchObject({ code: 'cloud_connection_not_verified' });
+  });
+
+  it('rejects mint with both oauth and cloud connection ids', async () => {
+    const customerId = await newCustomer();
+    const agentId = await newAgent(customerId);
+    const cloudId = await newCloudConnection(customerId);
+    const oauthConn = await saveConnection(
+      { db: db.drizzle, encryptionKey },
+      {
+        customerId,
+        connector: 'github',
+        tokens: {
+          accessToken: 'gho_z',
+          refreshToken: 'ghr_z',
+          accessTokenExpiresAt: null,
+          refreshTokenExpiresAt: null,
+          scopesGranted: [],
+          accountId: 'octocat-z',
+        },
+      },
+    );
+    await expect(
+      mintUcan(
+        {
+          customerId,
+          agentId,
+          command: '/azure/vm/list',
+          cloudConnectionId: cloudId,
+          oauthConnectionId: oauthConn.id,
+          ttlSeconds: 60,
+          nonce: 'conflict',
+        },
+        { db: db.drizzle, ...signing },
+      ),
+    ).rejects.toMatchObject({ code: 'connection_kind_conflict' });
+  });
+
   it('uses injected `now` for deterministic exp/nbf', async () => {
     const customerId = await newCustomer();
     const agentId = await newAgent(customerId);
