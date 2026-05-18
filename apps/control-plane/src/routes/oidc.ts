@@ -13,7 +13,7 @@
  */
 
 import type { JwtSigner } from '@auto-nomos/crypto';
-import { Hono } from 'hono';
+import { type Context, Hono } from 'hono';
 import { z } from 'zod';
 import { internalAuth } from '../middleware/internal-auth.js';
 import type { KeyStore } from '../oidc/key-store.js';
@@ -55,7 +55,7 @@ export function createOidcRoutes(deps: OidcDeps): Hono {
     });
   });
 
-  const jwksHandler = async (c: Parameters<Parameters<typeof app.get>[1]>[0]) => {
+  const jwksHandler = async (c: Context) => {
     const keys = await deps.keyStore.getPublishedKeys();
     return c.json({
       keys: keys.map((k) => ({ ...k.publicJwk, alg: k.alg })),
@@ -63,10 +63,10 @@ export function createOidcRoutes(deps: OidcDeps): Hono {
   };
   app.get('/oidc/jwks.json', jwksHandler);
   // Alias matching the path advertised in the discovery doc (jwks_uri).
-  // Cloudflare Worker at id.auto-nomos.com is supposed to rewrite this to
-  // /oidc/jwks.json but in case the Worker is bypassed or missing we still
-  // serve the same JWKS here. Azure AD's federated credential trust fetches
-  // this URL to validate the signature on the assertion JWT.
+  // Nginx at id.auto-nomos.com normally rewrites /jwks.json → /oidc/jwks.json
+  // upstream, but we also serve it directly so the path works if the rewrite
+  // is bypassed. Azure AD's federated credential trust fetches this URL to
+  // validate the signature on the assertion JWT.
   app.get('/jwks.json', jwksHandler);
 
   // ----- internal mint -----
