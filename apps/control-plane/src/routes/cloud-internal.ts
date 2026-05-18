@@ -32,6 +32,7 @@ import { type CredsCache, scopeKey } from '../cloud/creds-cache.js';
 import { getCloudProvider } from '../cloud/registry.js';
 import type { Db } from '../db/index.js';
 import { internalAuth } from '../middleware/internal-auth.js';
+import { getLog } from '../middleware/logger.js';
 import { mintIdToken } from '../oidc/mint.js';
 import {
   type CloudAuditPublisher,
@@ -297,6 +298,17 @@ function jsonResp(status: number, body: unknown): Response {
 
 function federationErrorToResponse(c: import('hono').Context, err: unknown): Response {
   if (err instanceof CloudFederationError) {
+    const log = getLog(c);
+    log.error(
+      {
+        message: err.message,
+        providerStatus: err.status,
+        providerBody:
+          typeof err.providerBody === 'string' ? err.providerBody.slice(0, 800) : err.providerBody,
+        retryable: err.retryable,
+      },
+      'cloud_federation_error',
+    );
     return c.json(
       {
         error: 'cloud_call_failed',
@@ -308,6 +320,11 @@ function federationErrorToResponse(c: import('hono').Context, err: unknown): Res
       err.retryable ? 503 : 502,
     );
   }
+  const log = getLog(c);
+  log.error(
+    { err: err instanceof Error ? { message: err.message, name: err.name } : String(err) },
+    'cloud_federation_unexpected_error',
+  );
   throw err;
 }
 

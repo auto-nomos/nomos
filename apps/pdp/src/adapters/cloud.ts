@@ -117,12 +117,17 @@ export async function cloudApiCall(
     throw new Error(`cloud_api_call_non_json_${res.status}: ${raw.slice(0, 200)}`);
   }
   if (res.status === 502 || res.status === 503) {
-    const data = parsed as Partial<CloudFederationFailure>;
+    // CP returns snake_case (provider_status, provider_body) per its public
+    // contract; accept either to be robust.
+    const data = parsed as Partial<CloudFederationFailure> & {
+      provider_status?: number;
+      provider_body?: unknown;
+    };
     throw new CloudCallError({
       error: 'cloud_call_failed',
       message: data.message ?? 'cloud_call_failed',
-      providerStatus: data.providerStatus ?? res.status,
-      providerBody: data.providerBody,
+      providerStatus: data.providerStatus ?? data.provider_status ?? res.status,
+      providerBody: data.providerBody ?? data.provider_body,
       retryable: data.retryable ?? res.status === 503,
     });
   }
