@@ -52,6 +52,7 @@
     "sim:approve": "tsx --env-file-if-exists=.env.local scripts/simulate-approval.mts",
     "audit:smuggle": "tsx --env-file-if-exists=.env.local scripts/audit-content-update-smuggle.mts",
     "test:prod:fs:mutate": "tsx --env-file-if-exists=.env.local scripts/prod-fs-mutate.mts",
+    "test:prod:ssh:mutate": "tsx --env-file-if-exists=.env.local scripts/prod-ssh-mutate.mts",
     "test:local:ssh:mutate": "tsx --env-file-if-exists=.env.local scripts/local-ssh-mutate.mts",
     "test:local:ssh:fixture": "bash scripts/setup-ssh-test-fixture.sh",
     "test:local:ssh:up": "docker compose -f infrastructure/docker/docker-compose.ssh-test.yml up -d",
