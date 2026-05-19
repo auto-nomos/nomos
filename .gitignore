@@ -48,3 +48,7 @@ audit.log
 .claude/
 graphify-out/
 dep-temp.md
+
+# SSH test fixture (scripts/setup-ssh-test-fixture.sh generates these)
+infrastructure/docker/ssh-keys/
+infrastructure/docker/ssh-sandbox/

@@ -1,0 +1,49 @@
+# Local SSH/SFTP target for scripts/local-ssh-mutate.mts.
+#
+# Boots an openssh-server on host port 2222 with a single key-only user
+# (`nomos`) and mounts ./ssh-sandbox into /sandbox so the harness can
+# write, read, exec, and delete inside it from the PDP running on this
+# laptop.
+#
+# Bring-up:
+#   scripts/setup-ssh-test-fixture.sh   # generates key + creates sandbox dir
+#   pnpm test:local:ssh:up               # docker compose up -d
+#   pnpm test:local:ssh:mutate           # run the 3-check script
+#   pnpm test:local:ssh:down             # docker compose down -v
+#
+# linuxserver/openssh-server image notes:
+#   - PUBLIC_KEY_FILE: path *inside* the container.
+#   - SUDO_ACCESS=false locks the user out of sudo.
+#   - PASSWORD_ACCESS=false forces key auth.
+
+# Joins the credential-broker-dev_default network so the PDP container
+# can reach test-sshd via service DNS (host="test-sshd"). Falls back to
+# host port 2222 if you want to ssh into it from the laptop.
+name: credential-broker-dev
+
+services:
+  test-sshd:
+    image: lscr.io/linuxserver/openssh-server:latest
+    container_name: cb-test-sshd
+    restart: unless-stopped
+    ports:
+      - "2222:2222"
+    environment:
+      PUID: "1000"
+      PGID: "1000"
+      TZ: Etc/UTC
+      USER_NAME: nomos
+      PUBLIC_KEY_FILE: /keys/nomos.pub
+      SUDO_ACCESS: "false"
+      PASSWORD_ACCESS: "false"
+      LISTEN_PORT: "2222"
+    volumes:
+      - ./ssh-keys/nomos.pub:/keys/nomos.pub:ro
+      - ./ssh-sandbox:/sandbox
+    networks:
+      - default
+
+networks:
+  default:
+    name: credential-broker-dev_default
+    external: true
