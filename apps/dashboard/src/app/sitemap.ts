@@ -15,6 +15,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { path: '/pricing', priority: 0.7, changeFrequency: 'monthly' },
     { path: '/security', priority: 0.8, changeFrequency: 'monthly' },
     { path: '/changelog', priority: 0.6, changeFrequency: 'weekly' },
+    { path: '/open-source', priority: 0.8, changeFrequency: 'weekly' },
+    { path: '/community', priority: 0.7, changeFrequency: 'weekly' },
+    { path: '/vs/auth0', priority: 0.7, changeFrequency: 'monthly' },
+    { path: '/vs/vault', priority: 0.7, changeFrequency: 'monthly' },
+    { path: '/vs/permit-io', priority: 0.7, changeFrequency: 'monthly' },
+    { path: '/vs/raw-oauth', priority: 0.7, changeFrequency: 'monthly' },
     { path: '/sign-up', priority: 0.4, changeFrequency: 'yearly' },
     { path: '/sign-in', priority: 0.3, changeFrequency: 'yearly' },
   ];

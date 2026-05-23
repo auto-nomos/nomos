@@ -1,7 +1,7 @@
 import { ImageResponse } from 'next/og';
 
 export const runtime = 'edge';
-export const alt = 'Nomos — control plane for cloud keys, agent swarms, and live audit';
+export const alt = 'Nomos — open source authorization for AI agents';
 export const size = { width: 1200, height: 630 };
 export const contentType = 'image/png';
 
@@ -53,15 +53,15 @@ export default function TwitterImage() {
           style={{
             display: 'flex',
             flexWrap: 'wrap',
-            fontSize: 82,
+            fontSize: 76,
             lineHeight: 1.05,
             letterSpacing: '-0.025em',
             color: '#e8dcc4',
             maxWidth: 1040,
           }}
         >
-          <span>Cloud keys, agent swarms, live audit —&nbsp;</span>
-          <span style={{ color: '#bfff00' }}>one control plane.</span>
+          <span>Your agent should never hold a&nbsp;</span>
+          <span style={{ color: '#bfff00' }}>key it could leak.</span>
         </div>
         <div
           style={{
@@ -73,8 +73,8 @@ export default function TwitterImage() {
           }}
         >
           <span>
-            Federated OIDC for AWS, Azure, GCP. UCAN delegation across multi-agent swarms.
-            Hash-chained audit you can replay.
+            Open source authorization for AI agents. Capability tokens, Cedar policy, cryptographic
+            audit, MCP-native.
           </span>
         </div>
       </div>
@@ -90,7 +90,7 @@ export default function TwitterImage() {
         }}
       >
         <span>auto-nomos.com</span>
-        <span>authorization for AI agents</span>
+        <span>open source · MCP-native</span>
       </div>
     </div>,
     size,
