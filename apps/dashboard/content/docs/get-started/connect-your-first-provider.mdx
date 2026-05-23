@@ -1,0 +1,89 @@
+---
+title: Connect your first provider
+description: GitHub OAuth in three clicks — five minutes from "no integration" to "agent has a scoped delegation."
+journey: get-started
+order: 4
+readMinutes: 5
+product:
+  - { href: "/app/connections", label: "Connections" }
+---
+
+You're going to bind a SaaS account to your organization. This is the only time a real
+OAuth token enters the system — Nomos stores it encrypted and never gives it back to
+your agent.
+
+We use **GitHub** for this walkthrough because the OAuth scopes are familiar. The same
+flow works for Slack, Google, Notion, Linear, Stripe, Discord. Pick the one you actually
+need; only the consent screen differs.
+
+<Prereqs items={[
+  "An organization on Nomos (Get started → Install the dashboard).",
+  "A GitHub account you can sign into right now.",
+]} />
+
+<Callout tone="info" title="Prefer the CLI?">
+  `cb connections create --provider github` opens the same OAuth consent
+  screen in your browser and writes the encrypted token back. See the
+  <Link href="/docs/get-started/quickstart">Quickstart</Link> for the
+  side-by-side CLI / MCP / SDK paths.
+</Callout>
+
+## Step-by-step
+
+<Steps>
+  <Step n="1" title="Open Connections">
+    From the dashboard left nav, go to <Link href="/app/connections">Connections</Link>.
+    A fresh org shows an empty table with a "Connect provider" button.
+
+    <Shot src="connections-empty.png" alt="Empty Connections page" caption="The Connections page on a fresh organization." />
+  </Step>
+  <Step n="2" title="Click Connect → GitHub">
+    The picker shows every connector Nomos supports. Click the GitHub tile.
+
+    <Shot src="connections-picker-github.png" alt="Provider picker with GitHub highlighted" caption="Pick a provider. Tiles labeled 'GA' are production-ready." />
+  </Step>
+  <Step n="3" title="Approve the OAuth consent screen">
+    GitHub opens its standard consent screen in a new tab. Pick the org you want Nomos
+    to be able to talk to on your behalf. Nomos asks for `repo`, `read:user`,
+    `read:org` — adjust later via Cedar; the OAuth scope is a *ceiling*, not the
+    enforcement layer.
+
+    <Shot src="github-oauth-consent.png" alt="GitHub OAuth consent screen for Nomos" caption="GitHub's own consent screen. Pick the org you want exposed to Nomos." />
+
+    Click **Authorize Nomos**. GitHub redirects back to the dashboard.
+  </Step>
+  <Step n="4" title="Verify the connection row">
+    You're back on `/app/connections` with one row: GitHub, your username, "active",
+    "refreshable". Token expiry shows up on the right; Nomos refreshes it automatically
+    on a 1-hour cadence with a 24-hour lookahead.
+
+    <Shot src="connections-github-active.png" alt="Connections page with GitHub connection active" caption="One row per connected account. The token is encrypted in the broker — you never see it." />
+  </Step>
+</Steps>
+
+<Verify>
+  - The Connections row shows `status: active` and a token expiry in the future.
+  - Clicking the row opens a side drawer with: connected account, granted scopes,
+    refresh-token availability, last-used timestamp.
+  - No raw OAuth token is visible anywhere in the UI. That's the point — only the
+    PDP can decrypt it, and only at request time.
+</Verify>
+
+<Callout tone="info" title="One connection, many apps">
+  A Connection isn't tied to an App. You'll create multiple Apps later (one per agent)
+  and each will reference this single GitHub connection. That's how you give five
+  different agents narrow GitHub access without ever cloning the OAuth token.
+</Callout>
+
+## Common failures
+
+<Faqs items={[
+  ["I see 'OAuth callback URL mismatch'", "Self-hosted: confirm OAUTH_REDIRECT_URI matches the GitHub OAuth App's callback URL exactly — including trailing slash. Hosted: this never happens, the callback is fixed."],
+  ["GitHub says 'this app isn't allowed in this org'", "Your GitHub org has approval-required for third-party OAuth apps. An org owner needs to approve Nomos under GitHub Settings → Third-party access. Until they do, the consent screen denies."],
+  ["Connection shows 'token expired' immediately", "Rare. Means GitHub returned a token that's already past its expiry. Disconnect, re-connect, and if it persists open a ticket — usually a clock skew on a self-hosted PDP."]
+]} />
+
+<NextSteps items={[
+  { href: "/docs/get-started/register-your-first-app", label: "Register your first App", description: "Give your agent an identity + API key." },
+  { href: "/docs/providers/github", label: "GitHub deep dive", description: "Every action, every scope, every quirk." },
+]} />

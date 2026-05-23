@@ -1,0 +1,105 @@
+---
+title: Register your first App
+description: Create an identity for your agent and issue an API key. The key is visible exactly once.
+journey: get-started
+order: 5
+readMinutes: 5
+product:
+  - { href: "/app/agents", label: "Apps" }
+---
+
+An **App** is one agent's identity inside your organization. It has a DID (used to sign
+UCANs), an optional Cedar policy, zero or more API keys, and a mode flag that decides
+how the agent is allowed to ask for delegations.
+
+<Prereqs items={[
+  "At least one Connection (Get started → Connect your first provider).",
+  "An idea of what this agent is for. The App name shows up in audit logs forever — name it accurately.",
+]} />
+
+<Callout tone="info" title="Prefer the CLI?">
+  `cb apps create --name "…" --mode dynamic` issues the same App; then
+  `cb apps keys create <app-id>` prints the API key (visible once). See the
+  <Link href="/docs/get-started/quickstart">Quickstart</Link> for the
+  side-by-side CLI / MCP / SDK paths.
+</Callout>
+
+## Step-by-step
+
+<Steps>
+  <Step n="1" title="Open Apps">
+    Left nav → <Link href="/app/agents">Apps</Link>. Empty state shows a "Create App" CTA.
+
+    <Shot src="apps-empty.png" alt="Empty Apps page" caption="Each row will be one agent identity." />
+  </Step>
+  <Step n="2" title="Create the App">
+    Click **Create App**. Fill in:
+
+    - **Name** — what shows in audit logs. e.g. `triage-bot`, `prod-codegen`, `pr-reviewer`.
+    - **Mode** — `static` (default) means the agent calls fixed commands; `dynamic`
+      means the agent narrates intents at runtime. Start static.
+    - **Default policy** — skip for now; we'll attach one in the next page.
+
+    Save. The app row appears.
+
+    <Shot src="apps-create-form.png" alt="Create App form" caption="Pick a name you'll recognize in audit logs six months from now." />
+  </Step>
+  <Step n="3" title="Issue an API key">
+    Click into the App's detail page. **API keys** section → **Issue key**. Pick:
+
+    - **Label** — `local-dev`, `prod`, `cursor-laptop`. So you can revoke per-machine.
+    - **Role** — `member` for read flows, `agent_manager` for runtime, `admin` only if
+      the agent provisions other agents (rare).
+
+    <Shot src="api-key-issue-form.png" alt="Issue API key form" caption="One key per machine, per environment. Easier to revoke." />
+
+    Click **Issue**. A modal shows the key one time only.
+
+    <Shot src="api-key-reveal-modal.png" alt="API key reveal modal with copy button" caption="Copy this now. Nomos never shows it again." />
+  </Step>
+  <Step n="4" title="Stash the key">
+    Drop it in your `.env`, your secret manager, or your laptop keychain:
+
+    ```bash
+    export NOMOS_API_KEY="nk_live_…"
+    export NOMOS_CONTROL_URL="https://control.auto-nomos.com"
+    ```
+
+    These two env vars are all the SDK and MCP server need.
+  </Step>
+</Steps>
+
+<Verify>
+  - The Apps page shows your new app with status `active`.
+  - The detail page's API keys section lists the key with the label you chose, the
+    role, and "last used: never."
+  - Trying to call the dashboard's API-key reveal route a second time fails — the
+    plaintext key was shown once and is now hashed at rest.
+</Verify>
+
+<Callout tone="warn" title="If you lose the key, issue a new one.">
+  Nomos doesn't store the plaintext. Revoke the lost key from the same screen, then
+  re-issue. Existing UCANs that the lost key already minted remain valid until they
+  expire — revoke the App's envelope from the Apps page to kill those too.
+</Callout>
+
+## What the key actually authorizes
+
+The API key authenticates *the call to the control plane*. It is not the credential
+your agent presents to the SaaS API.
+
+Flow:
+
+1. Agent → control plane: `Authorization: Bearer <api-key>` plus an authorize request.
+2. Control plane checks: does this API key belong to an active App, with a policy that
+   allows this command? If yes, mint a UCAN.
+3. Agent → PDP: `Authorization: Bearer <ucan>` plus the request.
+4. PDP swaps UCAN for the real OAuth token (decrypted just-in-time) and proxies upstream.
+
+The API key never leaves your infrastructure → control plane edge. The UCAN never
+leaves your infrastructure → PDP edge. The OAuth token never leaves the broker.
+
+<NextSteps items={[
+  { href: "/docs/get-started/make-your-first-call", label: "Make your first call", description: "Curl a real /github/issue/list with a real UCAN." },
+  { href: "/docs/operate/api-keys", label: "API key lifecycle", description: "Rotate, revoke, scope, audit." },
+]} />
