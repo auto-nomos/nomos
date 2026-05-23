@@ -1,15 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import {
-  Area,
-  AreaChart,
-  CartesianGrid,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts';
+import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { trpc } from '../../lib/trpc';
 import { ChartCard, ChartEmpty, ChartSkeleton } from './chart-card';
 
@@ -53,6 +45,7 @@ export function DecisionsTrendChart({ windowDays }: { windowDays: number }) {
     [trend.data, windowDays],
   );
   const total = data.reduce((acc, p) => acc + p.allow + p.deny + p.stepup, 0);
+  const xInterval = windowDays > 14 ? Math.floor(windowDays / 7) : 0;
 
   return (
     <ChartCard
@@ -66,73 +59,50 @@ export function DecisionsTrendChart({ windowDays }: { windowDays: number }) {
       ) : total === 0 ? (
         <ChartEmpty>No decisions in this window yet.</ChartEmpty>
       ) : (
-        <div className="h-[260px]">
+        <div className="h-[260px] w-full">
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={data} margin={{ top: 8, right: 16, bottom: 0, left: -16 }}>
-              <defs>
-                <linearGradient id="allow-grad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor={COLORS.allow} stopOpacity={0.45} />
-                  <stop offset="100%" stopColor={COLORS.allow} stopOpacity={0} />
-                </linearGradient>
-                <linearGradient id="deny-grad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor={COLORS.deny} stopOpacity={0.5} />
-                  <stop offset="100%" stopColor={COLORS.deny} stopOpacity={0} />
-                </linearGradient>
-                <linearGradient id="stepup-grad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor={COLORS.stepup} stopOpacity={0.5} />
-                  <stop offset="100%" stopColor={COLORS.stepup} stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid stroke="hsl(var(--aegis-line))" vertical={false} />
+            <BarChart
+              data={data}
+              margin={{ top: 8, right: 12, bottom: 4, left: -8 }}
+              barCategoryGap={windowDays > 14 ? 2 : 6}
+            >
+              <CartesianGrid
+                stroke="hsl(var(--aegis-line-strong))"
+                strokeDasharray="2 3"
+                vertical={false}
+              />
               <XAxis
                 dataKey="day"
                 tickFormatter={fmtDay}
-                tick={{ fill: 'hsl(var(--aegis-mute))', fontSize: 11 }}
-                axisLine={{ stroke: 'hsl(var(--aegis-line))' }}
+                tick={{ fill: 'hsl(var(--aegis-paper))', fontSize: 11 }}
+                axisLine={{ stroke: 'hsl(var(--aegis-line-strong))' }}
                 tickLine={false}
+                interval={xInterval}
+                minTickGap={8}
               />
               <YAxis
-                tick={{ fill: 'hsl(var(--aegis-mute))', fontSize: 11 }}
-                axisLine={{ stroke: 'hsl(var(--aegis-line))' }}
+                tick={{ fill: 'hsl(var(--aegis-paper))', fontSize: 11 }}
+                axisLine={{ stroke: 'hsl(var(--aegis-line-strong))' }}
                 tickLine={false}
-                width={32}
+                width={36}
                 allowDecimals={false}
+                domain={[0, 'auto']}
               />
               <Tooltip
+                cursor={{ fill: 'hsl(var(--aegis-surface-2) / 0.6)' }}
                 contentStyle={{
                   background: 'hsl(var(--aegis-surface-2))',
-                  border: '1px solid hsl(var(--aegis-line))',
+                  border: '1px solid hsl(var(--aegis-line-strong))',
                   borderRadius: 2,
                   fontSize: 12,
                 }}
                 labelStyle={{ color: 'hsl(var(--aegis-paper))' }}
                 labelFormatter={(label) => (typeof label === 'string' ? fmtDay(label) : label)}
               />
-              <Area
-                type="monotone"
-                dataKey="allow"
-                stackId="d"
-                stroke={COLORS.allow}
-                strokeWidth={1.5}
-                fill="url(#allow-grad)"
-              />
-              <Area
-                type="monotone"
-                dataKey="stepup"
-                stackId="d"
-                stroke={COLORS.stepup}
-                strokeWidth={1.5}
-                fill="url(#stepup-grad)"
-              />
-              <Area
-                type="monotone"
-                dataKey="deny"
-                stackId="d"
-                stroke={COLORS.deny}
-                strokeWidth={1.5}
-                fill="url(#deny-grad)"
-              />
-            </AreaChart>
+              <Bar dataKey="allow" stackId="d" fill={COLORS.allow} radius={[0, 0, 0, 0]} />
+              <Bar dataKey="stepup" stackId="d" fill={COLORS.stepup} radius={[0, 0, 0, 0]} />
+              <Bar dataKey="deny" stackId="d" fill={COLORS.deny} radius={[2, 2, 0, 0]} />
+            </BarChart>
           </ResponsiveContainer>
         </div>
       )}
