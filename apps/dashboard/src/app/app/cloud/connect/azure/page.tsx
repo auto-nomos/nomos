@@ -72,7 +72,7 @@ module "nomos_azure" {
   # Pin <SHA> to a specific commit for reproducible production deploys.
   source = "git::https://github.com/varendra007/nomos-terraforms.git//azurerm-nomos-bootstrap?ref=main"
 
-  customer_id     = "<your-nomos-customer-id>"  # from /app/settings/workspace
+  customer_id     = "<your-nomos-customer-id>"  # from /app/settings/organization
   subscription_id = "${subscriptionId || '<subscription-id>'}"
 
   # One federated credential is created per agent_id. The "verify-poll" id
@@ -225,8 +225,8 @@ echo "tenant_id:       $TENANT_ID"
 echo "subscription_id: $SUBSCRIPTION_ID"`}</pre>
           <p className="text-xs text-muted-foreground">
             Replace <code>{'<your-customer-id>'}</code> with your Nomos org ID from{' '}
-            <Link href="/app/settings/workspace" className="underline">
-              Settings → Workspace
+            <Link href="/app/settings/organization" className="underline">
+              Settings → Organization
             </Link>
             .
           </p>

@@ -70,7 +70,7 @@ module "nomos_gcp" {
   source = "../credential-broker/infra/terraform/google-nomos-bootstrap"
   # Pin for prod: source = "git::https://github.com/varendra007/agent-credential-broker.git//infra/terraform/google-nomos-bootstrap?ref=<SHA>"
 
-  customer_id       = "<your-nomos-customer-id>"  # from /app/settings/workspace
+  customer_id       = "<your-nomos-customer-id>"  # from /app/settings/organization
   project_id        = "${projectId || '<project-id>'}"
   nomos_oidc_issuer = "https://id.auto-nomos.com"
 

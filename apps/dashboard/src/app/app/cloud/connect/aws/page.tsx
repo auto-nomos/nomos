@@ -68,7 +68,7 @@ module "nomos_aws" {
   source = "../credential-broker/infra/terraform/aws-nomos-bootstrap"
   # Pin for prod: source = "git::https://github.com/varendra007/agent-credential-broker.git//infra/terraform/aws-nomos-bootstrap?ref=<SHA>"
 
-  customer_id       = "<your-nomos-customer-id>"  # from /app/settings/workspace
+  customer_id       = "<your-nomos-customer-id>"  # from /app/settings/organization
   region            = "${region}"
   nomos_oidc_issuer = "https://id.auto-nomos.com"
 

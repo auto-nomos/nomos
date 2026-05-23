@@ -34,59 +34,134 @@ interface NavItem {
   href: string;
   label: string;
   icon: React.ComponentType<{ className?: string }>;
-  hint?: string;
+  description?: string;
   badge?: string;
   external?: boolean;
 }
 
 const NAV_GROUPS: { id: string; label: string; items: NavItem[] }[] = [
   {
-    id: 'monitor',
-    label: 'Monitor',
+    id: 'workspace',
+    label: 'Workspace',
     items: [
-      { href: '/app', label: 'Overview', icon: CircleDot, hint: 'home' },
-      { href: '/onboarding', label: 'Onboarding', icon: Sparkles, hint: '6-step wizard' },
-      { href: '/app/approvals', label: 'Approvals', icon: BellRing, hint: 'pending step-ups' },
-      { href: '/app/audit', label: 'Audit chain', icon: Activity, hint: 'every decision' },
-      { href: '/app/grants', label: 'Standing grants', icon: ShieldCheck, hint: 'durable' },
+      {
+        href: '/app',
+        label: 'Overview',
+        icon: CircleDot,
+        description: 'Live activity & health',
+      },
+      {
+        href: '/app/approvals',
+        label: 'Approvals',
+        icon: BellRing,
+        description: 'Pending step-ups',
+      },
+      {
+        href: '/app/audit',
+        label: 'Audit chain',
+        icon: Activity,
+        description: 'Every signed decision',
+      },
     ],
   },
   {
-    id: 'build',
-    label: 'Build',
+    id: 'configure',
+    label: 'Configure',
     items: [
-      { href: '/app/agents', label: 'Apps', icon: Boxes, hint: 'agents + keys' },
+      { href: '/app/agents', label: 'Apps', icon: Boxes, description: 'Agents & API keys' },
+      {
+        href: '/app/policies',
+        label: 'Policies',
+        icon: FileLock2,
+        description: 'Cedar rules & visual builder',
+      },
+      {
+        href: '/app/grants',
+        label: 'Standing grants',
+        icon: ShieldCheck,
+        description: 'Durable approvals',
+      },
       {
         href: '/app/swarms',
         label: 'Swarms',
         icon: GitBranch,
-        hint: 'delegation chains',
+        description: 'Multi-agent delegation',
         badge: 'beta',
       },
-      { href: '/app/policies', label: 'Policies', icon: FileLock2, hint: 'cedar + visual' },
-      { href: '/app/connections', label: 'Connections', icon: Plug, hint: 'OAuth bridge' },
-      { href: '/app/cloud', label: 'Cloud accounts', icon: Cloud, hint: 'AWS / Azure / GCP' },
+    ],
+  },
+  {
+    id: 'integrations',
+    label: 'Integrations',
+    items: [
+      {
+        href: '/app/connections',
+        label: 'Connections',
+        icon: Plug,
+        description: 'SaaS via OAuth',
+      },
+      {
+        href: '/app/cloud',
+        label: 'Cloud accounts',
+        icon: Cloud,
+        description: 'AWS, Azure, GCP',
+      },
       {
         href: '/integrations',
         label: 'Marketplace',
         icon: LayoutGrid,
-        hint: 'connector catalog',
+        description: 'Connector catalog',
         external: true,
       },
     ],
   },
   {
-    id: 'account',
-    label: 'Account',
+    id: 'settings',
+    label: 'Settings',
     items: [
-      { href: '/app/billing', label: 'Billing', icon: Gauge, hint: 'usage + plan' },
-      { href: '/app/settings/workspace', label: 'Workspace', icon: Boxes, hint: 'org IDs + TF' },
-      { href: '/app/settings/members', label: 'Members', icon: Users, hint: 'team + roles' },
-      { href: '/app/settings/organization', label: 'Organization', icon: Cog, hint: 'name + slug' },
-      { href: '/app/settings/security', label: 'Passkeys', icon: KeyRound, hint: 'step-up' },
-      { href: '/app/settings/edge', label: 'Edge PDP', icon: Server, hint: 'self-host install' },
-      { href: '/app/settings/notifications', label: 'Notifications', icon: Layers },
-      { href: '/app/guide/what-is-nomos', label: 'User guide', icon: BookOpen, hint: 'docs' },
+      {
+        href: '/app/settings/organization',
+        label: 'Organization',
+        icon: Cog,
+        description: 'Profile, IDs, Terraform',
+      },
+      {
+        href: '/app/settings/members',
+        label: 'Members',
+        icon: Users,
+        description: 'Team & roles',
+      },
+      { href: '/app/billing', label: 'Billing', icon: Gauge, description: 'Plan & usage' },
+      {
+        href: '/app/settings/security',
+        label: 'Security',
+        icon: KeyRound,
+        description: 'Passkeys & step-up',
+      },
+      {
+        href: '/app/settings/notifications',
+        label: 'Notifications',
+        icon: Layers,
+        description: 'Channels & alerts',
+      },
+      {
+        href: '/app/settings/edge',
+        label: 'Edge PDP',
+        icon: Server,
+        description: 'Self-host install',
+      },
+    ],
+  },
+  {
+    id: 'help',
+    label: 'Help',
+    items: [
+      {
+        href: '/app/guide/what-is-nomos',
+        label: 'User guide',
+        icon: BookOpen,
+        description: 'Docs & mental models',
+      },
     ],
   },
 ];
@@ -96,7 +171,7 @@ export function NomosShell({ children }: { children: React.ReactNode }) {
     <div data-theme="aegis" className="relative isolate min-h-screen bg-aegis-ink text-aegis-paper">
       <QuotaBanner />
       <OnboardingBanner />
-      <div className="relative z-10 grid min-h-screen grid-cols-[260px_minmax(0,1fr)]">
+      <div className="relative z-10 grid min-h-screen grid-cols-[300px_minmax(0,1fr)]">
         <Sidebar />
         <div className="flex min-h-screen flex-col">
           <Topbar />
@@ -216,29 +291,36 @@ function Sidebar() {
                       target={item.external ? '_blank' : undefined}
                       rel={item.external ? 'noreferrer' : undefined}
                       className={cn(
-                        'group flex items-center gap-3 rounded-sm px-3 py-2 text-sm transition-colors',
+                        'group flex items-start gap-3 rounded-sm px-3 py-2 transition-colors',
                         active
                           ? 'bg-aegis-surface-2 text-aegis-paper'
                           : 'text-aegis-mute hover:bg-aegis-surface-2/60 hover:text-aegis-paper',
                       )}
                     >
                       <item.icon
-                        className={cn('h-4 w-4', active ? 'text-aegis-signal' : 'text-aegis-faint')}
+                        className={cn(
+                          'mt-0.5 h-4 w-4 shrink-0',
+                          active ? 'text-aegis-signal' : 'text-aegis-faint',
+                        )}
                       />
-                      <span className="flex-1">{item.label}</span>
-                      {item.badge ? (
-                        <span className="rounded-sm border border-aegis-iris/40 bg-aegis-iris/10 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.16em] text-aegis-iris">
-                          {item.badge}
-                        </span>
-                      ) : null}
-                      {item.hint ? (
-                        <span className="font-mono text-[10px] uppercase tracking-wider text-aegis-faint group-hover:text-aegis-mute">
-                          {item.hint}
-                        </span>
-                      ) : null}
-                      {item.external ? (
-                        <span className="font-mono text-[10px] text-aegis-faint">↗</span>
-                      ) : null}
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="truncate text-sm leading-tight">{item.label}</span>
+                          {item.badge ? (
+                            <span className="rounded-sm border border-aegis-iris/40 bg-aegis-iris/10 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.16em] text-aegis-iris">
+                              {item.badge}
+                            </span>
+                          ) : null}
+                          {item.external ? (
+                            <span className="font-mono text-[10px] text-aegis-faint">↗</span>
+                          ) : null}
+                        </div>
+                        {item.description ? (
+                          <span className="mt-0.5 block truncate text-[11px] leading-snug text-aegis-faint group-hover:text-aegis-mute">
+                            {item.description}
+                          </span>
+                        ) : null}
+                      </div>
                     </Link>
                   </li>
                 );
