@@ -30,6 +30,8 @@ export const actionToCommand: Record<string, string> = {
   get_balance: '/stripe/balance/read',
   list_setup_intents: '/stripe/setup_intent/list',
   list_refunds: '/stripe/refund/list',
+  create_invoice: '/stripe/invoice/create',
+  send_invoice: '/stripe/invoice/send',
 };
 
 export function resourceFor(
@@ -65,6 +67,7 @@ export function resourceFor(
     case 'get_balance':
     case 'list_setup_intents':
     case 'list_refunds':
+    case 'create_invoice':
       return {};
     case 'get_customer':
     case 'update_customer':
@@ -72,6 +75,7 @@ export function resourceFor(
     case 'get_charge':
       return chargeId ? { charge: chargeId } : {};
     case 'get_invoice':
+    case 'send_invoice':
       return invoiceId ? { invoice: invoiceId } : {};
     case 'get_subscription':
     case 'cancel_subscription':

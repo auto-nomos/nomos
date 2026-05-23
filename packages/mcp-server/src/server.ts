@@ -32,6 +32,8 @@ function integrationLabel(id: IntegrationId): string {
       return 'Linear';
     case 'stripe':
       return 'Stripe';
+    case 'discord':
+      return 'Discord';
     case 'google_calendar':
       return 'Google Calendar';
     case 'google_gmail':

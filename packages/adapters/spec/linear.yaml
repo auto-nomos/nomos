@@ -400,6 +400,19 @@ actions:
       - { name: query, in: body, required: true, type: string, default: "mutation IssueUpdate($id: String!, $input: IssueUpdateInput!) { issueUpdate(id: $id, input: $input) { success } }" }
       - { name: variables, in: body, type: object }
 
+  - id: close_issue
+    description: Close a Linear issue by transitioning it to a completed workflow state.
+    expected_use: Mark an issue as Done; uses issueUpdate with the team's completed stateId under the hood.
+    auto_execute: false
+    required_scopes: [write]
+    risk: { category: write, sensitivity: medium }
+    http:
+      method: POST
+      path: "/"
+    params:
+      - { name: query, in: body, required: true, type: string, default: "mutation Close($id: String!, $input: IssueUpdateInput!) { issueUpdate(id: $id, input: $input) { success issue { id state { name } } } }" }
+      - { name: variables, in: body, required: true, type: object }
+
 notes: |
   Linear's API is GraphQL-only; every action POSTs to /graphql with
   `query` + `variables`. The YAML wraps that with default queries so an

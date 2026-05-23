@@ -369,3 +369,31 @@ actions:
       - { name: charge, in: query, type: string }
       - { name: customer, in: query, type: string }
       - { name: limit, in: query, type: integer, default: 10 }
+
+  - id: create_invoice
+    description: Create an invoice for a customer.
+    expected_use: Generate a one-off or scheduled invoice for collected charges.
+    auto_execute: false
+    required_scopes: [read_write]
+    risk: { category: write, sensitivity: high }
+    http:
+      method: POST
+      path: "/invoices"
+    params:
+      - { name: customer, in: form, required: true, type: string }
+      - { name: collection_method, in: form, type: string, enum: [charge_automatically, send_invoice] }
+      - { name: days_until_due, in: form, type: integer }
+      - { name: description, in: form, type: string }
+      - { name: auto_advance, in: form, type: boolean }
+
+  - id: send_invoice
+    description: Send an invoice to the customer.
+    expected_use: Email an open invoice to the customer's billing address.
+    auto_execute: false
+    required_scopes: [read_write]
+    risk: { category: write, sensitivity: high }
+    http:
+      method: POST
+      path: "/invoices/{invoice_id}/send"
+    params:
+      - { name: invoice_id, in: path, required: true, type: string }

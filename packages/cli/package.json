@@ -1,8 +1,8 @@
 {
   "name": "@auto-nomos/cli",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "private": false,
-  "description": "cb \u2014 credential-broker command-line: setup wizard, agent-client connectors, TUI, status checks.",
+  "description": "cb — credential-broker command-line: setup wizard, agent-client connectors, TUI, status checks.",
   "license": "MIT",
   "homepage": "https://github.com/auto-nomos/nomos/tree/main/packages/cli#readme",
   "bugs": {

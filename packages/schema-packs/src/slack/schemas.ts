@@ -7,6 +7,7 @@
  */
 import { z } from 'zod';
 import type { ActionSchemas } from '../types.js';
+import { actions } from './templates.js';
 
 const safePath = z
   .string()
@@ -25,6 +26,7 @@ const apiCallBase = z.object({
 
 const slackResource = z
   .object({
+    channel: z.string().optional(),
     channel_id: z.string().optional(),
     user_id: z.string().optional(),
     thread_ts: z.string().optional(),
@@ -54,11 +56,124 @@ const deleteMessageCall = postCall.extend({
     .optional(),
 });
 
-export const slackActionSchemas: Partial<Record<string, ActionSchemas>> = {
-  '/slack/message/post': { apiCallSchema: postMessageCall, resourceSchema: slackResource },
-  '/slack/message/reply': { apiCallSchema: postMessageCall, resourceSchema: slackResource },
-  '/slack/message/delete': { apiCallSchema: deleteMessageCall, resourceSchema: slackResource },
-  '/slack/channel/list': { resourceSchema: slackResource },
-  '/slack/channel/history': { resourceSchema: slackResource },
-  '/slack/channel/read': { resourceSchema: slackResource },
+/** POST /chat.update needs `channel` + `ts` + (text|blocks). */
+const updateMessageCall = postCall.extend({
+  body: z
+    .object({ channel: z.string().min(1), ts: z.string().min(1) })
+    .and(
+      z.union([
+        z.object({ text: z.string().min(1) }).passthrough(),
+        z.object({ blocks: z.array(z.unknown()).min(1) }).passthrough(),
+      ]),
+    )
+    .optional(),
+});
+
+/** POST /reactions.add | reactions.remove — channel + name + timestamp required. */
+const reactionCall = postCall.extend({
+  body: z
+    .object({
+      channel: z.string().min(1),
+      name: z.string().min(1),
+      timestamp: z.string().min(1),
+    })
+    .passthrough()
+    .optional(),
+});
+
+/** POST /chat.scheduleMessage — channel + post_at + (text|blocks). */
+const scheduleMessageCall = postCall.extend({
+  body: z
+    .object({
+      channel: z.string().min(1),
+      post_at: z.union([z.number().int().positive(), z.string().min(1)]),
+    })
+    .and(
+      z.union([
+        z.object({ text: z.string().min(1) }).passthrough(),
+        z.object({ blocks: z.array(z.unknown()).min(1) }).passthrough(),
+      ]),
+    )
+    .optional(),
+});
+
+/** POST /conversations.create — name required. */
+const createChannelCall = postCall.extend({
+  body: z
+    .object({ name: z.string().min(1) })
+    .passthrough()
+    .optional(),
+});
+
+/** POST /conversations.setTopic — channel + topic. */
+const setTopicCall = postCall.extend({
+  body: z
+    .object({ channel: z.string().min(1), topic: z.string() })
+    .passthrough()
+    .optional(),
+});
+
+/** POST /conversations.open — users (csv) or channel required. */
+const openDmCall = postCall.extend({
+  body: z
+    .object({})
+    .passthrough()
+    .refine(
+      (b) =>
+        typeof (b as { users?: unknown }).users === 'string' ||
+        typeof (b as { channel?: unknown }).channel === 'string',
+      { message: 'open_dm requires `users` (csv) or `channel`' },
+    )
+    .optional(),
+});
+
+/** POST /files.upload — at least one of channels/channel_id required. */
+const uploadFileCall = postCall.extend({
+  body: z
+    .object({})
+    .passthrough()
+    .refine(
+      (b) =>
+        typeof (b as { channels?: unknown }).channels === 'string' ||
+        typeof (b as { channel_id?: unknown }).channel_id === 'string',
+      { message: 'upload_file requires `channels` or `channel_id`' },
+    )
+    .optional(),
+});
+
+// Hand-curated overrides — these win over generated. Resource schema is
+// applied to every slack command so Cedar policies can match on channel/user/thread.
+const handCurated: Partial<Record<string, ActionSchemas>> = {
+  '/slack/message/post': { apiCallSchema: postMessageCall },
+  '/slack/message/reply': { apiCallSchema: postMessageCall },
+  '/slack/message/delete': { apiCallSchema: deleteMessageCall },
+  '/slack/message/update': { apiCallSchema: updateMessageCall },
+  '/slack/message/react': { apiCallSchema: reactionCall },
+  '/slack/message/unreact': { apiCallSchema: reactionCall },
+  '/slack/message/schedule': { apiCallSchema: scheduleMessageCall },
+  '/slack/message/pin': {
+    apiCallSchema: postCall.extend({
+      body: z
+        .object({ channel: z.string().min(1), timestamp: z.string().min(1) })
+        .passthrough()
+        .optional(),
+    }),
+  },
+  '/slack/channel/create': { apiCallSchema: createChannelCall },
+  '/slack/channel/topic': { apiCallSchema: setTopicCall },
+  '/slack/channel/invite': {
+    apiCallSchema: postCall.extend({
+      body: z
+        .object({ channel: z.string().min(1), users: z.string().min(1) })
+        .passthrough()
+        .optional(),
+    }),
+  },
+  '/slack/dm/open': { apiCallSchema: openDmCall },
+  '/slack/file/upload': { apiCallSchema: uploadFileCall },
 };
+
+// Apply slackResource to every slack action so resource_mismatch can fire.
+export const slackActionSchemas: Partial<Record<string, ActionSchemas>> = Object.fromEntries(
+  actions.map((cmd) => [cmd, { ...handCurated[cmd], resourceSchema: slackResource }]),
+);

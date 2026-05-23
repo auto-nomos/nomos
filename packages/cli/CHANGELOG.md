@@ -1,5 +1,13 @@
 # @auto-nomos/cli
 
+## 0.0.3
+
+### Patch Changes
+
+- Updated dependencies
+- Updated dependencies
+  - @auto-nomos/adapters@0.1.0
+
 ## 0.0.1
 
 ### Patch Changes

@@ -16,6 +16,7 @@ export type IntegrationId =
   | 'filesystem'
   | 'linear'
   | 'stripe'
+  | 'discord'
   | 'google_calendar'
   | 'google_gmail'
   | 'google_docs'

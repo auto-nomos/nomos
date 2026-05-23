@@ -33,6 +33,7 @@ export const OAUTH_FLOW_CONNECTORS: readonly ConnectorId[] = [
   'notion',
   'linear',
   'stripe',
+  'discord',
 ];
 
 export interface ConnectInitResponse {

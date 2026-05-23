@@ -31,6 +31,7 @@ const PACK_TO_ADAPTER: Record<string, string> = {
   notion: 'notion',
   linear: 'linear',
   stripe: 'stripe',
+  discord: 'discord',
   google: 'google_drive',
   google_calendar: 'google_calendar',
   google_gmail: 'google_gmail',

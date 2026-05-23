@@ -12,7 +12,6 @@ export const READS = [
   '/google/drive/quota/read',
   '/google/drive/about/read',
   '/google/drive/change/list',
-  '/google/calendar/read',
 ] as const;
 export const WRITES = [
   '/google/drive/write',
@@ -21,8 +20,6 @@ export const WRITES = [
   '/google/drive/share',
   '/google/drive/folder/create',
   '/google/drive/untrash',
-  '/google/calendar/event/create',
-  '/google/calendar/event/update',
 ] as const;
 export const DELETES = [
   '/google/drive/delete',
@@ -39,7 +36,7 @@ export const templates: PolicyTemplate[] = [
     id: 'google:read-only',
     integrationId: 'google',
     name: 'Read-only',
-    description: 'List + read Drive files and calendar events. No writes.',
+    description: 'List + read Drive files. No writes.',
     cedarText: `permit (\n  principal,\n  action in [${READ_LIST}],\n  resource\n);`,
     visualReady: true,
   },
@@ -64,7 +61,7 @@ export const templates: PolicyTemplate[] = [
     id: 'google:step-up-write',
     integrationId: 'google',
     name: 'Step-up for writes',
-    description: 'Reads always; Drive writes and calendar mutations require co-signer approval.',
+    description: 'Reads always; Drive writes require co-signer approval.',
     cedarText: `permit (\n  principal,\n  action in [${READ_LIST}],\n  resource\n);\n\npermit (\n  principal,\n  action in [${WRITE_LIST}],\n  resource\n)\nwhen { context.cosigner == true };`,
     visualReady: true,
   },
@@ -72,7 +69,7 @@ export const templates: PolicyTemplate[] = [
     id: 'google:read-public-write-private',
     integrationId: 'google',
     name: 'Read public, write private',
-    description: 'Read shared (public) docs and calendars; write only in private spaces.',
+    description: 'Read shared (public) docs; write only in private spaces.',
     cedarText: `permit (\n  principal,\n  action in [${READ_LIST}],\n  resource\n)\nwhen { resource.visibility == "public" };\n\npermit (\n  principal,\n  action in [${WRITE_LIST}],\n  resource\n)\nwhen { resource.visibility == "private" };`,
     visualReady: true,
   },

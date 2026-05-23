@@ -61,6 +61,7 @@ function connectorCredentials(
     notion: [config.OAUTH_NOTION_CLIENT_ID, config.OAUTH_NOTION_CLIENT_SECRET],
     linear: [config.OAUTH_LINEAR_CLIENT_ID, config.OAUTH_LINEAR_CLIENT_SECRET],
     stripe: [config.OAUTH_STRIPE_CLIENT_ID, config.OAUTH_STRIPE_CLIENT_SECRET],
+    discord: [config.OAUTH_DISCORD_CLIENT_ID, config.OAUTH_DISCORD_CLIENT_SECRET],
   };
   const [cid, sec] = map[id];
   if (!cid || !sec) return null;
@@ -86,7 +87,15 @@ export async function refreshConnection(
 
   const connectorId = stored.connector;
   const isImplemented = (
-    ['github', 'slack', 'google', 'notion'] as ImplementedConnectorId[]
+    [
+      'github',
+      'slack',
+      'google',
+      'notion',
+      'linear',
+      'stripe',
+      'discord',
+    ] as ImplementedConnectorId[]
   ).includes(connectorId as ImplementedConnectorId);
   if (!isImplemented) {
     throw new RefreshError(

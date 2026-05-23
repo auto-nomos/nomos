@@ -8,6 +8,7 @@ export const SUPPORTED_INTEGRATIONS = [
   'notion',
   'linear',
   'stripe',
+  'discord',
   'google_calendar',
   'google_gmail',
   'google_docs',

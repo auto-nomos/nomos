@@ -4,7 +4,6 @@ export const READS = [
   '/slack/channel/list',
   '/slack/channel/history',
   '/slack/channel/read',
-  '/slack/message/read',
   '/slack/message/search',
   '/slack/user/read',
   '/slack/user/list',

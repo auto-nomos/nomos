@@ -23,7 +23,6 @@ const ALL_CONNECTORS: { id: ConnectorId; label: string; hint: string }[] = [
   { id: 'notion', label: 'Notion', hint: 'Internal Integration Secret' },
   { id: 'linear', label: 'Linear', hint: 'Personal API key (lin_api_...)' },
   { id: 'stripe', label: 'Stripe', hint: 'Restricted key (rk_...) or secret key' },
-  { id: 'discord', label: 'Discord', hint: 'Bot token' },
   { id: 'telegram', label: 'Telegram', hint: 'Bot token from @BotFather' },
   { id: 'dropbox', label: 'Dropbox', hint: 'Generated access token' },
   { id: 'twilio', label: 'Twilio', hint: 'Account SID:Auth Token (basic auth)' },

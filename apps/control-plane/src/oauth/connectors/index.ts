@@ -1,4 +1,5 @@
 import type { Connector, ConnectorId, ImplementedConnectorId } from '../connector.js';
+import { discordConnector } from './discord.js';
 import { githubConnector } from './github.js';
 import { googleConnector } from './google.js';
 import { linearConnector } from './linear.js';
@@ -19,6 +20,7 @@ export const connectorRegistry: Record<ImplementedConnectorId, Connector> = {
   notion: notionConnector,
   linear: linearConnector,
   stripe: stripeConnector,
+  discord: discordConnector,
 };
 
 export function getConnector(id: ConnectorId): Connector {
@@ -34,4 +36,5 @@ export const ALL_CONNECTOR_IDS: ImplementedConnectorId[] = [
   'notion',
   'linear',
   'stripe',
+  'discord',
 ];

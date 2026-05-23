@@ -28,6 +28,9 @@ const CONNECTOR_LABELS: Record<string, string> = {
   slack: 'Slack',
   google: 'Google',
   notion: 'Notion',
+  linear: 'Linear',
+  stripe: 'Stripe',
+  discord: 'Discord',
 };
 
 export default function ConnectionsPage() {

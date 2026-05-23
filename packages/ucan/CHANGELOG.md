@@ -1,5 +1,12 @@
 # @auto-nomos/ucan
 
+## 0.0.3
+
+### Patch Changes
+
+- Updated dependencies
+  - @auto-nomos/shared-types@0.1.0
+
 ## 0.0.1
 
 ### Patch Changes

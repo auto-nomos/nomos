@@ -39,6 +39,14 @@ const Config = z.object({
   OAUTH_LINEAR_CLIENT_SECRET: z.string().optional(),
   OAUTH_STRIPE_CLIENT_ID: z.string().optional(),
   OAUTH_STRIPE_CLIENT_SECRET: z.string().optional(),
+  // Discord bot-install flow. CLIENT_ID/SECRET come from the Discord
+  // Developer Portal "OAuth2 → General" page; BOT_TOKEN is the static
+  // token from the "Bot" page — the connector uses BOT_TOKEN as the
+  // authenticated credential for every API call (the user access_token
+  // returned by OAuth is discarded).
+  OAUTH_DISCORD_CLIENT_ID: z.string().optional(),
+  OAUTH_DISCORD_CLIENT_SECRET: z.string().optional(),
+  OAUTH_DISCORD_BOT_TOKEN: z.string().optional(),
 
   // Sprint 8 — push revocation. Comma-separated PDP webhook URLs the control
   // plane POSTs to on revoke (e.g. `http://localhost:8787/v1/internal/refresh-revocations`).

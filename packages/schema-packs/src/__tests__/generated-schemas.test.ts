@@ -13,6 +13,7 @@
  */
 import { type Action, loadAllAdapters } from '@auto-nomos/adapters';
 import { describe, expect, it } from 'vitest';
+import { actionToCommand as discordMap } from '../discord/actions.js';
 import { actionToCommand as githubMap } from '../github/actions.js';
 import { actionToCommand as googleMap } from '../google/actions.js';
 import { actionToCommand as googleCalendarMap } from '../google_calendar/actions.js';
@@ -37,6 +38,7 @@ const PACK_TO_ENTRY: Record<string, PackEntry> = {
   notion: { adapterId: 'notion', actionToCommand: notionMap },
   linear: { adapterId: 'linear', actionToCommand: linearMap },
   stripe: { adapterId: 'stripe', actionToCommand: stripeMap },
+  discord: { adapterId: 'discord', actionToCommand: discordMap },
   google: { adapterId: 'google_drive', actionToCommand: googleMap },
   google_calendar: { adapterId: 'google_calendar', actionToCommand: googleCalendarMap },
   google_gmail: { adapterId: 'google_gmail', actionToCommand: googleGmailMap },
@@ -195,17 +197,15 @@ describe('apiCall-smuggle regression', () => {
 });
 
 describe('fail-closed on declared write commands without a schema', () => {
-  it('returns schema_missing when a pack action loses its schema entry', () => {
-    // Construct a synthetic case: github command that exists in pack.actions
-    // but has no apiCallSchema. The orphans allowlisted in parity-check
-    // (e.g. /slack/message/read) exercise this path naturally.
-    const result = validateApiCall('/slack/message/read', {
+  it('returns ok when an integration namespace is unknown (Cedar handles)', () => {
+    // After 2026-05-23 KNOWN_ORPHAN_COMMANDS cleanup every pack action has
+    // a schema entry, so the `pack.actions includes(command) && no schema`
+    // branch is no longer exercisable from real data. The function's
+    // unknown-namespace pass-through path is verified here.
+    const result = validateApiCall('/unknown_integration/some/op', {
       method: 'GET',
-      path: '/api/conversations.history',
+      path: '/whatever',
     });
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.reason).toBe('schema_missing');
-    }
+    expect(result.ok).toBe(true);
   });
 });

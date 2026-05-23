@@ -1,5 +1,6 @@
 import type { IntegrationId } from '../config.js';
 import { azureTools } from './azure.js';
+import { discordTools } from './discord.js';
 import { filesystemTools } from './filesystem.js';
 import { githubTools } from './github.js';
 import { googleTools } from './google.js';
@@ -24,6 +25,7 @@ const REGISTRY: Partial<Record<IntegrationId, ToolDefinition[]>> = {
   notion: notionTools,
   linear: linearTools,
   stripe: stripeTools,
+  discord: discordTools,
   google_calendar: googleCalendarTools,
   google_gmail: googleGmailTools,
   google_docs: googleDocsTools,

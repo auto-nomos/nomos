@@ -7,14 +7,14 @@ terraform {
 
 provider "azurerm" {
   features {}
-  subscription_id = "3ba95802-7e7c-46b3-975f-cf8508c41100"
+  subscription_id = "da3388b9-1155-4b27-a430-4daae86db313"
 }
 
 module "nomos_azure" {
   source = "../azurerm-nomos-bootstrap"
 
-  customer_id       = "bdad3568-ba4f-43b2-bb64-9ac3d13b5e78"
-  subscription_id   = "3ba95802-7e7c-46b3-975f-cf8508c41100"
+  customer_id       = "ed539890-8bab-4d3d-804a-b1bfe8c90a9f"
+  subscription_id   = "da3388b9-1155-4b27-a430-4daae86db313"
   nomos_oidc_issuer = "https://id.auto-nomos.com"
 }
 

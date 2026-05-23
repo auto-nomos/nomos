@@ -14,12 +14,16 @@
 import { PACKS } from '@auto-nomos/schema-packs';
 
 /**
- * Packs enforced by something other than the HTTP proxy (e.g. filesystem
- * is gated by the local adapter executor). They legitimately have no
- * `extractResourceFromApiCall` since `validateResourceConsistency` is
- * never called for them.
+ * Packs enforced by something other than the HTTP proxy. They legitimately
+ * have no `extractResourceFromApiCall` since `validateResourceConsistency`
+ * is never called for them.
+ *
+ *   filesystem  — gated by the local adapter executor (no proxy hop).
+ *   azure/aws/gcp — cloud IAM federation; PDP issues short-lived
+ *                   provider tokens via OIDC-FIC, the SDK calls the
+ *                   cloud provider directly. No `/v1/proxy` involvement.
  */
-const NON_PROXY_PACKS = new Set<string>(['filesystem']);
+const NON_PROXY_PACKS = new Set<string>(['filesystem', 'azure', 'aws', 'gcp']);
 
 function main(): void {
   const missing: string[] = [];

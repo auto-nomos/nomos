@@ -5,7 +5,7 @@
 // This file is the apiCall floor for the PDP proxy. Hand-curated overrides
 // in <pack>/schemas.ts can tighten body shape further. See types.ts
 // `mergeActionSchemas` for how the two layers combine.
-// pack=linear actions=23 mapped=23
+// pack=linear actions=24 mapped=24
 
 import { z } from 'zod';
 import type { ActionSchemas } from '../types.js';
@@ -345,6 +345,21 @@ export const generated: Partial<Record<string, ActionSchemas>> = {
       body: z
         .object({
           query: z.string().min(1),
+        })
+        .passthrough()
+        .optional(),
+      headers: z.record(z.string(), z.string()).optional(),
+    }),
+  },
+  '/linear/issue/close': {
+    apiCallSchema: z.object({
+      method: z.literal('POST'),
+      path: safePath.refine((p) => /^\/$/.test(p), 'apiCall.path does not match action template /'),
+      query: z.record(z.string(), z.string()).optional(),
+      body: z
+        .object({
+          query: z.string().min(1),
+          variables: z.record(z.string(), z.unknown()),
         })
         .passthrough()
         .optional(),

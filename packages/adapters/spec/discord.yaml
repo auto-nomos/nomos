@@ -1,7 +1,7 @@
 id: discord
 name: Discord
-version: 1.0.0
-description: Discord REST API — guilds, channels, messages.
+version: 2.0.0
+description: Discord REST API (bot-token install) — guilds, channels, messages, roles, members, invites, webhooks, emojis.
 homepage: https://discord.com/developers/docs
 
 api_base: https://discord.com/api/v10
@@ -11,40 +11,63 @@ auth:
   authorize_url: https://discord.com/oauth2/authorize
   token_url: https://discord.com/api/oauth2/token
   default_scopes:
-    - identify
-    - guilds
-    - messages.read
+    - bot
+    - applications.commands
   pkce: false
 
 actions:
-  - id: get_user
-    description: Get the authenticated user's profile.
-    expected_use: Identify which Discord account the agent is acting as.
+  # ── Guild ──────────────────────────────────────────────────────────────────
+  - id: get_guild
+    description: Get guild metadata (name, icon, owner, features).
+    expected_use: Inspect the guild the bot was installed into.
     auto_execute: true
-    required_scopes: [identify]
+    required_scopes: [bot]
     risk: { category: read, sensitivity: low }
     http:
       method: GET
-      path: "/users/@me"
-    response:
-      type: object
-      sanitize:
-        - { field: email, redact: true }
+      path: "/guilds/{guild_id}"
+    params:
+      - { name: guild_id, in: path, required: true, type: string }
 
-  - id: list_guilds
-    description: List servers the user is a member of.
-    expected_use: Discover where the agent can post / read.
+  - id: list_guild_members
+    description: List members of a guild.
+    expected_use: Enumerate members to assign roles or moderate.
     auto_execute: true
-    required_scopes: [guilds]
-    risk: { category: read, sensitivity: low }
+    required_scopes: [bot]
+    risk: { category: read, sensitivity: medium }
     http:
       method: GET
-      path: "/users/@me/guilds"
+      path: "/guilds/{guild_id}/members"
+    params:
+      - { name: guild_id, in: path, required: true, type: string }
+      - { name: limit, in: query, type: integer, default: 100 }
+      - { name: after, in: query, type: string }
+    response:
+      type: array
+      sanitize:
+        - { field: user.email, redact: true }
+
+  - id: modify_guild
+    description: Modify guild settings (name, icon, system channel).
+    expected_use: Update guild-wide configuration.
+    auto_execute: false
+    required_scopes: [bot]
+    risk: { category: write, sensitivity: high }
+    http:
+      method: PATCH
+      path: "/guilds/{guild_id}"
+    params:
+      - { name: guild_id, in: path, required: true, type: string }
+      - { name: name, in: body, type: string }
+      - { name: description, in: body, type: string }
+      - { name: system_channel_id, in: body, type: string }
+
+  # ── Channel ────────────────────────────────────────────────────────────────
   - id: list_channels
     description: List channels in a guild.
-    expected_use: Pick a channel before posting.
+    expected_use: Discover existing channels before posting or creating.
     auto_execute: true
-    required_scopes: [guilds]
+    required_scopes: [bot]
     risk: { category: read, sensitivity: low }
     http:
       method: GET
@@ -52,9 +75,100 @@ actions:
     params:
       - { name: guild_id, in: path, required: true, type: string }
 
+  - id: get_channel
+    description: Get a single channel's metadata.
+    expected_use: Inspect channel type/parent/permissions before posting.
+    auto_execute: true
+    required_scopes: [bot]
+    risk: { category: read, sensitivity: low }
+    http:
+      method: GET
+      path: "/channels/{channel_id}"
+    params:
+      - { name: channel_id, in: path, required: true, type: string }
+
+  - id: create_channel
+    description: Create a channel in a guild (text/voice/category/announcement).
+    expected_use: Provision channels when setting up or expanding a server.
+    auto_execute: false
+    required_scopes: [bot]
+    risk: { category: write, sensitivity: medium }
+    http:
+      method: POST
+      path: "/guilds/{guild_id}/channels"
+    params:
+      - { name: guild_id, in: path, required: true, type: string }
+      - { name: name, in: body, required: true, type: string }
+      - { name: type, in: body, type: integer, description: "0=text 2=voice 4=category 5=announcement" }
+      - { name: parent_id, in: body, type: string }
+      - { name: topic, in: body, type: string }
+      - { name: position, in: body, type: integer }
+      - { name: nsfw, in: body, type: boolean }
+      - { name: rate_limit_per_user, in: body, type: integer }
+
+  - id: modify_channel
+    description: Modify channel settings (name, topic, position, parent).
+    expected_use: Rename or re-categorize a channel.
+    auto_execute: false
+    required_scopes: [bot]
+    risk: { category: write, sensitivity: medium }
+    http:
+      method: PATCH
+      path: "/channels/{channel_id}"
+    params:
+      - { name: channel_id, in: path, required: true, type: string }
+      - { name: name, in: body, type: string }
+      - { name: topic, in: body, type: string }
+      - { name: position, in: body, type: integer }
+      - { name: parent_id, in: body, type: string }
+
+  - id: delete_channel
+    description: Permanently delete a channel.
+    expected_use: Remove a channel that's no longer needed. Requires explicit approval.
+    auto_execute: false
+    required_scopes: [bot]
+    risk: { category: delete, sensitivity: high }
+    http:
+      method: DELETE
+      path: "/channels/{channel_id}"
+    params:
+      - { name: channel_id, in: path, required: true, type: string }
+
+  - id: set_channel_permissions
+    description: Set permission overwrites on a channel for a role or member.
+    expected_use: Grant or restrict access to a specific channel.
+    auto_execute: false
+    required_scopes: [bot]
+    risk: { category: write, sensitivity: high }
+    http:
+      method: PUT
+      path: "/channels/{channel_id}/permissions/{overwrite_id}"
+    params:
+      - { name: channel_id, in: path, required: true, type: string }
+      - { name: overwrite_id, in: path, required: true, type: string }
+      - { name: type, in: body, required: true, type: integer, description: "0=role 1=member" }
+      - { name: allow, in: body, type: string, description: "Bitfield as string." }
+      - { name: deny, in: body, type: string, description: "Bitfield as string." }
+
+  # ── Message ────────────────────────────────────────────────────────────────
+  - id: list_messages
+    description: List recent messages in a channel.
+    expected_use: Read recent traffic to inform a reply or context-aware action.
+    auto_execute: true
+    required_scopes: [bot]
+    risk: { category: read, sensitivity: medium }
+    http:
+      method: GET
+      path: "/channels/{channel_id}/messages"
+    params:
+      - { name: channel_id, in: path, required: true, type: string }
+      - { name: limit, in: query, type: integer, default: 50 }
+      - { name: before, in: query, type: string }
+      - { name: after, in: query, type: string }
+
   - id: post_message
-    description: Post a message to a channel (requires bot scope).
-    expected_use: Send notifications to the team.
+    description: Post a message to a channel.
+    expected_use: Send announcements, welcome notes, status updates.
     auto_execute: false
     required_scopes: [bot]
     risk: { category: write, sensitivity: medium }
@@ -63,19 +177,170 @@ actions:
       path: "/channels/{channel_id}/messages"
     params:
       - { name: channel_id, in: path, required: true, type: string }
-      - { name: content, in: body, required: true, type: string }
-      - { name: tts, in: body, type: boolean, default: false }
+      - { name: content, in: body, type: string }
       - { name: embeds, in: body, type: array }
+      - { name: components, in: body, type: array }
+      - { name: tts, in: body, type: boolean, default: false }
+      - { name: allowed_mentions, in: body, type: object }
 
-  - id: list_messages
-    description: List recent messages in a channel.
-    expected_use: Read recent traffic to inform a reply.
-    auto_execute: true
-    required_scopes: [messages.read]
-    risk: { category: read, sensitivity: medium }
+  - id: edit_message
+    description: Edit a previously-posted message.
+    expected_use: Correct or amend a prior message authored by this bot.
+    auto_execute: false
+    required_scopes: [bot]
+    risk: { category: write, sensitivity: medium }
     http:
-      method: GET
-      path: "/channels/{channel_id}/messages"
+      method: PATCH
+      path: "/channels/{channel_id}/messages/{message_id}"
     params:
       - { name: channel_id, in: path, required: true, type: string }
-      - { name: limit, in: query, type: integer, default: 50 }
+      - { name: message_id, in: path, required: true, type: string }
+      - { name: content, in: body, type: string }
+      - { name: embeds, in: body, type: array }
+      - { name: components, in: body, type: array }
+
+  - id: delete_message
+    description: Permanently delete a message.
+    expected_use: Remove a message posted in error or moderation cleanup.
+    auto_execute: false
+    required_scopes: [bot]
+    risk: { category: delete, sensitivity: high }
+    http:
+      method: DELETE
+      path: "/channels/{channel_id}/messages/{message_id}"
+    params:
+      - { name: channel_id, in: path, required: true, type: string }
+      - { name: message_id, in: path, required: true, type: string }
+
+  # ── Role ───────────────────────────────────────────────────────────────────
+  - id: list_roles
+    description: List roles defined in a guild.
+    expected_use: Inspect roles before assigning or modifying.
+    auto_execute: true
+    required_scopes: [bot]
+    risk: { category: read, sensitivity: low }
+    http:
+      method: GET
+      path: "/guilds/{guild_id}/roles"
+    params:
+      - { name: guild_id, in: path, required: true, type: string }
+
+  - id: create_role
+    description: Create a role in a guild.
+    expected_use: Set up Maintainer / Contributor / Community roles when bootstrapping a server.
+    auto_execute: false
+    required_scopes: [bot]
+    risk: { category: write, sensitivity: medium }
+    http:
+      method: POST
+      path: "/guilds/{guild_id}/roles"
+    params:
+      - { name: guild_id, in: path, required: true, type: string }
+      - { name: name, in: body, required: true, type: string }
+      - { name: color, in: body, type: integer }
+      - { name: permissions, in: body, type: string, description: "Bitfield as string." }
+      - { name: hoist, in: body, type: boolean }
+      - { name: mentionable, in: body, type: boolean }
+
+  - id: modify_role
+    description: Modify an existing role's name, color, or permissions.
+    expected_use: Adjust role configuration.
+    auto_execute: false
+    required_scopes: [bot]
+    risk: { category: write, sensitivity: medium }
+    http:
+      method: PATCH
+      path: "/guilds/{guild_id}/roles/{role_id}"
+    params:
+      - { name: guild_id, in: path, required: true, type: string }
+      - { name: role_id, in: path, required: true, type: string }
+      - { name: name, in: body, type: string }
+      - { name: color, in: body, type: integer }
+      - { name: permissions, in: body, type: string }
+
+  - id: delete_role
+    description: Permanently delete a role.
+    expected_use: Remove an obsolete role.
+    auto_execute: false
+    required_scopes: [bot]
+    risk: { category: delete, sensitivity: high }
+    http:
+      method: DELETE
+      path: "/guilds/{guild_id}/roles/{role_id}"
+    params:
+      - { name: guild_id, in: path, required: true, type: string }
+      - { name: role_id, in: path, required: true, type: string }
+
+  # ── Member ─────────────────────────────────────────────────────────────────
+  - id: add_member_role
+    description: Add a role to a guild member.
+    expected_use: Promote a contributor or grant permissions.
+    auto_execute: false
+    required_scopes: [bot]
+    risk: { category: write, sensitivity: medium }
+    http:
+      method: PUT
+      path: "/guilds/{guild_id}/members/{user_id}/roles/{role_id}"
+    params:
+      - { name: guild_id, in: path, required: true, type: string }
+      - { name: user_id, in: path, required: true, type: string }
+      - { name: role_id, in: path, required: true, type: string }
+
+  - id: remove_member_role
+    description: Remove a role from a guild member.
+    expected_use: Demote or revoke role-based permissions.
+    auto_execute: false
+    required_scopes: [bot]
+    risk: { category: write, sensitivity: medium }
+    http:
+      method: DELETE
+      path: "/guilds/{guild_id}/members/{user_id}/roles/{role_id}"
+    params:
+      - { name: guild_id, in: path, required: true, type: string }
+      - { name: user_id, in: path, required: true, type: string }
+      - { name: role_id, in: path, required: true, type: string }
+
+  # ── Invite ─────────────────────────────────────────────────────────────────
+  - id: create_invite
+    description: Create an invite link for a channel.
+    expected_use: Generate a shareable link for new community members.
+    auto_execute: false
+    required_scopes: [bot]
+    risk: { category: write, sensitivity: medium }
+    http:
+      method: POST
+      path: "/channels/{channel_id}/invites"
+    params:
+      - { name: channel_id, in: path, required: true, type: string }
+      - { name: max_age, in: body, type: integer, default: 86400 }
+      - { name: max_uses, in: body, type: integer, default: 0 }
+      - { name: temporary, in: body, type: boolean, default: false }
+      - { name: unique, in: body, type: boolean, default: false }
+
+  # ── Webhook ────────────────────────────────────────────────────────────────
+  - id: create_webhook
+    description: Create a webhook on a channel.
+    expected_use: Set up an integration endpoint for external systems to post into Discord.
+    auto_execute: false
+    required_scopes: [bot]
+    risk: { category: write, sensitivity: medium }
+    http:
+      method: POST
+      path: "/channels/{channel_id}/webhooks"
+    params:
+      - { name: channel_id, in: path, required: true, type: string }
+      - { name: name, in: body, required: true, type: string }
+      - { name: avatar, in: body, type: string, description: "Image data URI." }
+
+  # ── Emoji ──────────────────────────────────────────────────────────────────
+  - id: list_emojis
+    description: List custom emojis in a guild.
+    expected_use: Inspect available emoji before referencing in a message.
+    auto_execute: true
+    required_scopes: [bot]
+    risk: { category: read, sensitivity: low }
+    http:
+      method: GET
+      path: "/guilds/{guild_id}/emojis"
+    params:
+      - { name: guild_id, in: path, required: true, type: string }

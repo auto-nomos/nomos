@@ -28,6 +28,7 @@ export const actionToCommand: Record<string, string> = {
   get_team: '/linear/team/read',
   create_comment: '/linear/comment/create',
   move_issue: '/linear/issue/move',
+  close_issue: '/linear/issue/close',
 };
 
 export function resourceFor(
@@ -52,6 +53,7 @@ export function resourceFor(
       return teamId ? { team: teamId } : {};
     case 'assign_issue':
     case 'move_issue':
+    case 'close_issue':
       return id ? { issue: id } : {};
     case 'archive_project':
       return id ? { project: id } : {};

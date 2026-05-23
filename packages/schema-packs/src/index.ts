@@ -1,5 +1,6 @@
 export { awsPack } from './aws/index.js';
 export { azurePack } from './azure/index.js';
+export { discordPack } from './discord/index.js';
 export { filesystemPack } from './filesystem/index.js';
 export { gcpPack } from './gcp/index.js';
 export { githubPack } from './github/index.js';
@@ -20,6 +21,7 @@ export * from './types.js';
 
 import { awsPack } from './aws/index.js';
 import { azurePack } from './azure/index.js';
+import { discordPack } from './discord/index.js';
 import { filesystemPack } from './filesystem/index.js';
 import { gcpPack } from './gcp/index.js';
 import { githubPack } from './github/index.js';
@@ -51,6 +53,7 @@ export const PACKS: IntegrationPack[] = [
   notionPack,
   linearPack,
   stripePack,
+  discordPack,
   filesystemPack,
   sshPack,
   azurePack,
@@ -232,6 +235,9 @@ const COMPARED_KEYS = [
   // filesystem + ssh
   'path',
   'host',
+  // discord
+  'guild_id',
+  'role_id',
 ] as const;
 
 export function validateResourceConsistency(

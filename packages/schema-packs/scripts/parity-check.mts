@@ -31,12 +31,15 @@ const PACK_TO_ADAPTER: Record<string, string> = {
   notion: 'notion',
   linear: 'linear',
   stripe: 'stripe',
+  discord: 'discord',
   google: 'google_drive',
   google_calendar: 'google_calendar',
   google_gmail: 'google_gmail',
   google_docs: 'google_docs',
   google_sheets: 'google_sheets',
   google_tasks: 'google_tasks',
+  filesystem: 'filesystem',
+  ssh: 'ssh',
 };
 
 /**
@@ -46,7 +49,6 @@ const PACK_TO_ADAPTER: Record<string, string> = {
  * the pack lands.
  */
 const PACKLESS_ADAPTERS = new Set<string>([
-  'discord',
   'dropbox',
   'google_contacts',
   'granola',
@@ -72,20 +74,6 @@ const PACKLESS_ADAPTERS = new Set<string>([
  * properly (extend the YAML or change the command name to match).
  */
 const KNOWN_ORPHAN_COMMANDS = new Set<string>([
-  // TODO(schema-packs): slack adapter has no single-message read endpoint;
-  // either add `read_message` (conversations.history with oldest=ts) or
-  // drop from slack templates.
-  '/slack/message/read',
-  // TODO(schema-packs): linear update_issue covers close; drop or alias.
-  '/linear/issue/close',
-  // TODO(schema-packs): stripe.yaml missing invoice create + send; add.
-  '/stripe/invoice/create',
-  '/stripe/invoice/send',
-  // TODO(schema-packs): google pack (Drive) carries calendar commands by
-  // accident; either move templates to google_calendar pack or drop.
-  '/google/calendar/read',
-  '/google/calendar/event/create',
-  '/google/calendar/event/update',
 ]);
 
 interface Problem {

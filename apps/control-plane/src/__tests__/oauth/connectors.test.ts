@@ -655,3 +655,118 @@ describe('github connector — additional', () => {
     expect(res.body).toBe('<html>not json</html>');
   });
 });
+
+describe('discord connector', () => {
+  const c = getConnector('discord');
+
+  it('authUrl includes scope=bot+applications.commands, permissions bitfield, state', () => {
+    const url = new URL(c.authUrl(ctx(fetch), { state: 'st1' }));
+    expect(url.origin + url.pathname).toBe('https://discord.com/oauth2/authorize');
+    expect(url.searchParams.get('client_id')).toBe('CLIENT_ID');
+    expect(url.searchParams.get('scope')).toBe('bot applications.commands');
+    expect(url.searchParams.get('permissions')).toBe('1644971949559');
+    expect(url.searchParams.get('state')).toBe('st1');
+    expect(url.searchParams.get('response_type')).toBe('code');
+  });
+
+  it('exchangeCode parses guild.id as accountId and overrides accessToken with bot token from env', async () => {
+    const prev = process.env.OAUTH_DISCORD_BOT_TOKEN;
+    process.env.OAUTH_DISCORD_BOT_TOKEN = 'BOT_TOKEN_XYZ';
+    try {
+      const { fetch: f } = makeFetch({
+        'https://discord.com/api/oauth2/token': () =>
+          new Response(
+            JSON.stringify({
+              access_token: 'discord_user_token',
+              refresh_token: 'rt',
+              expires_in: 604800,
+              scope: 'bot applications.commands',
+              guild: { id: 'G123456', name: 'Test Guild' },
+            }),
+            { status: 200, headers: { 'content-type': 'application/json' } },
+          ),
+      });
+      const tokens = await c.exchangeCode(ctx(f), 'code1');
+      expect(tokens.accountId).toBe('G123456');
+      expect(tokens.accessToken).toBe('BOT_TOKEN_XYZ');
+      expect(tokens.refreshToken).toBe('');
+      expect(tokens.scopesGranted).toEqual(['applications.commands', 'bot']);
+    } finally {
+      process.env.OAUTH_DISCORD_BOT_TOKEN = prev;
+    }
+  });
+
+  it('exchangeCode throws ConnectorAuthError when guild missing', async () => {
+    process.env.OAUTH_DISCORD_BOT_TOKEN = 'BOT_TOKEN_XYZ';
+    const { fetch: f } = makeFetch({
+      'https://discord.com/api/oauth2/token': () =>
+        new Response(JSON.stringify({ access_token: 'x', scope: 'bot' }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        }),
+    });
+    await expect(c.exchangeCode(ctx(f), 'bad')).rejects.toMatchObject({
+      message: /missing guild\.id/,
+    });
+  });
+
+  it('exchangeCode throws when bot token env var unset', async () => {
+    const prev = process.env.OAUTH_DISCORD_BOT_TOKEN;
+    delete process.env.OAUTH_DISCORD_BOT_TOKEN;
+    try {
+      const { fetch: f } = makeFetch({
+        'https://discord.com/api/oauth2/token': () =>
+          new Response(
+            JSON.stringify({
+              access_token: 'x',
+              scope: 'bot',
+              guild: { id: 'G1' },
+            }),
+            { status: 200, headers: { 'content-type': 'application/json' } },
+          ),
+      });
+      await expect(c.exchangeCode(ctx(f), 'code')).rejects.toMatchObject({
+        message: /OAUTH_DISCORD_BOT_TOKEN/,
+      });
+    } finally {
+      process.env.OAUTH_DISCORD_BOT_TOKEN = prev;
+    }
+  });
+
+  it('refresh always throws (bot installs do not issue refresh tokens)', async () => {
+    await expect(c.refresh(ctx(fetch), 'anything')).rejects.toMatchObject({
+      message: /do not issue refresh tokens/,
+    });
+  });
+
+  it('callApi sends Authorization: Bot <token> and JSON body on POST', async () => {
+    const { fetch: f, calls } = makeFetch({
+      'https://discord.com/api/v10/guilds/G1/channels': () =>
+        new Response(JSON.stringify({ id: 'C1', name: 'general' }), {
+          status: 201,
+          headers: { 'content-type': 'application/json' },
+        }),
+    });
+    const res = await c.callApi(ctx(f), 'BOT_TOK', {
+      method: 'POST',
+      path: '/guilds/G1/channels',
+      body: { name: 'general', type: 0 },
+    });
+    expect(res.status).toBe(201);
+    expect(calls[0].headers.authorization).toBe('Bot BOT_TOK');
+    expect(calls[0].headers['content-type']).toBe('application/json; charset=utf-8');
+    expect(calls[0].body).toBe('{"name":"general","type":0}');
+  });
+
+  it('callApi omits body on DELETE', async () => {
+    const { fetch: f, calls } = makeFetch({
+      'https://discord.com/api/v10/channels/C1': () => new Response(null, { status: 204 }),
+    });
+    const res = await c.callApi(ctx(f), 'BOT_TOK', {
+      method: 'DELETE',
+      path: '/channels/C1',
+    });
+    expect(res.status).toBe(204);
+    expect(calls[0].body).toBeUndefined();
+  });
+});

@@ -51,7 +51,14 @@ export type ConnectorId =
   | 'perplexity'
   | 'imessage';
 
-export type ImplementedConnectorId = 'github' | 'slack' | 'google' | 'notion' | 'linear' | 'stripe';
+export type ImplementedConnectorId =
+  | 'github'
+  | 'slack'
+  | 'google'
+  | 'notion'
+  | 'linear'
+  | 'stripe'
+  | 'discord';
 
 export interface OAuthTokens {
   accessToken: string;

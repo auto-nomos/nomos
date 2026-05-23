@@ -52,3 +52,9 @@ dep-temp.md
 # SSH test fixture (scripts/setup-ssh-test-fixture.sh generates these)
 infrastructure/docker/ssh-keys/
 infrastructure/docker/ssh-sandbox/
+
+# Terraform local state (never commit)
+.terraform/
+*.tfstate
+*.tfstate.*
+.terraform.lock.hcl

@@ -5,7 +5,7 @@
 // This file is the apiCall floor for the PDP proxy. Hand-curated overrides
 // in <pack>/schemas.ts can tighten body shape further. See types.ts
 // `mergeActionSchemas` for how the two layers combine.
-// pack=stripe actions=26 mapped=26
+// pack=stripe actions=28 mapped=28
 
 import { z } from 'zod';
 import type { ActionSchemas } from '../types.js';
@@ -341,6 +341,35 @@ export const generated: Partial<Record<string, ActionSchemas>> = {
       path: safePath.refine(
         (p) => /^\/refunds$/.test(p),
         'apiCall.path does not match action template /refunds',
+      ),
+      query: z.record(z.string(), z.string()).optional(),
+      body: z.unknown().optional(),
+      headers: z.record(z.string(), z.string()).optional(),
+    }),
+  },
+  '/stripe/invoice/create': {
+    apiCallSchema: z.object({
+      method: z.literal('POST'),
+      path: safePath.refine(
+        (p) => /^\/invoices$/.test(p),
+        'apiCall.path does not match action template /invoices',
+      ),
+      query: z.record(z.string(), z.string()).optional(),
+      body: z
+        .object({
+          customer: z.string().min(1),
+        })
+        .passthrough()
+        .optional(),
+      headers: z.record(z.string(), z.string()).optional(),
+    }),
+  },
+  '/stripe/invoice/send': {
+    apiCallSchema: z.object({
+      method: z.literal('POST'),
+      path: safePath.refine(
+        (p) => /^\/invoices\/[^/]+\/send$/.test(p),
+        'apiCall.path does not match action template /invoices/{invoice_id}/send',
       ),
       query: z.record(z.string(), z.string()).optional(),
       body: z.unknown().optional(),

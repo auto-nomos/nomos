@@ -58,6 +58,7 @@ function connectorCredentials(
     notion: [config.OAUTH_NOTION_CLIENT_ID, config.OAUTH_NOTION_CLIENT_SECRET],
     linear: [config.OAUTH_LINEAR_CLIENT_ID, config.OAUTH_LINEAR_CLIENT_SECRET],
     stripe: [config.OAUTH_STRIPE_CLIENT_ID, config.OAUTH_STRIPE_CLIENT_SECRET],
+    discord: [config.OAUTH_DISCORD_CLIENT_ID, config.OAUTH_DISCORD_CLIENT_SECRET],
   };
   const [cid, sec] = map[id];
   if (!cid || !sec) return null;
