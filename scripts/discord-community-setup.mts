@@ -137,8 +137,31 @@ async function setup(): Promise<{ agentId: string; apiKey: string }> {
   return { agentId: ctx.agentId, apiKey: ctx.apiKey };
 }
 
+async function listExistingChannels(apiKey: string): Promise<void> {
+  const ucan = await mintStaticUcan({
+    controlPlane: CONTROL_PLANE,
+    apiKey,
+    commands: ['/discord/channel/list'],
+    ttlSeconds: 300,
+  });
+  const res = await pdpProxy({
+    pdp: PDP,
+    orgId: ORG_ID,
+    command: '/discord/channel/list',
+    ucan,
+    resource: { guild_id: GUILD_ID },
+    apiCall: { method: 'GET', path: `/guilds/${GUILD_ID}/channels` },
+  });
+  const list = (res.body as { upstream?: { body?: Array<{ id: string; name: string }> } })?.upstream
+    ?.body;
+  if (!Array.isArray(list)) return;
+  for (const c of list) channelIds[c.name] = c.id;
+  if (list.length > 0) console.log(`  found ${list.length} existing channels — will skip duplicates`);
+}
+
 async function createChannels(apiKey: string, _agentId: string): Promise<void> {
   console.log('\n--- Phase 1 — Channels ---');
+  await listExistingChannels(apiKey);
   const ucan = await mintStaticUcan({
     controlPlane: CONTROL_PLANE,
     apiKey,
@@ -148,6 +171,10 @@ async function createChannels(apiKey: string, _agentId: string): Promise<void> {
 
   // Create categories first (type 4).
   for (const catName of CATEGORIES) {
+    if (channelIds[catName]) {
+      results.pass(`category ${catName}`, `existing id=${channelIds[catName]}`);
+      continue;
+    }
     const res = await pdpProxy({
       pdp: PDP,
       orgId: ORG_ID,
@@ -160,7 +187,7 @@ async function createChannels(apiKey: string, _agentId: string): Promise<void> {
         body: { name: catName, type: 4 },
       },
     });
-    const upstream = (res.body as { decision?: { upstream?: { id?: string } } })?.decision?.upstream;
+    const upstream = (res.body as { upstream?: { status?: number; body?: { id?: string } } })?.upstream?.body;
     if (res.status === 200 && upstream?.id) {
       channelIds[catName] = upstream.id;
       results.pass(`category ${catName}`, `id=${upstream.id}`);
@@ -174,6 +201,10 @@ async function createChannels(apiKey: string, _agentId: string): Promise<void> {
     const parentId = channelIds[ch.parentName];
     if (!parentId) {
       results.fail(`channel ${ch.name}`, `parent category ${ch.parentName} not created`);
+      continue;
+    }
+    if (channelIds[ch.name]) {
+      results.pass(`channel #${ch.name}`, `existing id=${channelIds[ch.name]}`);
       continue;
     }
     const body: Record<string, unknown> = {
@@ -194,7 +225,7 @@ async function createChannels(apiKey: string, _agentId: string): Promise<void> {
         body,
       },
     });
-    const upstream = (res.body as { decision?: { upstream?: { id?: string } } })?.decision?.upstream;
+    const upstream = (res.body as { upstream?: { status?: number; body?: { id?: string } } })?.upstream?.body;
     if (res.status === 200 && upstream?.id) {
       channelIds[ch.name] = upstream.id;
       results.pass(`channel #${ch.name}`, `id=${upstream.id}`);
@@ -206,6 +237,26 @@ async function createChannels(apiKey: string, _agentId: string): Promise<void> {
 
 async function createRoles(apiKey: string, _agentId: string): Promise<void> {
   console.log('\n--- Phase 2 — Roles ---');
+  const listUcan = await mintStaticUcan({
+    controlPlane: CONTROL_PLANE,
+    apiKey,
+    commands: ['/discord/role/list'],
+    ttlSeconds: 300,
+  });
+  const existingRes = await pdpProxy({
+    pdp: PDP,
+    orgId: ORG_ID,
+    command: '/discord/role/list',
+    ucan: listUcan,
+    resource: { guild_id: GUILD_ID },
+    apiCall: { method: 'GET', path: `/guilds/${GUILD_ID}/roles` },
+  });
+  const existing = (existingRes.body as {
+    upstream?: { body?: Array<{ id: string; name: string }> };
+  })?.upstream?.body;
+  if (Array.isArray(existing)) {
+    for (const r of existing) roleIds[r.name] = r.id;
+  }
   const ucan = await mintStaticUcan({
     controlPlane: CONTROL_PLANE,
     apiKey,
@@ -214,6 +265,10 @@ async function createRoles(apiKey: string, _agentId: string): Promise<void> {
   });
 
   for (const role of ROLES) {
+    if (roleIds[role.name]) {
+      results.pass(`role ${role.name}`, `existing id=${roleIds[role.name]}`);
+      continue;
+    }
     const res = await pdpProxy({
       pdp: PDP,
       orgId: ORG_ID,
@@ -231,7 +286,7 @@ async function createRoles(apiKey: string, _agentId: string): Promise<void> {
         },
       },
     });
-    const upstream = (res.body as { decision?: { upstream?: { id?: string } } })?.decision?.upstream;
+    const upstream = (res.body as { upstream?: { status?: number; body?: { id?: string } } })?.upstream?.body;
     if (res.status === 200 && upstream?.id) {
       roleIds[role.name] = upstream.id;
       results.pass(`role ${role.name}`, `id=${upstream.id}`);
@@ -272,7 +327,7 @@ async function postMessage(
       body: { content },
     },
   });
-  const upstream = (res.body as { decision?: { upstream?: { id?: string } } })?.decision?.upstream;
+  const upstream = (res.body as { upstream?: { status?: number; body?: { id?: string } } })?.upstream?.body;
   if (res.status === 200 && upstream?.id) {
     results.pass(`post #${channelName}`, `msg=${upstream.id}`);
   } else {
@@ -305,7 +360,7 @@ async function createInvite(apiKey: string, _agentId: string): Promise<void> {
       body: { max_age: 0, max_uses: 0, unique: true },
     },
   });
-  const upstream = (res.body as { decision?: { upstream?: { code?: string } } })?.decision?.upstream;
+  const upstream = (res.body as { upstream?: { body?: { code?: string } } })?.upstream?.body;
   if (res.status === 200 && upstream?.code) {
     const inviteUrl = `https://discord.gg/${upstream.code}`;
     results.pass('invite', inviteUrl);
