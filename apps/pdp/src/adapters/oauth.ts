@@ -47,7 +47,7 @@ export const PROVIDER_API: Record<ProviderId, ProviderApiConfig> = {
     base: 'https://slack.com/api',
     jsonContentType: 'application/json; charset=utf-8',
   },
-  google: { base: 'https://www.googleapis.com' },
+  google: { base: 'https://www.googleapis.com/drive/v3' },
   notion: {
     base: 'https://api.notion.com/v1',
     staticHeaders: { 'notion-version': '2022-06-28' },
