@@ -15,7 +15,7 @@
  *   3. Hit /v1/oauth/callback/github with a hand-crafted signed state to
  *      complete the OAuth handshake without a real GitHub redirect.
  *   4. Mint a proxy-bound UCAN (meta.oauth_connection_id) via mintUcan.
- *   5. Use @credential-broker/sdk to call PDP /v1/proxy — assert allow +
+ *   5. Use @auto-nomos/sdk to call PDP /v1/proxy — assert allow +
  *      upstream 201 + bearer is the gho_* mock token (NOT the agent api key).
  *   6. Repeat against acme/payroll → assert deny + no upstream call.
  *   7. Repeat with a UCAN scoped to /issue/create against /pr/merge →
@@ -27,8 +27,8 @@
  * The live-tunnel demo against real GitHub (per plan task 5.7) is deferred
  * until the user provisions a dev OAuth app + cloudflared tunnel.
  */
-import { generateKeypair, generateSecretboxKeyHex } from '@credential-broker/crypto';
-import { createAuthGuard } from '@credential-broker/sdk';
+import { generateKeypair, generateSecretboxKeyHex } from '@auto-nomos/crypto';
+import { createAuthGuard } from '@auto-nomos/sdk';
 import { serve } from '@hono/node-server';
 import { hexToBytes } from '@noble/hashes/utils';
 import { eq } from 'drizzle-orm';

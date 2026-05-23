@@ -19,8 +19,8 @@
  *
  * For a deeper smoke test, see `scripts/e2e-sprint5.mts`.
  */
-import { generateKeypair, generateSecretboxKeyHex } from '@credential-broker/crypto';
-import { createAuthGuard } from '@credential-broker/sdk';
+import { generateKeypair, generateSecretboxKeyHex } from '@auto-nomos/crypto';
+import { createAuthGuard } from '@auto-nomos/sdk';
 import { serve } from '@hono/node-server';
 import { hexToBytes } from '@noble/hashes/utils';
 import { eq } from 'drizzle-orm';
@@ -286,7 +286,7 @@ async function main(): Promise<void> {
 
     console.info('\nDemo green. Open http://localhost:3000/app/audit to view audit rows.');
     console.info(
-      'Next: wire `@credential-broker/mcp-server` into Claude Desktop — see packages/mcp-server/README.md',
+      'Next: wire `@auto-nomos/mcp-server` into Claude Desktop — see packages/mcp-server/README.md',
     );
   } finally {
     if (customerId) {

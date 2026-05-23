@@ -13,7 +13,7 @@
  *
  * Run: `pnpm e2e:sprint3` (after `pnpm db:up`).
  */
-import { generateKeypair } from '@credential-broker/crypto';
+import { generateKeypair } from '@auto-nomos/crypto';
 import { serve } from '@hono/node-server';
 import { bytesToHex } from '@noble/hashes/utils';
 import { createTRPCClient, httpBatchLink } from '@trpc/client';

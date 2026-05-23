@@ -56,5 +56,5 @@ console.info('Audit root signing keypair written to .env.local');
 console.info(`  did:    ${auditKp.did}`);
 console.info(`  pubkey: ${auditPub}`);
 console.info('');
-console.info('Audit verifier (npx @credential-broker/audit-verify) needs');
+console.info('Audit verifier (npx @auto-nomos/audit-verify) needs');
 console.info('AUDIT_VERIFY_KEY set to the same hex value.');

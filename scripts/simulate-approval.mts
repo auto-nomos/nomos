@@ -1,5 +1,5 @@
 #!/usr/bin/env tsx
-import { issueUcan } from '@credential-broker/ucan';
+import { issueUcan } from '@auto-nomos/ucan';
 /**
  * `pnpm tsx scripts/simulate-approval.mts <approvalId>`
  *

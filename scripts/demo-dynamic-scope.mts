@@ -31,8 +31,8 @@
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import * as path from 'node:path';
-import { generateKeypair, generateSecretboxKeyHex, sha256Hex } from '@credential-broker/crypto';
-import { issueUcan, parseUcanJwt } from '@credential-broker/ucan';
+import { generateKeypair, generateSecretboxKeyHex, sha256Hex } from '@auto-nomos/crypto';
+import { issueUcan, parseUcanJwt } from '@auto-nomos/ucan';
 import { serve } from '@hono/node-server';
 import { hexToBytes } from '@noble/hashes/utils';
 import { eq } from 'drizzle-orm';
