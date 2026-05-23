@@ -20,8 +20,20 @@ const PACKAGES: { name: string; role: string; status: 'public' | 'soon' }[] = [
   { name: '@auto-nomos/cli', role: 'nomos CLI', status: 'public' },
   { name: '@auto-nomos/ucan-cli', role: 'nomos-ucan CLI', status: 'public' },
   { name: '@auto-nomos/shared-types', role: 'Zod schemas', status: 'public' },
+  { name: 'nomos-sdk (PyPI)', role: 'Python SDK for agents', status: 'public' },
   { name: '@auto-nomos/control-plane', role: 'Hono + tRPC server', status: 'soon' },
   { name: '@auto-nomos/dashboard', role: 'Next.js operator UI', status: 'soon' },
+];
+
+const INSTALL_LINES: { lang: string; cmd: string }[] = [
+  { lang: 'TypeScript SDK', cmd: 'npm i @auto-nomos/sdk' },
+  { lang: 'Python SDK', cmd: 'pip install nomos-sdk' },
+  { lang: 'CLI', cmd: 'npm i -g @auto-nomos/cli' },
+  { lang: 'MCP server', cmd: 'npm i -g @auto-nomos/mcp-server' },
+  {
+    lang: 'Self-host PDP (Helm)',
+    cmd: 'helm install pdp oci://ghcr.io/varendra007/charts/cb-pdp',
+  },
 ];
 
 export function OpenSource() {
@@ -117,6 +129,26 @@ export function OpenSource() {
               <span>license · Apache-2.0 on flip</span>
               <span className="text-aegis-paper">{PACKAGES.length} packages</span>
             </div>
+          </div>
+          <div className="mt-6 rounded-sm border border-aegis-line bg-aegis-ink">
+            <div className="border-b border-aegis-line px-6 py-4 font-mono text-[10px] uppercase tracking-[0.18em] text-aegis-faint">
+              install in 30 seconds
+            </div>
+            <ul className="divide-y divide-aegis-line">
+              {INSTALL_LINES.map((row) => (
+                <li
+                  key={row.lang}
+                  className="grid grid-cols-12 items-center gap-3 px-6 py-3 transition-colors hover:bg-aegis-surface/40"
+                >
+                  <div className="col-span-4 font-mono text-[10px] uppercase tracking-[0.18em] text-aegis-faint">
+                    {row.lang}
+                  </div>
+                  <code className="col-span-8 select-all break-all font-mono text-[12px] text-aegis-paper">
+                    {row.cmd}
+                  </code>
+                </li>
+              ))}
+            </ul>
           </div>
         </div>
       </div>

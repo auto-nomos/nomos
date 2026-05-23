@@ -16,6 +16,7 @@ import {
   LayoutGrid,
   LogOut,
   Plug,
+  Server,
   ShieldCheck,
   Users,
 } from 'lucide-react';
@@ -80,6 +81,7 @@ const NAV_GROUPS: { id: string; label: string; items: NavItem[] }[] = [
       { href: '/app/settings/members', label: 'Members', icon: Users, hint: 'team + roles' },
       { href: '/app/settings/organization', label: 'Organization', icon: Cog, hint: 'name + slug' },
       { href: '/app/settings/security', label: 'Passkeys', icon: KeyRound, hint: 'step-up' },
+      { href: '/app/settings/edge', label: 'Edge PDP', icon: Server, hint: 'self-host install' },
       { href: '/app/settings/notifications', label: 'Notifications', icon: Layers },
       { href: '/app/guide/what-is-nomos', label: 'User guide', icon: BookOpen, hint: 'docs' },
     ],

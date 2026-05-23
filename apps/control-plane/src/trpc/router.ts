@@ -7,6 +7,7 @@ import { billingRouter } from './routers/billing.js';
 import { chainApprovalsRouter } from './routers/chain-approvals.js';
 import { cloudConnectionsRouter } from './routers/cloud-connections.js';
 import { customersRouter } from './routers/customers.js';
+import { edgeRouter } from './routers/edge.js';
 import { envelopesRouter } from './routers/envelopes.js';
 import { grantsRouter } from './routers/grants.js';
 import { invitesRouter } from './routers/invites.js';
@@ -34,6 +35,7 @@ export const appRouter = router({
   stepup: stepupRouter,
   oauth: oauthRouter,
   cloudConnections: cloudConnectionsRouter,
+  edge: edgeRouter,
   envelopes: envelopesRouter,
   grants: grantsRouter,
   notificationPreferences: notificationPreferencesRouter,
