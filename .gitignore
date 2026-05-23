@@ -58,3 +58,9 @@ infrastructure/docker/ssh-sandbox/
 *.tfstate
 *.tfstate.*
 .terraform.lock.hcl
+
+# Python SDK build artefacts
+packages/sdk-python/.venv/
+packages/sdk-python/dist/
+packages/sdk-python/build/
+packages/sdk-python/src/*.egg-info/

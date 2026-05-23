@@ -16,94 +16,245 @@ export const metadata = {
 interface Integration {
   id: string;
   name: string;
-  category: 'OAuth' | 'Provider';
-  scopes: string;
-  templates: number;
+  category: 'SaaS' | 'Productivity' | 'Cloud IAM' | 'Messaging' | 'Data' | 'System' | 'AI';
+  auth: string;
   state: 'live' | 'beta' | 'soon';
   blurb: string;
 }
 
+const CATEGORY_ORDER: Integration['category'][] = [
+  'SaaS',
+  'Messaging',
+  'Productivity',
+  'Cloud IAM',
+  'Data',
+  'System',
+  'AI',
+];
+
 const INTEGRATIONS: Integration[] = [
+  // SaaS / dev
   {
     id: 'github',
     name: 'GitHub',
-    category: 'OAuth',
-    scopes: 'repo, read:org, write:issues',
-    templates: 5,
+    category: 'SaaS',
+    auth: 'OAuth · PAT',
     state: 'live',
-    blurb: 'Issues, PRs, repo metadata, branch protection.',
-  },
-  {
-    id: 'slack',
-    name: 'Slack',
-    category: 'OAuth',
-    scopes: 'chat:write, channels:read',
-    templates: 5,
-    state: 'live',
-    blurb: 'Channel messages, threads, user lookups.',
-  },
-  {
-    id: 'google',
-    name: 'Google',
-    category: 'OAuth',
-    scopes: 'drive.file, calendar',
-    templates: 10,
-    state: 'live',
-    blurb: 'Drive (files, sheets) and Calendar (events).',
-  },
-  {
-    id: 'notion',
-    name: 'Notion',
-    category: 'OAuth',
-    scopes: 'pages, databases',
-    templates: 5,
-    state: 'live',
-    blurb: 'Read/write pages and database rows.',
+    blurb: 'Issues, PRs, branches, repo metadata, branch protection.',
   },
   {
     id: 'linear',
     name: 'Linear',
-    category: 'OAuth',
-    scopes: 'read, issues:create',
-    templates: 5,
+    category: 'SaaS',
+    auth: 'OAuth',
     state: 'live',
-    blurb: 'Issues, projects, comments via GraphQL.',
-  },
-  {
-    id: 'stripe',
-    name: 'Stripe',
-    category: 'OAuth',
-    scopes: 'read_only (Connect)',
-    templates: 5,
-    state: 'live',
-    blurb: 'Customers, charges, invoices. Refunds gated by step-up.',
-  },
-  {
-    id: 'filesystem',
-    name: 'Filesystem',
-    category: 'Provider',
-    scopes: 'path-scoped read/write',
-    templates: 5,
-    state: 'live',
-    blurb: 'Local + sandboxed FS access for dynamic agents.',
-  },
-  {
-    id: 'salesforce',
-    name: 'Salesforce',
-    category: 'OAuth',
-    scopes: 'api, refresh_token',
-    templates: 0,
-    state: 'soon',
-    blurb: 'Accounts, opportunities, custom objects.',
+    blurb: 'Issues, projects, cycles, comments via GraphQL.',
   },
   {
     id: 'jira',
     name: 'Jira',
-    category: 'OAuth',
-    scopes: 'read:jira-work',
-    templates: 0,
-    state: 'soon',
-    blurb: 'Issues, sprints, projects.',
+    category: 'SaaS',
+    auth: 'OAuth',
+    state: 'live',
+    blurb: 'Issues, sprints, transitions, JQL search.',
+  },
+  {
+    id: 'stripe',
+    name: 'Stripe',
+    category: 'SaaS',
+    auth: 'OAuth · API key',
+    state: 'live',
+    blurb: 'Customers, charges, invoices. Refunds gated by step-up.',
+  },
+  {
+    id: 'salesforce',
+    name: 'Salesforce',
+    category: 'SaaS',
+    auth: 'OAuth',
+    state: 'beta',
+    blurb: 'Accounts, opportunities, custom objects.',
+  },
+  // Messaging
+  {
+    id: 'slack',
+    name: 'Slack',
+    category: 'Messaging',
+    auth: 'OAuth',
+    state: 'live',
+    blurb: 'Channel messages, threads, user lookups, file uploads.',
+  },
+  {
+    id: 'discord',
+    name: 'Discord',
+    category: 'Messaging',
+    auth: 'Bot token',
+    state: 'live',
+    blurb: 'Guild messages, channels, role-scoped posting.',
+  },
+  {
+    id: 'telegram',
+    name: 'Telegram',
+    category: 'Messaging',
+    auth: 'Bot token',
+    state: 'live',
+    blurb: 'Bot send/receive, group + DM, inline keyboards.',
+  },
+  {
+    id: 'twilio',
+    name: 'Twilio',
+    category: 'Messaging',
+    auth: 'API key',
+    state: 'live',
+    blurb: 'SMS, voice, WhatsApp. Cost-cap enforced per envelope.',
+  },
+  {
+    id: 'imessage',
+    name: 'iMessage',
+    category: 'Messaging',
+    auth: 'macOS host',
+    state: 'beta',
+    blurb: 'Local-host bridge for macOS Messages.app.',
+  },
+  // Productivity
+  {
+    id: 'notion',
+    name: 'Notion',
+    category: 'Productivity',
+    auth: 'OAuth',
+    state: 'live',
+    blurb: 'Read/write pages, blocks, database rows.',
+  },
+  {
+    id: 'google_drive',
+    name: 'Google Drive',
+    category: 'Productivity',
+    auth: 'OAuth',
+    state: 'live',
+    blurb: 'Files, folders, sharing, revisions.',
+  },
+  {
+    id: 'google_docs',
+    name: 'Google Docs',
+    category: 'Productivity',
+    auth: 'OAuth',
+    state: 'live',
+    blurb: 'Create, read, edit documents and headings.',
+  },
+  {
+    id: 'google_sheets',
+    name: 'Google Sheets',
+    category: 'Productivity',
+    auth: 'OAuth',
+    state: 'live',
+    blurb: 'Read/write ranges, append, format, batch update.',
+  },
+  {
+    id: 'google_gmail',
+    name: 'Gmail',
+    category: 'Productivity',
+    auth: 'OAuth',
+    state: 'live',
+    blurb: 'Read, send, label, search. Send gated by step-up.',
+  },
+  {
+    id: 'google_calendar',
+    name: 'Google Calendar',
+    category: 'Productivity',
+    auth: 'OAuth',
+    state: 'live',
+    blurb: 'Events, attendees, free/busy, multi-calendar.',
+  },
+  {
+    id: 'google_contacts',
+    name: 'Google Contacts',
+    category: 'Productivity',
+    auth: 'OAuth',
+    state: 'live',
+    blurb: 'People, groups, contact-level reads.',
+  },
+  {
+    id: 'google_tasks',
+    name: 'Google Tasks',
+    category: 'Productivity',
+    auth: 'OAuth',
+    state: 'live',
+    blurb: 'Lists, tasks, completion state.',
+  },
+  {
+    id: 'dropbox',
+    name: 'Dropbox',
+    category: 'Productivity',
+    auth: 'OAuth',
+    state: 'live',
+    blurb: 'Files, folders, shared links.',
+  },
+  {
+    id: 'granola',
+    name: 'Granola',
+    category: 'Productivity',
+    auth: 'API key',
+    state: 'beta',
+    blurb: 'Meeting transcripts + notes.',
+  },
+  // Cloud IAM
+  {
+    id: 'aws',
+    name: 'AWS',
+    category: 'Cloud IAM',
+    auth: 'OIDC federation',
+    state: 'beta',
+    blurb: 'STS AssumeRoleWithWebIdentity. KMS-signed Nomos JWT.',
+  },
+  {
+    id: 'azure',
+    name: 'Azure',
+    category: 'Cloud IAM',
+    auth: 'OIDC federation',
+    state: 'beta',
+    blurb: 'Workload identity federation. Service principal scoped.',
+  },
+  {
+    id: 'gcp',
+    name: 'Google Cloud',
+    category: 'Cloud IAM',
+    auth: 'OIDC federation',
+    state: 'beta',
+    blurb: 'Workload identity pool. Per-call service account impersonation.',
+  },
+  // Data
+  {
+    id: 'postgres',
+    name: 'Postgres',
+    category: 'Data',
+    auth: 'Connection string',
+    state: 'live',
+    blurb: 'Query, transaction, schema introspection. Row-level cap.',
+  },
+  // System
+  {
+    id: 'filesystem',
+    name: 'Filesystem',
+    category: 'System',
+    auth: 'Host path',
+    state: 'live',
+    blurb: 'Path-scoped read/write. Local + sandboxed for dynamic agents.',
+  },
+  {
+    id: 'ssh',
+    name: 'SSH / SFTP',
+    category: 'System',
+    auth: 'Key · password',
+    state: 'live',
+    blurb: 'Remote exec, file transfer. Shell-injection guards.',
+  },
+  // AI
+  {
+    id: 'perplexity',
+    name: 'Perplexity',
+    category: 'AI',
+    auth: 'API key',
+    state: 'beta',
+    blurb: 'Sonar search + chat completions.',
   },
 ];
 
@@ -134,25 +285,29 @@ function Hero() {
             every <em>action</em>.
           </h1>
           <p className="mt-7 max-w-[640px] text-base leading-relaxed text-aegis-mute md:text-lg">
-            Nomos ships pre-flighted policy templates for each supported SaaS so you can grant
-            least-scope access without writing a single line of Cedar. Need a connector that
-            isn&rsquo;t here yet? The adapter contract is six functions.
+            From GitHub to AWS to your filesystem — Nomos ships pre-flighted policy templates for
+            every supported provider so you can grant least-scope access without writing a single
+            line of Cedar. Need a connector that isn&rsquo;t here yet? The adapter contract is six
+            functions.
           </p>
         </div>
         <aside className="hidden lg:col-span-4 lg:block">
           <div className="corners relative rounded-sm border border-aegis-line bg-aegis-surface/40 p-7">
             <div className="eyebrow">stats · live</div>
             <dl className="mt-5 space-y-4 font-mono">
+              <Stat label="total" value={INTEGRATIONS.length.toString()} />
               <Stat
-                label="connectors"
+                label="live"
                 value={INTEGRATIONS.filter((i) => i.state === 'live').length.toString()}
               />
               <Stat
-                label="templates"
-                value={INTEGRATIONS.reduce((a, b) => a + b.templates, 0).toString()}
+                label="beta"
+                value={INTEGRATIONS.filter((i) => i.state === 'beta').length.toString()}
               />
-              <Stat label="categories" value="2" />
-              <Stat label="adapter loc" value="< 200" />
+              <Stat
+                label="categories"
+                value={new Set(INTEGRATIONS.map((i) => i.category)).size.toString()}
+              />
             </dl>
           </div>
         </aside>
@@ -183,43 +338,54 @@ function Matrix() {
           </h2>
         </div>
       </div>
-      <div className="overflow-hidden rounded-sm border border-aegis-line">
-        <div className="grid grid-cols-12 gap-3 border-b border-aegis-line bg-aegis-ink/60 px-5 py-3 font-mono text-[10px] uppercase tracking-[0.18em] text-aegis-faint">
-          <div className="col-span-3">provider</div>
-          <div className="col-span-2">category</div>
-          <div className="col-span-3">scopes</div>
-          <div className="col-span-2">templates</div>
-          <div className="col-span-2 text-right">status</div>
-        </div>
-        <ul className="divide-y divide-aegis-line">
-          {INTEGRATIONS.map((it) => (
-            <li
-              key={it.id}
-              className="grid grid-cols-12 items-center gap-3 px-5 py-5 transition-colors hover:bg-aegis-surface/40"
-            >
-              <div className="col-span-3 flex items-center gap-3">
-                <span className="grid h-9 w-9 place-items-center rounded-sm border border-aegis-line bg-aegis-surface font-mono text-[11px] text-aegis-paper">
-                  {it.name.slice(0, 2).toUpperCase()}
-                </span>
-                <div>
-                  <div className="font-display text-[18px] text-aegis-paper">{it.name}</div>
-                  <div className="text-xs text-aegis-mute">{it.blurb}</div>
-                </div>
+      {CATEGORY_ORDER.map((cat) => {
+        const rows = INTEGRATIONS.filter((i) => i.category === cat);
+        if (rows.length === 0) return null;
+        return (
+          <div key={cat} className="mb-10">
+            <div className="mb-3 flex items-baseline justify-between">
+              <h3 className="font-mono text-[11px] uppercase tracking-[0.18em] text-aegis-faint">
+                {cat} · {rows.length}
+              </h3>
+            </div>
+            <div className="overflow-hidden rounded-sm border border-aegis-line">
+              <div className="grid grid-cols-12 gap-3 border-b border-aegis-line bg-aegis-ink/60 px-5 py-3 font-mono text-[10px] uppercase tracking-[0.18em] text-aegis-faint">
+                <div className="col-span-4">provider</div>
+                <div className="col-span-3">auth</div>
+                <div className="col-span-3">notes</div>
+                <div className="col-span-2 text-right">status</div>
               </div>
-              <div className="col-span-2 font-mono text-[11px] uppercase tracking-[0.16em] text-aegis-mute">
-                {it.category}
-              </div>
-              <div className="col-span-3 font-mono text-[11px] text-aegis-mute">{it.scopes}</div>
-              <div className="col-span-2 font-mono text-[12px] text-aegis-paper">
-                {it.templates > 0 ? `${it.templates} ready` : '—'}
-              </div>
-              <div className="col-span-2 text-right">
-                <StateBadge state={it.state} />
-              </div>
-            </li>
-          ))}
-        </ul>
-      </div>
+              <ul className="divide-y divide-aegis-line">
+                {rows.map((it) => (
+                  <li
+                    key={it.id}
+                    className="grid grid-cols-12 items-center gap-3 px-5 py-5 transition-colors hover:bg-aegis-surface/40"
+                  >
+                    <div className="col-span-4 flex items-center gap-3">
+                      <span className="grid h-9 w-9 place-items-center rounded-sm border border-aegis-line bg-aegis-surface font-mono text-[11px] text-aegis-paper">
+                        {it.name.slice(0, 2).toUpperCase()}
+                      </span>
+                      <div>
+                        <div className="font-display text-[18px] text-aegis-paper">{it.name}</div>
+                        <div className="font-mono text-[10px] uppercase tracking-[0.14em] text-aegis-faint">
+                          {it.id}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="col-span-3 font-mono text-[11px] text-aegis-mute">
+                      {it.auth}
+                    </div>
+                    <div className="col-span-3 text-xs text-aegis-mute">{it.blurb}</div>
+                    <div className="col-span-2 text-right">
+                      <StateBadge state={it.state} />
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        );
+      })}
     </section>
   );
 }

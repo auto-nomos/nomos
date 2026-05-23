@@ -39,10 +39,17 @@ class AuthorizeDecision:
 
 
 def _decision_from_json(body: dict) -> AuthorizeDecision:
+    reason = body.get("reason")
+    receipt_id = body.get("receiptId") or ""
+    # Mirror TS SDK pdp-synth backfill: PDP must always emit a receiptId.
+    # When it doesn't (older deploy / proxy synth-deny paths), synthesise
+    # one from the reason so downstream audit always has a non-empty id.
+    if not receipt_id:
+        receipt_id = f"pdp-synth-{reason or 'unknown'}"
     return AuthorizeDecision(
         allow=bool(body.get("allow")),
-        receipt_id=str(body.get("receiptId", "")),
-        reason=body.get("reason"),
+        receipt_id=str(receipt_id),
+        reason=reason,
         obligations=body.get("obligations"),
         requires_step_up=body.get("requiresStepUp"),
         step_up_url=body.get("stepUpUrl"),
@@ -141,6 +148,78 @@ class AuthGuard:
             allow=self.failure_mode == "open",
             reason="pdp_unreachable",
             receipt_id="sdk-fail-closed",
+        )
+
+    @dataclass
+    class ProxyResult:
+        allow: bool
+        decision: AuthorizeDecision
+        upstream_status: Optional[int] = None
+        upstream_body: Optional[Any] = None
+        error_code: Optional[str] = None
+
+    def proxy(
+        self,
+        *,
+        ucan: str,
+        command: str,
+        resource: dict,
+        api_call: dict,
+        context: Optional[dict] = None,
+        cosigner_jwt: Optional[str] = None,
+        traceparent: Optional[str] = None,
+    ) -> "AuthGuard.ProxyResult":
+        """POST /v1/proxy/:command — borrows the OAuth access token from the
+        control plane and proxies the SaaS API call so the agent never sees
+        raw tokens. `api_call` is `{method, path[, body, query, headers, intent]}`.
+        """
+        request: dict[str, Any] = {
+            "ucan": ucan,
+            "command": command,
+            "resource": resource,
+            "context": context or {},
+        }
+        if cosigner_jwt:
+            request["cosignerJwt"] = cosigner_jwt
+        request = apply_parent_chain(request, self._parent_chain_ctx)
+        body = {"ucan": ucan, "request": request, "apiCall": api_call}
+        headers = dict(self._headers)
+        if traceparent:
+            headers["traceparent"] = traceparent
+        proxy_path = command if command.startswith("/") else f"/{command}"
+        try:
+            res = self._client.post(
+                f"{self.pdp_url}/v1/proxy{proxy_path}", json=body, headers=headers
+            )
+        except httpx.HTTPError:
+            fail = self._fail()
+            return AuthGuard.ProxyResult(
+                allow=fail.allow, decision=fail, error_code="pdp_unreachable"
+            )
+        try:
+            payload = res.json()
+        except json.JSONDecodeError:
+            return AuthGuard.ProxyResult(
+                allow=self.failure_mode == "open",
+                decision=AuthorizeDecision(
+                    allow=self.failure_mode == "open",
+                    reason="pdp_invalid_response",
+                    receipt_id="sdk-invalid-response",
+                ),
+                upstream_status=res.status_code,
+                error_code="pdp_invalid_response",
+            )
+        decision_obj = payload.get("decision")
+        if isinstance(decision_obj, dict):
+            decision = _decision_from_json(decision_obj)
+        else:
+            decision = _decision_from_json(payload)
+        return AuthGuard.ProxyResult(
+            allow=bool(payload.get("allow", decision.allow)),
+            decision=decision,
+            upstream_status=res.status_code,
+            upstream_body=payload.get("body"),
+            error_code=payload.get("error_code"),
         )
 
     @staticmethod

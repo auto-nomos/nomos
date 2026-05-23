@@ -23,9 +23,12 @@ from .chain import (
 )
 from .guard import AuthGuard, AuthorizeDecision
 
+ProxyResult = AuthGuard.ProxyResult
+
 __all__ = [
     "AuthGuard",
     "AuthorizeDecision",
+    "ProxyResult",
     "DEFAULT_MAX_CHAIN_DEPTH",
     "ENV_PARENT_CHAIN",
     "ENV_PARENT_CHAIN_FILE",
@@ -36,3 +39,5 @@ __all__ = [
     "fork_child",
     "read_parent_chain_from_env",
 ]
+
+__version__ = "0.1.0"

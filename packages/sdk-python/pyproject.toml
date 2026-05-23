@@ -1,17 +1,48 @@
 [project]
-name = "auto-nomos-sdk"
-version = "0.0.1"
-description = "Python SDK for Nomos — multi-agent orchestration security"
+name = "nomos-sdk"
+version = "0.1.0"
+description = "Nomos Python SDK — capability layer for AI agents (scoped, time-bound, revocable, delegable permissions for MCP / LangGraph / CrewAI / AutoGen)"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
-authors = [{ name = "auto-nomos" }]
+authors = [
+  { name = "Nomos", email = "hello@auto-nomos.com" },
+]
+keywords = [
+  "ai", "agents", "mcp", "ucan", "cedar", "authorization",
+  "policy", "capability", "langgraph", "crewai", "autogen",
+]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Security",
+  "Topic :: Software Development :: Libraries :: Python Modules",
+  "Typing :: Typed",
+]
 dependencies = [
   "httpx>=0.27.0",
 ]
 
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0",
+  "pytest-asyncio>=0.23",
+]
+
 [project.urls]
-Homepage = "https://github.com/auto-nomos/nomos"
+Homepage = "https://auto-nomos.com"
+Documentation = "https://github.com/varendra007/nomos/blob/main/docs/SELF_HOSTING.md"
+Repository = "https://github.com/varendra007/nomos"
+Issues = "https://github.com/varendra007/nomos/issues"
+Changelog = "https://github.com/varendra007/nomos/blob/main/packages/sdk-python/CHANGELOG.md"
 
 [build-system]
 requires = ["setuptools>=68", "wheel"]
@@ -19,3 +50,6 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+nomos = ["py.typed"]
