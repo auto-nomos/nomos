@@ -1,389 +1,82 @@
 'use client';
 
-import {
-  ArrowUpRight,
-  Boxes,
-  CheckCircle2,
-  CircleSlash,
-  Clock,
-  FileLock2,
-  KeyRound,
-  Plug,
-  ShieldAlert,
-  ShieldCheck,
-  Sparkles,
-} from 'lucide-react';
+import { ArrowUpRight, Sparkles } from 'lucide-react';
 import Link from 'next/link';
-import { fmtCount as fmt, MetricTile } from '../../components/metric-tile';
-import { TallyBadge } from '../../components/tally-badge';
+import { Suspense } from 'react';
+import { AlertStrip } from '../../components/dashboard/alert-strip';
+import { DecisionMixChart } from '../../components/dashboard/decision-mix-chart';
+import { DecisionsTrendChart } from '../../components/dashboard/decisions-trend-chart';
+import { IntegrationHealth } from '../../components/dashboard/integration-health';
+import { KpiRow } from '../../components/dashboard/kpi-row';
+import { QuickActions } from '../../components/dashboard/quick-actions';
+import { RecentDecisionsTable } from '../../components/dashboard/recent-decisions-table';
+import { TopAgentsChart } from '../../components/dashboard/top-agents-chart';
+import { useWindowDays, WindowSelect } from '../../components/dashboard/window-select';
 import { trpc } from '../../lib/trpc';
-import { cn } from '../../lib/utils';
 
 export default function AppHomePage() {
-  const customer = trpc.customers.get.useQuery();
-  const agents = trpc.agents.list.useQuery();
-  const policies = trpc.policies.list.useQuery();
-  const audit = trpc.audit.list.useQuery({ limit: 8 });
-  const connections = trpc.oauth.list.useQuery();
-  const pending = trpc.stepup.listPending.useQuery(undefined, { refetchInterval: 5_000 });
+  return (
+    <Suspense fallback={null}>
+      <DashboardInner />
+    </Suspense>
+  );
+}
 
-  const allows = (audit.data ?? []).filter((r) => r.decision === 'allow').length;
-  const denies = (audit.data ?? []).filter((r) => r.decision === 'deny').length;
-  const stepups = (audit.data ?? []).filter((r) => r.decision === 'stepup').length;
-  const total = audit.data?.length ?? 0;
-  const allowRate = total > 0 ? Math.round((allows / total) * 100) : null;
+function DashboardInner() {
+  const customer = trpc.customers.get.useQuery();
+  const windowDays = useWindowDays();
 
   return (
-    <div className="mx-auto max-w-[1180px] space-y-12">
+    <div className="mx-auto max-w-[1180px] space-y-8">
       <Hero workspaceName={customer.data?.name ?? 'Workspace'} />
 
-      <section
-        data-stagger
-        className="grid grid-cols-12 gap-px overflow-hidden rounded-sm border border-aegis-line bg-aegis-line"
-      >
-        <MetricTile
-          icon={Boxes}
-          label="Apps"
-          value={fmt(agents.data?.length)}
-          unit="registered"
-          href="/app/agents"
-          accent="paper"
-        />
-        <MetricTile
-          icon={Plug}
-          label="Connections"
-          value={fmt(connections.data?.length)}
-          unit="OAuth bound"
-          href="/app/connections"
-          accent="iris"
-        />
-        <MetricTile
-          icon={FileLock2}
-          label="Policies"
-          value={fmt(policies.data?.length)}
-          unit="cedar rules"
-          href="/app/policies"
-          accent="paper"
-        />
-        <MetricTile
-          icon={ShieldCheck}
-          label="Allow rate"
-          value={allowRate === null ? '—' : `${allowRate}%`}
-          unit={`${allows}/${total} last`}
-          href="/app/audit"
-          accent="signal"
-        />
-      </section>
+      <QuickActions />
 
-      {(pending.data?.length ?? 0) > 0 ? <PendingApprovals rows={pending.data ?? []} /> : null}
+      <AlertStrip windowDays={windowDays} />
+
+      <KpiRow windowDays={windowDays} />
 
       <section className="grid grid-cols-12 gap-6">
-        <RecentDecisions
-          rows={audit.data ?? []}
-          loading={audit.isPending}
-          allows={allows}
-          denies={denies}
-          stepups={stepups}
-        />
-        <QuickStart />
+        <DecisionsTrendChart windowDays={windowDays} />
+        <DecisionMixChart windowDays={windowDays} />
       </section>
 
-      <Glossary />
+      <section className="grid grid-cols-12 gap-6">
+        <TopAgentsChart windowDays={windowDays} />
+        <IntegrationHealth />
+      </section>
+
+      <section className="grid grid-cols-12 gap-6">
+        <RecentDecisionsTable />
+      </section>
     </div>
   );
 }
 
-/* ─── Hero ────────────────────────────────────────────────────────────── */
-
 function Hero({ workspaceName }: { workspaceName: string }) {
   return (
-    <header className="relative">
-      <div className="eyebrow mb-5">workspace · {workspaceName.toLowerCase()}</div>
-      <h1 className="display max-w-[820px] text-[64px] text-aegis-paper md:text-[80px]">
-        Authorize what your <em>agents</em> do — without giving them the keys.
-      </h1>
-      <p className="mt-6 max-w-[640px] text-base text-aegis-mute">
-        Nomos sits between your AI agents and every SaaS API you connect. Agents declare intent, you
-        set the policy, the gateway proxies the call. Credentials never leave the broker.
-      </p>
-      <div className="mt-8 flex flex-wrap items-center gap-3">
+    <header className="relative flex flex-wrap items-end justify-between gap-6">
+      <div>
+        <div className="eyebrow mb-3">workspace · {workspaceName.toLowerCase()}</div>
+        <h1 className="display max-w-[820px] text-[44px] text-aegis-paper md:text-[56px]">
+          Dashboard
+        </h1>
+        <p className="mt-3 max-w-[560px] text-sm text-aegis-mute">
+          Decisions, apps, and integration health at a glance. Use the actions below to spin up new
+          surface area without leaving home.
+        </p>
+      </div>
+      <div className="flex items-center gap-3">
+        <WindowSelect />
         <Link
           href="/app/guide"
-          className="group inline-flex items-center gap-2 rounded-sm bg-aegis-signal px-4 py-2.5 font-mono text-xs uppercase tracking-[0.16em] text-aegis-ink transition-transform hover:-translate-y-px"
+          className="group inline-flex items-center gap-2 rounded-sm border border-aegis-line bg-aegis-surface px-3.5 py-2 font-mono text-[11px] uppercase tracking-[0.16em] text-aegis-paper transition-colors hover:border-aegis-signal/40"
         >
-          <Sparkles className="h-3.5 w-3.5" />
-          Open user guide
-          <ArrowUpRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+          <Sparkles className="h-3.5 w-3.5 text-aegis-signal" />
+          Guide
+          <ArrowUpRight className="h-3 w-3 transition-transform group-hover:translate-x-0.5" />
         </Link>
-        <Link
-          href="/onboarding"
-          className="inline-flex items-center gap-2 rounded-sm border border-aegis-line bg-aegis-surface-2 px-4 py-2.5 font-mono text-xs uppercase tracking-[0.16em] text-aegis-paper transition-colors hover:border-aegis-line-strong"
-        >
-          5-min onboarding
-          <ArrowUpRight className="h-3.5 w-3.5" />
-        </Link>
-        <span className="ml-1 font-mono text-[11px] uppercase tracking-wider text-aegis-faint">
-          v0.1.x · prerelease
-        </span>
       </div>
     </header>
-  );
-}
-
-/* ─── Recent decisions strip ──────────────────────────────────────────── */
-
-interface AuditRow {
-  eventId: string;
-  decision: string;
-  command?: string | null;
-  ts?: Date | string;
-  payload?: unknown;
-}
-
-function RecentDecisions({
-  rows,
-  loading,
-  allows,
-  denies,
-  stepups,
-}: {
-  rows: AuditRow[];
-  loading: boolean;
-  allows: number;
-  denies: number;
-  stepups: number;
-}) {
-  return (
-    <article className="col-span-12 overflow-hidden rounded-sm border border-aegis-line bg-aegis-surface lg:col-span-8">
-      <div className="flex items-center justify-between border-b border-aegis-line px-6 py-4">
-        <div>
-          <div className="eyebrow">live · last 8 decisions</div>
-          <h2 className="mt-1 font-display text-2xl text-aegis-paper">Audit chain</h2>
-        </div>
-        <div className="tickrow font-mono text-[11px] uppercase tracking-wider">
-          <TallyBadge icon={CheckCircle2} label="allow" value={allows} tone="text-aegis-signal" />
-          <TallyBadge icon={ShieldAlert} label="step-up" value={stepups} tone="text-aegis-amber" />
-          <TallyBadge icon={CircleSlash} label="deny" value={denies} tone="text-aegis-coral" />
-        </div>
-      </div>
-
-      <ul className="divide-y divide-aegis-line">
-        {loading ? (
-          <li className="px-6 py-10 text-center font-mono text-xs uppercase tracking-wider text-aegis-mute">
-            <span className="pulse mr-2" />
-            streaming…
-          </li>
-        ) : rows.length === 0 ? (
-          <li className="px-6 py-10 text-center text-sm text-aegis-mute">
-            No decisions yet. Once your first App makes a call, it lands here.
-          </li>
-        ) : (
-          rows.map((r) => <DecisionRow key={r.eventId} row={r} />)
-        )}
-      </ul>
-
-      <div className="border-t border-aegis-line px-6 py-3">
-        <Link
-          href="/app/audit"
-          className="inline-flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-[0.18em] text-aegis-mute transition-colors hover:text-aegis-paper"
-        >
-          full chain · proof download
-          <ArrowUpRight className="h-3 w-3" />
-        </Link>
-      </div>
-    </article>
-  );
-}
-
-function DecisionRow({ row }: { row: AuditRow }) {
-  const tone =
-    row.decision === 'allow'
-      ? 'text-aegis-signal'
-      : row.decision === 'deny'
-        ? 'text-aegis-coral'
-        : 'text-aegis-amber';
-  const reason = readReason(row.payload);
-  return (
-    <li className="grid grid-cols-[100px_minmax(0,1fr)_140px] items-center gap-4 px-6 py-3.5">
-      <span className={cn('font-mono text-xs uppercase tracking-[0.16em]', tone)}>
-        {row.decision}
-      </span>
-      <div className="min-w-0">
-        <div className="truncate font-mono text-sm text-aegis-paper">{row.command ?? '—'}</div>
-        {reason ? <div className="mt-0.5 truncate text-xs text-aegis-mute">{reason}</div> : null}
-      </div>
-      <span className="text-right font-mono text-[11px] text-aegis-faint">
-        {row.ts ? new Date(row.ts).toLocaleTimeString() : '—'}
-      </span>
-    </li>
-  );
-}
-
-function readReason(payload: unknown): string | null {
-  if (!payload || typeof payload !== 'object') return null;
-  const p = payload as Record<string, unknown>;
-  const decision = p.decision as Record<string, unknown> | undefined;
-  if (decision && typeof decision === 'object' && typeof decision.reason === 'string') {
-    return decision.reason;
-  }
-  if (typeof p.reason === 'string') return p.reason;
-  return null;
-}
-
-/* ─── Quick start (right column) ──────────────────────────────────────── */
-
-const QUICK_STEPS = [
-  {
-    n: '01',
-    t: 'Connect a SaaS',
-    body: 'Bind GitHub, Slack, Linear, Stripe — credentials stay encrypted in the broker.',
-  },
-  {
-    n: '02',
-    t: 'Register an App',
-    body: 'Issue an API key for your agent. The key never sees a token; it asks Nomos to mint UCANs.',
-  },
-  {
-    n: '03',
-    t: 'Write a policy',
-    body: 'Pick a starter template or draft Cedar in the visual builder. The PDP enforces it on every call.',
-  },
-  {
-    n: '04',
-    t: 'Run the agent',
-    body: 'Watch decisions land in the audit chain. Approve step-ups via passkey when something risky shows up.',
-  },
-];
-
-function QuickStart() {
-  return (
-    <article className="col-span-12 overflow-hidden rounded-sm border border-aegis-line bg-aegis-surface lg:col-span-4">
-      <div className="border-b border-aegis-line px-6 py-4">
-        <div className="eyebrow">orientation</div>
-        <h2 className="mt-1 font-display text-2xl text-aegis-paper">5-minute path</h2>
-      </div>
-      <ol className="space-y-5 px-6 py-5">
-        {QUICK_STEPS.map((step) => (
-          <li key={step.n} className="grid grid-cols-[40px_minmax(0,1fr)] gap-3">
-            <div className="font-display text-2xl leading-none text-aegis-signal">{step.n}</div>
-            <div>
-              <div className="text-sm font-medium text-aegis-paper">{step.t}</div>
-              <div className="mt-1 text-xs leading-relaxed text-aegis-mute">{step.body}</div>
-            </div>
-          </li>
-        ))}
-      </ol>
-      <div className="border-t border-aegis-line px-6 py-3">
-        <Link
-          href="/app/guide"
-          className="inline-flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-[0.18em] text-aegis-mute transition-colors hover:text-aegis-paper"
-        >
-          read full guide
-          <ArrowUpRight className="h-3 w-3" />
-        </Link>
-      </div>
-    </article>
-  );
-}
-
-/* ─── Pending approvals ───────────────────────────────────────────────── */
-
-interface PendingRow {
-  id: string;
-  agentId: string;
-  agentName: string | null;
-  command: string | null;
-  resource: unknown;
-  expiresAt: Date | string;
-  requestedAt: Date | string | null;
-}
-
-function PendingApprovals({ rows }: { rows: PendingRow[] }) {
-  return (
-    <section className="overflow-hidden rounded-sm border border-aegis-amber/50 bg-aegis-amber/5">
-      <div className="flex items-center gap-3 border-b border-aegis-amber/30 px-6 py-4">
-        <Clock className="h-4 w-4 text-aegis-amber" />
-        <div>
-          <div className="font-mono text-[11px] uppercase tracking-[0.18em] text-aegis-amber">
-            action required
-          </div>
-          <h2 className="mt-0.5 font-display text-xl text-aegis-paper">
-            {rows.length} pending step-up{rows.length !== 1 ? 's' : ''}
-          </h2>
-        </div>
-      </div>
-      <ul className="divide-y divide-aegis-amber/20">
-        {rows.map((r) => {
-          const secsLeft = Math.max(
-            0,
-            Math.round((new Date(r.expiresAt).getTime() - Date.now()) / 1000),
-          );
-          return (
-            <li
-              key={r.id}
-              className="grid grid-cols-[minmax(0,1fr)_120px_140px] items-center gap-4 px-6 py-4"
-            >
-              <div className="min-w-0">
-                <div className="truncate font-mono text-sm text-aegis-paper">
-                  {r.command ?? '—'}
-                </div>
-                <div className="mt-0.5 truncate text-xs text-aegis-mute">
-                  {r.agentName ?? r.agentId.slice(0, 8)}
-                </div>
-              </div>
-              <span className="font-mono text-xs text-aegis-amber tabular-nums">
-                {secsLeft}s left
-              </span>
-              <Link
-                href={`/approve/${r.id}`}
-                className="inline-flex items-center justify-end gap-1.5 font-mono text-xs uppercase tracking-[0.14em] text-aegis-signal transition-colors hover:underline"
-              >
-                <KeyRound className="h-3.5 w-3.5" />
-                Approve
-                <ArrowUpRight className="h-3 w-3" />
-              </Link>
-            </li>
-          );
-        })}
-      </ul>
-    </section>
-  );
-}
-
-/* ─── Glossary band ───────────────────────────────────────────────────── */
-
-const GLOSSARY = [
-  {
-    term: 'UCAN',
-    body: 'Cryptographic delegation token. Nomos mints one per request — never gives the agent a long-lived key.',
-  },
-  {
-    term: 'Envelope',
-    body: 'A passkey-cosigned grant that bounds resource + actions for a session. Standing variant lasts until revoked.',
-  },
-  {
-    term: 'Step-up',
-    body: 'When the policy or risk classifier denies, the human approves with a passkey before the call proceeds.',
-  },
-  {
-    term: 'Audit chain',
-    body: 'Every decision is hashed into an append-only Merkle chain. Daily roots are signed Ed25519.',
-  },
-];
-
-function Glossary() {
-  return (
-    <section className="rounded-sm border border-aegis-line bg-aegis-surface px-8 py-7">
-      <div className="grid grid-cols-1 gap-x-10 gap-y-6 md:grid-cols-2 lg:grid-cols-4">
-        {GLOSSARY.map((g) => (
-          <div key={g.term}>
-            <div className="font-mono text-[11px] uppercase tracking-[0.18em] text-aegis-signal">
-              {g.term}
-            </div>
-            <p className="mt-2 text-sm leading-relaxed text-aegis-mute">{g.body}</p>
-          </div>
-        ))}
-      </div>
-    </section>
   );
 }

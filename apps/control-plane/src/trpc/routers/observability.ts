@@ -622,6 +622,42 @@ export const observabilityRouter = router({
     }),
 
   /**
+   * Daily decisions trend — GROUP BY day(ts) over the window. Powers the
+   * stacked-area chart on /app. Caller zero-fills missing days.
+   */
+  dailyTrend: withPermission('audit', 'read')
+    .input(z.object({ windowDays: WindowDays }))
+    .query(async ({ ctx, input }) => {
+      const since = sql`now() - (${input.windowDays} || ' days')::interval`;
+      const result = await ctx.db.drizzle.execute<{
+        day: string;
+        allow: number;
+        deny: number;
+        stepup: number;
+      }>(sql`
+        SELECT
+          to_char(date_trunc('day', ts), 'YYYY-MM-DD') AS day,
+          SUM(CASE WHEN decision = 'allow' THEN 1 ELSE 0 END)::int AS allow,
+          SUM(CASE WHEN decision = 'deny' THEN 1 ELSE 0 END)::int AS deny,
+          SUM(CASE WHEN decision = 'stepup' THEN 1 ELSE 0 END)::int AS stepup
+        FROM audit_events
+        WHERE customer_id = ${ctx.customerId}
+          AND ts >= ${since}
+        GROUP BY 1
+        ORDER BY 1 ASC
+      `);
+      return {
+        windowDays: input.windowDays,
+        points: result.rows.map((r) => ({
+          day: r.day,
+          allow: r.allow,
+          deny: r.deny,
+          stepup: r.stepup,
+        })),
+      };
+    }),
+
+  /**
    * Action graph — forward-flowing conversation tree of tool calls.
    *
    * Returns one node per span; the effective parent is the first of
