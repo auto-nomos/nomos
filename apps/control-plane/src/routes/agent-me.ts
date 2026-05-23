@@ -34,7 +34,10 @@ export function createAgentMeRoutes(
     const agentId = c.get('agentId');
 
     const rows = await deps.db.drizzle
-      .select({ integrationId: schema.policies.integrationId })
+      .select({
+        integrationId: schema.policies.integrationId,
+        cedarText: schema.policies.cedarText,
+      })
       .from(schema.agentPolicies)
       .innerJoin(schema.policies, eq(schema.agentPolicies.policyId, schema.policies.id))
       .where(
@@ -44,13 +47,22 @@ export function createAgentMeRoutes(
         ),
       );
 
-    const integrations = Array.from(
-      new Set(
-        rows
-          .map((r) => r.integrationId)
-          .filter((id): id is IntegrationId => id !== null && KNOWN_INTEGRATIONS.has(id)),
-      ),
-    ).sort() as IntegrationId[];
+    const found = new Set<IntegrationId>();
+    for (const r of rows) {
+      if (r.integrationId && KNOWN_INTEGRATIONS.has(r.integrationId)) {
+        found.add(r.integrationId as IntegrationId);
+        continue;
+      }
+      // Multi-provider policies leave integrationId null. Extract the
+      // top-level command segments from `Action::"/<seg>/..."` literals.
+      for (const m of r.cedarText.matchAll(/Action::"\/([a-z_]+)\//g)) {
+        const seg = m[1];
+        if (seg && KNOWN_INTEGRATIONS.has(seg)) {
+          found.add(seg as IntegrationId);
+        }
+      }
+    }
+    const integrations = Array.from(found).sort() as IntegrationId[];
 
     const commands = integrations.flatMap((id) => actionsFor(id)).sort();
 
