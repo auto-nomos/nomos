@@ -214,11 +214,24 @@ class AuthGuard:
             decision = _decision_from_json(decision_obj)
         else:
             decision = _decision_from_json(payload)
+        upstream = payload.get("upstream") if isinstance(payload.get("upstream"), dict) else None
+        # When PDP allowed the call and proxied upstream, the envelope is
+        # `upstream: { status, body }`; report the SaaS status + body.
+        # On deny (no upstream call), fall back to the PDP HTTP status so
+        # callers can still distinguish 403/5xx.
+        if upstream is not None:
+            upstream_status = (
+                int(upstream["status"]) if "status" in upstream else None
+            )
+            upstream_body = upstream.get("body")
+        else:
+            upstream_status = res.status_code
+            upstream_body = payload.get("body")
         return AuthGuard.ProxyResult(
             allow=bool(payload.get("allow", decision.allow)),
             decision=decision,
-            upstream_status=res.status_code,
-            upstream_body=payload.get("body"),
+            upstream_status=upstream_status,
+            upstream_body=upstream_body,
             error_code=payload.get("error_code"),
         )
 
