@@ -1,9 +1,9 @@
 /**
- * Nomos wordmark — Greek nu monogram (Ν) in a hairline frame.
- * "Nomos" is the Greek word for law/order, so the mark roots the brand
- * etymologically without needing a glossary. Two paper-toned legs, one
- * chartreuse diagonal, a small seal dot at the diagonal terminus.
- * Reads cleanly from a 16px favicon up to a 128px hero.
+ * Nomos wordmark — three stacked chevrons + NOMOS in display caps.
+ * Each chevron is a UCAN in the delegation chain: the parent grants,
+ * the child attenuates, the leaf fires. The bottom chevron — the call
+ * that actually executes — is chartreuse. Geometric, scales from 16px
+ * favicon to a hero block, no internal text or alpha glyph required.
  */
 export function NomosLogo({
   size = 28,
@@ -21,13 +21,13 @@ export function NomosLogo({
         <span
           className="font-display text-aegis-paper"
           style={{
-            fontSize: size * 0.8,
+            fontSize: size * 0.78,
             fontVariationSettings: "'opsz' 144, 'SOFT' 50, 'WONK' 0",
-            letterSpacing: '-0.025em',
+            letterSpacing: '-0.015em',
             lineHeight: 1,
           }}
         >
-          Nomos
+          NOMOS
         </span>
       ) : null}
     </span>
@@ -45,50 +45,32 @@ function Mark({ size }: { size: number }) {
       aria-hidden="true"
     >
       <title>Nomos mark</title>
-      {/* Hairline frame — the "seal" container. */}
-      <rect
-        x="3"
-        y="3"
-        width="26"
-        height="26"
-        rx="2"
+      {/* Three downward chevrons — root → branch → leaf. Each one widens and
+          thickens as the chain attenuates toward the actual call. */}
+      <path
+        d="M5 9 L16 13 L27 9"
         stroke="currentColor"
-        strokeWidth="1.2"
-        className="text-aegis-line-strong"
-      />
-      {/* Inner sigil — the Greek nu (Ν): two upright legs in paper,
-          one diagonal in chartreuse, anchored by a small seal dot. */}
-      <line
-        x1="9"
-        y1="8"
-        x2="9"
-        y2="24"
-        stroke="currentColor"
-        strokeWidth="2.4"
+        strokeWidth="1.8"
         strokeLinecap="square"
+        strokeLinejoin="miter"
+        className="text-aegis-mute"
+      />
+      <path
+        d="M5 17 L16 21 L27 17"
+        stroke="currentColor"
+        strokeWidth="2.2"
+        strokeLinecap="square"
+        strokeLinejoin="miter"
         className="text-aegis-paper"
       />
-      <line
-        x1="23"
-        y1="8"
-        x2="23"
-        y2="24"
+      <path
+        d="M4 25 L16 29.5 L28 25"
         stroke="currentColor"
-        strokeWidth="2.4"
+        strokeWidth="2.6"
         strokeLinecap="square"
-        className="text-aegis-paper"
-      />
-      <line
-        x1="9.7"
-        y1="8.7"
-        x2="22.3"
-        y2="23.3"
-        stroke="currentColor"
-        strokeWidth="2.4"
-        strokeLinecap="square"
+        strokeLinejoin="miter"
         className="text-aegis-signal"
       />
-      <circle cx="23" cy="24" r="1.6" fill="currentColor" className="text-aegis-signal" />
     </svg>
   );
 }
