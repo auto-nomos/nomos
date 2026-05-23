@@ -19,20 +19,44 @@ export default function AppleIcon() {
     >
       <svg width="140" height="140" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
         <title>Nomos</title>
-        <path
-          d="M16 3 L28 8 L28 17 L26 18 L28 19 L28 20.5 L16 29 L4 20.5 L4 8 Z"
+        <rect
+          x="3"
+          y="3"
+          width="26"
+          height="26"
+          rx="2"
           fill="none"
-          stroke="#e8dcc4"
-          strokeWidth="1.4"
-          strokeLinejoin="miter"
+          stroke="#3a4150"
+          strokeWidth="1.2"
         />
-        <path
-          d="M9.5 22 L16 8 L22.5 22 M11.5 18.5 L20.5 18.5"
-          fill="none"
-          stroke="#bfff00"
-          strokeWidth="1.8"
+        <line
+          x1="9"
+          y1="8"
+          x2="9"
+          y2="24"
+          stroke="#e8dcc4"
+          strokeWidth="2.4"
           strokeLinecap="square"
         />
+        <line
+          x1="23"
+          y1="8"
+          x2="23"
+          y2="24"
+          stroke="#e8dcc4"
+          strokeWidth="2.4"
+          strokeLinecap="square"
+        />
+        <line
+          x1="9.7"
+          y1="8.7"
+          x2="22.3"
+          y2="23.3"
+          stroke="#bfff00"
+          strokeWidth="2.4"
+          strokeLinecap="square"
+        />
+        <circle cx="23" cy="24" r="1.6" fill="#bfff00" />
       </svg>
     </div>,
     size,
