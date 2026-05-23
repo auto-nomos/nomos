@@ -16,10 +16,10 @@ interface DocShellProps {
 export function DocShell({ doc, docs, journeys, prev, next, basePath, children }: DocShellProps) {
   const variant = basePath === '/app/guide' ? 'in-app' : 'public';
   return (
-    <div className="mx-auto max-w-[1280px] px-6 py-12 md:px-10 md:py-16">
-      <div className="grid grid-cols-12 gap-10">
+    <div className="mx-auto max-w-[1600px] px-6 py-12 md:px-10 md:py-16">
+      <div className="grid grid-cols-12 gap-8">
         <DocNav docs={docs} journeys={journeys} basePath={basePath} />
-        <article className="col-span-12 max-w-[720px] lg:col-span-7">
+        <article className="col-span-12 lg:col-span-7">
           <header className="border-b border-aegis-line pb-8">
             <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-aegis-faint">
               {journeys.find((j) => j.id === doc.journey)?.label ?? 'Docs'}

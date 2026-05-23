@@ -1,6 +1,8 @@
 'use client';
 
 import { type AuthenticationResponseJSON, startAuthentication } from '@simplewebauthn/browser';
+import { ArrowLeft } from 'lucide-react';
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { type EnvelopeSpec, formatEnvelopeAsk, formatReason } from '../../../lib/format-envelope';
 import { registerPasskey } from '../../../lib/passkey-client';
@@ -130,6 +132,13 @@ export function ApproveClient({ approvalId }: ApproveClientProps) {
 
   return (
     <div className="space-y-6">
+      <Link
+        href="/app/approvals"
+        className="inline-flex items-center gap-1.5 text-sm text-zinc-500 transition-colors hover:text-zinc-900 dark:hover:text-zinc-100"
+      >
+        <ArrowLeft className="h-3.5 w-3.5" />
+        Back to approvals
+      </Link>
       <header className="space-y-1">
         <h1 className="text-xl font-semibold">Approve App action</h1>
         <p className="text-sm text-zinc-500">Step-up requested by an App in your account.</p>
@@ -147,7 +156,7 @@ export function ApproveClient({ approvalId }: ApproveClientProps) {
             </div>
             <details className="text-xs">
               <summary className="cursor-pointer text-zinc-500">Show raw spec</summary>
-              <pre className="mt-1 rounded bg-zinc-900 p-2 text-zinc-100">
+              <pre className="mt-1 max-h-60 overflow-auto whitespace-pre-wrap break-words rounded bg-zinc-900 p-2 text-zinc-100">
                 {JSON.stringify(a.resource, null, 2)}
               </pre>
             </details>
@@ -160,7 +169,7 @@ export function ApproveClient({ approvalId }: ApproveClientProps) {
             </div>
             <div>
               <dt className="text-zinc-500">Resource</dt>
-              <dd className="mt-1 rounded bg-zinc-900 p-2 font-mono text-xs text-zinc-100">
+              <dd className="mt-1 max-h-60 overflow-auto whitespace-pre-wrap break-words rounded bg-zinc-900 p-2 font-mono text-xs text-zinc-100">
                 {JSON.stringify(a.resource, null, 2)}
               </dd>
             </div>
@@ -196,17 +205,20 @@ export function ApproveClient({ approvalId }: ApproveClientProps) {
             <dd className="mt-1 text-zinc-700">{a.riskSummary}</dd>
           </div>
         )}
-        {(() => {
-          const variants = (a as { cedarVariants?: unknown }).cedarVariants as
-            | { narrow?: string; medium?: string; broad?: string }
-            | null
-            | undefined;
-          if (variants && (variants.narrow || variants.medium || variants.broad)) {
-            return (
-              <fieldset className="rounded-md border border-zinc-200 p-3 text-xs">
-                <legend className="px-1 text-xs font-medium text-zinc-500">
-                  Cedar policy preview (pick scope to save)
-                </legend>
+      </dl>
+
+      {(() => {
+        const variants = (a as { cedarVariants?: unknown }).cedarVariants as
+          | { narrow?: string; medium?: string; broad?: string }
+          | null
+          | undefined;
+        if (variants && (variants.narrow || variants.medium || variants.broad)) {
+          return (
+            <fieldset className="rounded-md border border-zinc-200 p-4 text-sm">
+              <legend className="px-1 text-xs font-medium text-zinc-500">
+                Cedar policy preview (pick scope to save)
+              </legend>
+              <div className="space-y-3">
                 {(['narrow', 'medium', 'broad'] as const).map((scope) => {
                   const text = variants[scope];
                   if (!text) return null;
@@ -220,7 +232,11 @@ export function ApproveClient({ approvalId }: ApproveClientProps) {
                   return (
                     <label
                       key={scope}
-                      className={`mt-2 block cursor-pointer rounded border p-2 ${isSelected ? 'border-zinc-700 bg-zinc-100 dark:bg-zinc-800' : 'border-zinc-200 dark:border-zinc-700'}`}
+                      className={`block cursor-pointer rounded border p-3 transition-colors ${
+                        isSelected
+                          ? 'border-zinc-700 bg-zinc-100 dark:bg-zinc-800'
+                          : 'border-zinc-200 hover:border-zinc-400 dark:border-zinc-700'
+                      }`}
                     >
                       <div className="flex items-center gap-2">
                         <input
@@ -232,30 +248,30 @@ export function ApproveClient({ approvalId }: ApproveClientProps) {
                         />
                         <span className="font-medium">{label}</span>
                       </div>
-                      <pre className="mt-2 whitespace-pre-wrap rounded bg-zinc-900 p-2 font-mono text-xs text-zinc-100">
+                      <pre className="mt-3 max-h-72 overflow-auto whitespace-pre-wrap break-words rounded bg-zinc-900 p-3 font-mono text-xs leading-relaxed text-zinc-100">
                         {text}
                       </pre>
                     </label>
                   );
                 })}
-              </fieldset>
-            );
-          }
-          if (a.cedarPreview) {
-            return (
-              <details className="text-xs">
-                <summary className="cursor-pointer text-zinc-500">
-                  Cedar preview (what would be saved)
-                </summary>
-                <pre className="mt-1 whitespace-pre-wrap rounded bg-zinc-900 p-2 text-zinc-100">
-                  {a.cedarPreview}
-                </pre>
-              </details>
-            );
-          }
-          return null;
-        })()}
-      </dl>
+              </div>
+            </fieldset>
+          );
+        }
+        if (a.cedarPreview) {
+          return (
+            <details className="rounded-md border border-zinc-200 p-3 text-sm">
+              <summary className="cursor-pointer text-zinc-500">
+                Cedar preview (what would be saved)
+              </summary>
+              <pre className="mt-3 max-h-72 overflow-auto whitespace-pre-wrap break-words rounded bg-zinc-900 p-3 font-mono text-xs leading-relaxed text-zinc-100">
+                {a.cedarPreview}
+              </pre>
+            </details>
+          );
+        }
+        return null;
+      })()}
 
       {expiredOrDecided ? (
         <p className="rounded bg-zinc-100 p-3 text-sm text-zinc-700">
