@@ -21,14 +21,6 @@ interface Props {
 export function AuthShell({ eyebrow, title, copy, children, footer }: Props) {
   return (
     <>
-      <div className="sticky top-0 z-50 flex items-center justify-center gap-3 bg-red-600 px-4 py-2.5 text-center text-sm font-semibold text-white shadow-lg">
-        <span className="text-red-200">⚠</span>
-        <span>
-          <strong>Under active development.</strong> Do not connect this to your agents or tools —
-          things will break. You may log in and explore, but agent configuration is not stable yet.
-        </span>
-        <span className="text-red-200">⚠</span>
-      </div>
       <div className="relative z-10 grid min-h-screen lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
         <aside className="relative hidden flex-col justify-between border-r border-aegis-line bg-aegis-surface/40 p-10 backdrop-blur lg:flex">
           <Link href="/" aria-label="Nomos home">
