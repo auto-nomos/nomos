@@ -10,9 +10,15 @@
    feels the live infrastructure under the brand.
    ====================================================================== */
 
-import { ArrowUpRight } from 'lucide-react';
+import { ArrowUpRight, Github } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import {
+  DISCORD_INVITE_URL,
+  GITHUB_DISCUSSIONS_URL,
+  GITHUB_REPO_URL,
+  GITHUB_STAR_URL,
+} from '../../lib/community-links';
 import { cn } from '../../lib/utils';
 import { NomosLogo } from './logo';
 
@@ -26,6 +32,8 @@ const NAV: NavLink[] = [
   { href: '/docs', label: 'Docs' },
   { href: '/integrations', label: 'Integrations' },
   { href: '/pricing', label: 'Pricing' },
+  { href: '/open-source', label: 'Open source' },
+  { href: '/community', label: 'Community' },
   { href: '/security', label: 'Security' },
   { href: '/changelog', label: 'Changelog' },
 ];
@@ -69,6 +77,15 @@ function PublicTopbar() {
           })}
         </nav>
         <div className="flex items-center gap-2">
+          <a
+            href={GITHUB_STAR_URL}
+            target="_blank"
+            rel="noreferrer"
+            aria-label="Star Nomos on GitHub"
+            className="hidden items-center gap-1.5 px-2 py-1.5 text-aegis-mute transition-colors hover:text-aegis-paper md:inline-flex"
+          >
+            <Github className="h-4 w-4" />
+          </a>
           <Link
             href="/sign-in"
             className="hidden items-center gap-1.5 px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.18em] text-aegis-mute transition-colors hover:text-aegis-paper md:inline-flex"
@@ -92,11 +109,16 @@ function PublicFooter() {
   return (
     <footer className="border-t border-aegis-line bg-aegis-ink/50 backdrop-blur">
       <div className="mx-auto grid max-w-[1280px] grid-cols-2 gap-10 px-6 py-14 md:grid-cols-12 md:px-10">
-        <div className="col-span-2 md:col-span-4">
+        <div className="col-span-2 md:col-span-3">
           <NomosLogo size={22} />
           <p className="mt-5 max-w-[320px] text-sm leading-relaxed text-aegis-mute">
             The authorization layer for AI agents. Cryptographic delegation, policy gates, audit
             chain — built so your agents can act without ever holding a raw credential.
+          </p>
+          <p className="mt-3 max-w-[320px] text-sm leading-relaxed text-aegis-mute">
+            Open source coming soon —{' '}
+            <code className="font-mono text-[12px] text-aegis-paper">@auto-nomos/*</code> on npm
+            today.
           </p>
           <div className="mt-6 flex items-center gap-2">
             <span className="pulse" />
@@ -122,6 +144,22 @@ function PublicFooter() {
           <FooterLink href="/docs#cloud-setup">Cloud federation setup</FooterLink>
           <FooterLink href="/docs#policies">Policy authoring</FooterLink>
           <FooterLink href="/docs#audit">Audit chain</FooterLink>
+          <FooterLink href="/open-source">Open source</FooterLink>
+        </FooterColumn>
+
+        <FooterColumn label="Community">
+          <FooterLink href={GITHUB_REPO_URL} external>
+            GitHub
+          </FooterLink>
+          <FooterLink href={DISCORD_INVITE_URL} external>
+            Discord
+          </FooterLink>
+          <FooterLink href={GITHUB_DISCUSSIONS_URL} external>
+            Discussions
+          </FooterLink>
+          <FooterLink href="/community">Contributors</FooterLink>
+          <FooterLink href="/vs/auth0">Nomos vs Auth0</FooterLink>
+          <FooterLink href="/vs/vault">Nomos vs Vault</FooterLink>
         </FooterColumn>
 
         <FooterColumn label="Account">
@@ -154,7 +192,29 @@ function FooterColumn({ label, children }: { label: string; children: React.Reac
   );
 }
 
-function FooterLink({ href, children }: { href: string; children: React.ReactNode }) {
+function FooterLink({
+  href,
+  children,
+  external,
+}: {
+  href: string;
+  children: React.ReactNode;
+  external?: boolean;
+}) {
+  if (external) {
+    return (
+      <li>
+        <a
+          href={href}
+          target="_blank"
+          rel="noreferrer"
+          className="text-sm text-aegis-mute transition-colors hover:text-aegis-paper"
+        >
+          {children}
+        </a>
+      </li>
+    );
+  }
   return (
     <li>
       <Link
