@@ -22,24 +22,26 @@ export default function AppleIcon() {
         <path
           d="M5 9 L16 13 L27 9"
           fill="none"
-          stroke="#9ca3af"
-          strokeWidth="1.8"
+          stroke="#bfff00"
+          strokeWidth="2"
           strokeLinecap="square"
           strokeLinejoin="miter"
+          opacity="0.45"
         />
         <path
           d="M5 17 L16 21 L27 17"
           fill="none"
-          stroke="#e8dcc4"
-          strokeWidth="2.2"
+          stroke="#bfff00"
+          strokeWidth="2.4"
           strokeLinecap="square"
           strokeLinejoin="miter"
+          opacity="0.75"
         />
         <path
           d="M4 25 L16 29.5 L28 25"
           fill="none"
           stroke="#bfff00"
-          strokeWidth="2.6"
+          strokeWidth="2.8"
           strokeLinecap="square"
           strokeLinejoin="miter"
         />

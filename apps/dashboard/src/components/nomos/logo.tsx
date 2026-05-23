@@ -19,11 +19,11 @@ export function NomosLogo({
       <Mark size={size} />
       {showWordmark ? (
         <span
-          className="font-display text-aegis-paper"
+          className="font-display text-aegis-signal"
           style={{
-            fontSize: size * 0.78,
+            fontSize: size * 1.05,
             fontVariationSettings: "'opsz' 144, 'SOFT' 50, 'WONK' 0",
-            letterSpacing: '-0.015em',
+            letterSpacing: '-0.02em',
             lineHeight: 1,
           }}
         >
