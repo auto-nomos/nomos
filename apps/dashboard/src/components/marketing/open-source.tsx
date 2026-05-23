@@ -1,0 +1,125 @@
+import { ArrowUpRight, Github, Star } from 'lucide-react';
+import Link from 'next/link';
+import { GITHUB_RELEASES_URL, GITHUB_STAR_URL, NPM_ORG_URL } from '../../lib/community-links';
+
+/**
+ * Band 9 — Open source. One idea: coming very soon, star to be there day one.
+ * Includes the small license matrix built from real package data.
+ */
+const PACKAGES: { name: string; role: string; status: 'public' | 'soon' }[] = [
+  { name: '@auto-nomos/core', role: 'PDP decide() engine', status: 'public' },
+  { name: '@auto-nomos/cedar', role: 'Policy evaluation', status: 'public' },
+  { name: '@auto-nomos/ucan', role: 'Capability tokens', status: 'public' },
+  { name: '@auto-nomos/crypto', role: 'DID + signing', status: 'public' },
+  { name: '@auto-nomos/sdk', role: 'TS SDK for agents', status: 'public' },
+  { name: '@auto-nomos/mcp-server', role: 'MCP server', status: 'public' },
+  { name: '@auto-nomos/adapters', role: 'YAML connectors', status: 'public' },
+  { name: '@auto-nomos/schema-packs', role: 'Tool-call validators', status: 'public' },
+  { name: '@auto-nomos/policy-builder', role: 'React Flow editor', status: 'public' },
+  { name: '@auto-nomos/audit-verify', role: 'Chain verify CLI', status: 'public' },
+  { name: '@auto-nomos/cli', role: 'nomos CLI', status: 'public' },
+  { name: '@auto-nomos/ucan-cli', role: 'nomos-ucan CLI', status: 'public' },
+  { name: '@auto-nomos/shared-types', role: 'Zod schemas', status: 'public' },
+  { name: '@auto-nomos/control-plane', role: 'Hono + tRPC server', status: 'soon' },
+  { name: '@auto-nomos/dashboard', role: 'Next.js operator UI', status: 'soon' },
+];
+
+export function OpenSource() {
+  return (
+    <section className="mx-auto max-w-[1280px] px-6 py-32 md:px-10">
+      <div className="grid grid-cols-12 gap-10">
+        <div className="col-span-12 lg:col-span-5">
+          <div className="eyebrow flex items-center gap-3">
+            <Github className="h-4 w-4 text-aegis-signal" aria-hidden />
+            open source
+          </div>
+          <h2 className="display mt-5 text-[56px] leading-[1.02] text-aegis-paper">
+            Open source.
+            <br />
+            <em>Coming very soon.</em>
+          </h2>
+          <p className="mt-6 max-w-[460px] text-base leading-relaxed text-aegis-mute">
+            Thirteen packages already live on npm under{' '}
+            <code className="rounded-sm border border-aegis-line bg-aegis-surface px-1.5 py-0.5 font-mono text-[12px] text-aegis-paper">
+              @auto-nomos/*
+            </code>
+            . The full control-plane and dashboard source flips public alongside our 1.0. Star the
+            repo to be in the first hundred — we&rsquo;re shipping a contributor swag drop on the
+            day.
+          </p>
+          <div className="mt-8 flex flex-wrap gap-3">
+            <a
+              href={GITHUB_STAR_URL}
+              target="_blank"
+              rel="noreferrer"
+              className="group inline-flex items-center gap-2 rounded-sm bg-aegis-signal px-5 py-3 font-mono text-[12px] uppercase tracking-[0.18em] text-aegis-ink transition-colors hover:bg-aegis-signal/90"
+            >
+              <Star className="h-4 w-4" />
+              Star on GitHub
+            </a>
+            <a
+              href={GITHUB_RELEASES_URL}
+              target="_blank"
+              rel="noreferrer"
+              className="group inline-flex items-center gap-2 rounded-sm border border-aegis-line px-5 py-3 font-mono text-[12px] uppercase tracking-[0.18em] text-aegis-paper transition-colors hover:border-aegis-line-strong"
+            >
+              Watch releases
+              <ArrowUpRight className="h-3.5 w-3.5" />
+            </a>
+            <Link
+              href="/open-source"
+              className="group inline-flex items-center gap-2 rounded-sm px-5 py-3 font-mono text-[12px] uppercase tracking-[0.18em] text-aegis-mute transition-colors hover:text-aegis-paper"
+            >
+              The full roadmap
+              <ArrowUpRight className="h-3.5 w-3.5" />
+            </Link>
+          </div>
+          <a
+            href={NPM_ORG_URL}
+            target="_blank"
+            rel="noreferrer"
+            className="mt-6 inline-flex items-center gap-2 font-mono text-[11px] text-aegis-faint hover:text-aegis-signal"
+          >
+            npmjs.com/org/auto-nomos
+            <ArrowUpRight className="h-3.5 w-3.5" />
+          </a>
+        </div>
+        <div className="col-span-12 lg:col-span-7">
+          <div className="corners relative rounded-sm border border-aegis-line bg-aegis-ink">
+            <div className="grid grid-cols-12 border-b border-aegis-line px-6 py-4 font-mono text-[10px] uppercase tracking-[0.18em] text-aegis-faint">
+              <div className="col-span-6">package</div>
+              <div className="col-span-4">role</div>
+              <div className="col-span-2 text-right">status</div>
+            </div>
+            <ul className="max-h-[440px] divide-y divide-aegis-line overflow-auto">
+              {PACKAGES.map((p) => (
+                <li
+                  key={p.name}
+                  className="grid grid-cols-12 items-center gap-3 px-6 py-3 transition-colors hover:bg-aegis-surface/40"
+                >
+                  <div className="col-span-6 font-mono text-[12px] text-aegis-paper">{p.name}</div>
+                  <div className="col-span-4 text-xs text-aegis-mute">{p.role}</div>
+                  <div className="col-span-2 text-right">
+                    <span
+                      className={`inline-flex items-center rounded-sm border px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.18em] ${
+                        p.status === 'public'
+                          ? 'border-aegis-signal/40 bg-aegis-signal/10 text-aegis-signal'
+                          : 'border-aegis-amber/40 bg-aegis-amber/10 text-aegis-amber'
+                      }`}
+                    >
+                      {p.status === 'public' ? 'on npm' : 'soon'}
+                    </span>
+                  </div>
+                </li>
+              ))}
+            </ul>
+            <div className="flex items-center justify-between border-t border-aegis-line px-6 py-4 font-mono text-[10px] uppercase tracking-[0.18em] text-aegis-faint">
+              <span>license · Apache-2.0 on flip</span>
+              <span className="text-aegis-paper">{PACKAGES.length} packages</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
