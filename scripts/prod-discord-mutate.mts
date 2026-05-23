@@ -118,7 +118,7 @@ async function listChannels(apiKey: string): Promise<void> {
 async function createChannel(apiKey: string, agentId: string): Promise<void> {
   console.log('--- create_channel (write, passkey) ---');
   const channelName = `nomos-smoke-${RUN_ID}`;
-  const constraint = { guild_id: GUILD_ID };
+  const constraint = { provider: 'discord' as const, guild_id: GUILD_ID };
   const { ucan } = await mintIntentWithApproval({
     controlPlane: CONTROL_PLANE,
     pdp: PDP,
@@ -161,7 +161,7 @@ async function postMessage(apiKey: string, agentId: string): Promise<void> {
     return;
   }
   console.log('--- post_message (write, passkey) ---');
-  const constraint = { channel_id: CREATED_CHANNEL_ID };
+  const constraint = { provider: 'discord' as const, channel_id: CREATED_CHANNEL_ID };
   const { ucan } = await mintIntentWithApproval({
     controlPlane: CONTROL_PLANE,
     pdp: PDP,
@@ -240,7 +240,7 @@ async function deleteChannel(apiKey: string, agentId: string): Promise<void> {
     return;
   }
   console.log('--- delete_channel (delete, passkey) ---');
-  const constraint = { channel_id: CREATED_CHANNEL_ID };
+  const constraint = { provider: 'discord' as const, channel_id: CREATED_CHANNEL_ID };
   try {
     const { ucan } = await mintIntentWithApproval({
       controlPlane: CONTROL_PLANE,
