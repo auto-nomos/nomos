@@ -2,6 +2,7 @@
 
 import {
   Activity,
+  ArrowRight,
   BellRing,
   BookOpen,
   Boxes,
@@ -18,6 +19,7 @@ import {
   Plug,
   Server,
   ShieldCheck,
+  Sparkles,
   Users,
 } from 'lucide-react';
 import Link from 'next/link';
@@ -43,6 +45,7 @@ const NAV_GROUPS: { id: string; label: string; items: NavItem[] }[] = [
     label: 'Monitor',
     items: [
       { href: '/app', label: 'Overview', icon: CircleDot, hint: 'home' },
+      { href: '/onboarding', label: 'Onboarding', icon: Sparkles, hint: '6-step wizard' },
       { href: '/app/approvals', label: 'Approvals', icon: BellRing, hint: 'pending step-ups' },
       { href: '/app/audit', label: 'Audit chain', icon: Activity, hint: 'every decision' },
       { href: '/app/grants', label: 'Standing grants', icon: ShieldCheck, hint: 'durable' },
@@ -92,6 +95,7 @@ export function NomosShell({ children }: { children: React.ReactNode }) {
   return (
     <div data-theme="aegis" className="relative isolate min-h-screen bg-aegis-ink text-aegis-paper">
       <QuotaBanner />
+      <OnboardingBanner />
       <div className="relative z-10 grid min-h-screen grid-cols-[260px_minmax(0,1fr)]">
         <Sidebar />
         <div className="flex min-h-screen flex-col">
@@ -143,6 +147,47 @@ function QuotaBanner() {
           </Link>
         </>
       )}
+    </div>
+  );
+}
+
+function OnboardingBanner() {
+  const agents = trpc.agents.list.useQuery();
+  const policies = trpc.policies.list.useQuery();
+  const connections = trpc.oauth.list.useQuery();
+  const audit = trpc.audit.list.useQuery({ limit: 1 });
+
+  // Wait for every query to settle so we don't flash the banner during boot.
+  if (agents.isPending || policies.isPending || connections.isPending || audit.isPending) {
+    return null;
+  }
+
+  const steps = [
+    (connections.data?.length ?? 0) > 0,
+    (agents.data?.length ?? 0) > 0,
+    (policies.data?.length ?? 0) > 0,
+    (audit.data?.length ?? 0) > 0,
+  ];
+  const done = steps.filter(Boolean).length;
+  if (done === steps.length) return null;
+
+  return (
+    <div className="sticky top-0 z-30 flex items-center justify-center gap-3 border-b border-aegis-line bg-aegis-surface/80 px-4 py-2 text-sm font-medium text-aegis-paper backdrop-blur">
+      <Sparkles className="h-3.5 w-3.5 text-aegis-signal" />
+      <span>
+        Setup{' '}
+        <span className="font-mono text-aegis-signal">
+          {done}/{steps.length}
+        </span>{' '}
+        — connect a SaaS, register an App, attach a policy, make your first call.
+      </span>
+      <Link
+        href="/onboarding"
+        className="group inline-flex items-center gap-1.5 rounded-sm border border-aegis-line bg-aegis-ink/40 px-3 py-1 font-mono text-[11px] uppercase tracking-[0.18em] text-aegis-paper transition-colors hover:border-aegis-signal hover:text-aegis-signal"
+      >
+        Continue
+        <ArrowRight className="h-3 w-3 transition-transform group-hover:translate-x-0.5" />
+      </Link>
     </div>
   );
 }
