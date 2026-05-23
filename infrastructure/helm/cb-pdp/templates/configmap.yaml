@@ -1,0 +1,28 @@
+{{/*
+  Non-secret runtime knobs. Mounted as env on the deployment via envFrom.
+  Secret material (service token, bundle verify key, DATABASE_URL) stays
+  in the Secret template; this ConfigMap holds only opaque tuning + URLs.
+*/}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "cb-pdp.fullname" . }}-config
+  labels: {{- include "cb-pdp.labels" . | nindent 4 }}
+data:
+  NODE_ENV: production
+  PORT: "8787"
+  CONTROL_PLANE_URL: {{ .Values.controlPlane.url | quote }}
+  AUDIT_BACKEND: {{ .Values.audit.backend | quote }}
+  AUDIT_LOG_PATH: {{ .Values.audit.logPath | quote }}
+  {{- if .Values.customerIdsOverride }}
+  PDP_CUSTOMER_IDS: {{ .Values.customerIdsOverride | quote }}
+  {{- end }}
+  {{- range $k, $v := .Values.env }}
+  {{ $k }}: {{ $v | quote }}
+  {{- end }}
+  {{- with .Values.otelExporterEndpoint }}
+  OTEL_EXPORTER_OTLP_ENDPOINT: {{ . | quote }}
+  {{- end }}
+  {{- with .Values.otelExporterHeaders }}
+  OTEL_EXPORTER_OTLP_HEADERS: {{ . | quote }}
+  {{- end }}

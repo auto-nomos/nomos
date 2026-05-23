@@ -55,6 +55,35 @@ autoscaling:
   minReplicas: 2
   maxReplicas: 10
   targetCPUUtilizationPercentage: 70
+  # targetMemoryUtilizationPercentage: 80
+
+# Optional PodDisruptionBudget (requires replicaCount > 1 or autoscaling
+# enabled to be meaningful). Set minAvailable XOR maxUnavailable.
+podDisruptionBudget:
+  enabled: false
+  minAvailable: 1
+  # maxUnavailable: 1
+
+# Opt-in NetworkPolicy. Defaults to: allow all pods in the cluster to hit
+# the PDP port; egress restricted to DNS + 443 (control-plane). Tighten
+# ingress by listing the namespaces your agent pods run in.
+networkPolicy:
+  enabled: false
+  agentNamespaces: []      # e.g. ["agents-prod","agents-staging"]
+  allowIngressFromIngressController: false
+  extraEgressPorts: []     # e.g. [5432] for an in-cluster postgres
+
+# Prometheus Operator ServiceMonitor. Opt-in; the PDP exposes OTel
+# metrics out of the box but no `/metrics` endpoint until OTel exporters
+# are wired (set otelExporterEndpoint or pair with the OTel Collector).
+serviceMonitor:
+  enabled: false
+  namespace: ""           # defaults to the release namespace
+  metricsPath: /metrics
+  interval: 30s
+  scrapeTimeout: 10s
+  labels: {}
+  relabelings: []
 
 # Required: where the control plane lives + service token + signed-bundle pubkey.
 # secret.* values flow into a generated Secret consumed via env.

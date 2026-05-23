@@ -22,13 +22,10 @@ spec:
             - name: http
               containerPort: 8787
               protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: {{ include "cb-pdp.fullname" . }}-config
           env:
-            - name: NODE_ENV
-              value: production
-            - name: PORT
-              value: "8787"
-            - name: CONTROL_PLANE_URL
-              value: {{ .Values.controlPlane.url | quote }}
             - name: CONTROL_PLANE_SERVICE_TOKEN
               valueFrom:
                 secretKeyRef:
@@ -39,24 +36,12 @@ spec:
                 secretKeyRef:
                   name: {{ include "cb-pdp.fullname" . }}-secrets
                   key: bundleVerifyKey
-            - name: AUDIT_BACKEND
-              value: {{ .Values.audit.backend | quote }}
-            - name: AUDIT_LOG_PATH
-              value: {{ .Values.audit.logPath | quote }}
             {{- if .Values.audit.databaseUrl }}
             - name: DATABASE_URL
               valueFrom:
                 secretKeyRef:
                   name: {{ include "cb-pdp.fullname" . }}-secrets
                   key: databaseUrl
-            {{- end }}
-            {{- if .Values.customerIdsOverride }}
-            - name: PDP_CUSTOMER_IDS
-              value: {{ .Values.customerIdsOverride | quote }}
-            {{- end }}
-            {{- range $k, $v := .Values.env }}
-            - name: {{ $k }}
-              value: {{ $v | quote }}
             {{- end }}
           volumeMounts:
             - name: audit
