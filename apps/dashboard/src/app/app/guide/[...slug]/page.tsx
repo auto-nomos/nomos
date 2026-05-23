@@ -53,7 +53,11 @@ export default async function GuideSlugPage({ params }: GuideSlugPageProps) {
       next={next}
       basePath="/app/guide"
     >
-      <MDXRemote source={source} components={docsMdxComponents} />
+      <MDXRemote
+        source={source}
+        components={docsMdxComponents}
+        options={{ blockJS: false, blockDangerousJS: false }}
+      />
     </DocShell>
   );
 }

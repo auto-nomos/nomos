@@ -52,7 +52,11 @@ export default async function DocsSlugPage({ params }: DocsSlugPageProps) {
   return (
     <PublicShell>
       <DocShell doc={doc} docs={docs} journeys={JOURNEYS} prev={prev} next={next} basePath="/docs">
-        <MDXRemote source={source} components={docsMdxComponents} />
+        <MDXRemote
+          source={source}
+          components={docsMdxComponents}
+          options={{ blockJS: false, blockDangerousJS: false }}
+        />
       </DocShell>
     </PublicShell>
   );
