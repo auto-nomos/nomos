@@ -1,0 +1,76 @@
+---
+title: What Nomos is
+description: A 90-second explanation of the platform — read this first.
+journey: get-started
+order: 1
+readMinutes: 3
+redirectsFrom:
+  - what-is-nomos
+product:
+  - { href: "/app", label: "Dashboard" }
+  - { href: "/app/connections", label: "Connections" }
+---
+
+## The one-sentence version
+
+**Nomos is an authorization layer for AI agents.** It sits between your agent and every
+SaaS API you let it touch — GitHub, Slack, Linear, Stripe, Google, Notion, your filesystem,
+your cloud — and makes sure the agent can only do what you said it could, before the call
+ever leaves your network.
+
+<DiagramFlow />
+
+## Why this exists
+
+Today, hooking an agent up to a SaaS API means dropping an OAuth token (or worse, a raw
+API key) into the agent's environment. That token does too much for too long:
+
+- A token scoped to "read & write everything in your GitHub" is the same token whether the
+  agent is closing one issue or wiping the repo.
+- If the token leaks — log line, prompt injection, leaked env file — the blast radius is
+  the entire integration.
+- You have no live record of *what the agent actually did* with the token, only an upstream
+  audit log scattered across a dozen vendors.
+
+Nomos replaces the token with a **single-use cryptographic delegation** (a UCAN). The agent
+gets a delegation that's good for "one method, one resource, the next five minutes." It
+never sees the underlying OAuth token. Every decision goes through your policy and lands in
+a tamper-evident chain you control.
+
+## Three guarantees that fall out
+
+<Steps>
+  <Step n="1" title="Credentials never leave the broker.">
+    Tokens are stored encrypted in the control plane and decrypted only inside the PDP at
+    request time. The agent gets a UCAN bound to one upstream call.
+  </Step>
+  <Step n="2" title="Policy is enforced before the call.">
+    Cedar policies you write (or pick from a template) run on every authorize. Denials
+    return a 403 — there's no "fix it after the fact."
+  </Step>
+  <Step n="3" title="Every decision is provable.">
+    Allows, denies, and step-ups land in an Ed25519-signed Merkle chain. Anyone with the
+    verifier CLI can audit it offline — your auditors, your customers, you.
+  </Step>
+</Steps>
+
+## What you'll do next
+
+The rest of the **Get started** journey walks you through your first end-to-end call —
+about 10 minutes start to finish. By the end you'll have:
+
+- A live connection to a SaaS provider (we use GitHub as the running example).
+- An **App** with one API key — that's your agent's identity.
+- A starter policy attached to that app.
+- One real authorize call returning a UCAN you can use to make a real request.
+
+<NextSteps items={[
+  { href: "/docs/get-started/mental-model", label: "Mental model", description: "Five moving parts in five minutes." },
+  { href: "/docs/get-started/install-the-dashboard", label: "Install the dashboard", description: "Hosted, Docker, or your own Vercel." },
+]} />
+
+<Callout tone="info" title="Coming from another platform?">
+  If you've used Auth0, Okta, or HashiCorp Vault — Nomos is *not* a general-purpose
+  IAM. It's purpose-built for AI agents calling SaaS APIs on a human's behalf. See
+  <Link href="/vs/auth0">Nomos vs Auth0</Link> for a side-by-side.
+</Callout>

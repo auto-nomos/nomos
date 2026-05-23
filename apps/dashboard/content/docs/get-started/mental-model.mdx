@@ -1,0 +1,78 @@
+---
+title: Mental model
+description: Five moving parts. The names matter — they show up in every error, log line, and API call.
+journey: get-started
+order: 2
+readMinutes: 5
+redirectsFrom:
+  - mental-model
+---
+
+Everything in Nomos is one of five things. Hold these in your head and the rest of the docs
+read themselves.
+
+<DiagramFlow />
+
+## The five parts
+
+<Steps>
+  <Step n="1" title="Agent + SDK">
+    Your code. The one that wants to call GitHub, Slack, or your filesystem. It imports
+    `@auto-nomos/sdk` (TypeScript) or `nomos` (Python) and talks to the control plane.
+    It never holds an OAuth token.
+  </Step>
+  <Step n="2" title="Control plane">
+    The hosted (or self-hosted) API at `control.auto-nomos.com`. Owns the database of
+    apps, connections, policies, and API keys. It mints UCANs — short-lived signed
+    delegations — and hands them to the agent.
+  </Step>
+  <Step n="3" title="PDP (Policy Decision Point)">
+    The gate. Every request from the agent goes through the PDP. It checks the UCAN
+    signature, runs your Cedar policy, proxies the call upstream, and returns the
+    sanitized response. Stateless and horizontally scalable.
+  </Step>
+  <Step n="4" title="SaaS API (or filesystem / SSH / cloud)">
+    The thing your agent is actually trying to talk to. The PDP swaps the UCAN for the
+    real OAuth token (held only on the broker side) and makes the upstream call.
+  </Step>
+  <Step n="5" title="Audit chain">
+    Every authorize, every deny, every step-up writes one row. Rows hash-chain to the
+    previous row. A signed root lands once a day. You can prove any single row was in
+    the chain at any point in time.
+  </Step>
+</Steps>
+
+## A request, narrated
+
+1. Your agent says *"I want to list issues on `acme/app`"* — the SDK turns that into an
+   `/v1/authorize` call to the control plane.
+2. The control plane checks: does this App's policy allow `/github/issue/list` on that
+   repo? Yes — it mints a UCAN scoped to exactly that, valid for 5 minutes.
+3. Your agent makes the actual call against the PDP: `GET /github/issue/list` with the
+   UCAN in the `Authorization` header.
+4. The PDP re-validates the UCAN, decrypts the GitHub OAuth token, calls GitHub, returns
+   the list.
+5. The audit chain gets one new row: `allow`, `command=/github/issue/list`, `app=…`,
+   `hash=…`. The next row will hash this one.
+
+## Names you'll see often
+
+<Callout tone="info" title="Glossary check">
+  These five terms appear in every doc page, error message, and log line. Memorize them
+  now and stop translating later.
+</Callout>
+
+- **Organization** — your team. One database row in `customers`. Has members, apps,
+  connections, policies.
+- **App** — one agent identity. Has a DID, zero-or-more API keys, exactly one policy,
+  one mode (static or dynamic).
+- **Connection** — one OAuth binding (e.g. your GitHub account). Apps reuse connections;
+  they don't own them.
+- **Policy** — Cedar source. Decides allow / deny / step-up on every request.
+- **UCAN** — the short-lived delegation. JWT-shaped. Carries `iss`, `aud`, `att`
+  (capabilities), `exp`. The agent never persists one.
+
+<NextSteps items={[
+  { href: "/docs/get-started/install-the-dashboard", label: "Install the dashboard", description: "Pick hosted, Docker, or self-host." },
+  { href: "/docs/get-started/connect-your-first-provider", label: "Connect your first provider", description: "GitHub OAuth in three clicks." },
+]} />

@@ -1,0 +1,122 @@
+---
+title: Cedar syntax
+description: The policy language. Three statement types, six built-in operators, three implicit variables. That's it.
+journey: policies
+order: 3
+readMinutes: 6
+---
+
+Nomos uses [Cedar](https://www.cedarpolicy.com) for policy. Cedar is small on purpose:
+three statements (permit, forbid, unless), six operators, three variables
+(`principal`, `action`, `resource`), one context bag.
+
+## Three statements
+
+```cedar
+// 1. permit: only mechanism that allows
+permit ( principal, action, resource );
+
+// 2. forbid: overrides any permit
+forbid ( principal, action == Action::"/github/repo/put_file", resource );
+
+// 3. unless: inline negation
+permit ( principal, action == Action::"/slack/message/post", resource )
+  unless { resource.channel == "C_RESTRICTED" };
+```
+
+Default: **deny**. If no permit matches, the request is denied.
+
+## The three variables
+
+- `principal` — the agent's identity (DID + role + delegation chain attrs).
+- `action` — the command being authorized (e.g. `Action::"/github/issue/list"`).
+- `resource` — the target object (provider-specific fields like `owner`, `repo`,
+  `channel`, `bucket`).
+
+## The context bag
+
+`context` is the runtime metadata the PDP adds:
+
+- `context.cosigner` — `true` if a passkey-signed cosigner UCAN is attached.
+- `context.now` — `{ epoch, hour, day_of_week, iso }` at request time.
+- `context.ip` — caller IP (set if `EGRESS_TRUST_PROXY=true`).
+- `context.purpose` — the agent's stated reason (dynamic mode only).
+- `context.envelope_active` — `true` if an active grant envelope covers this call.
+
+See <Link href="/docs/policies/dynamic-intent">Dynamic intent</Link> for the full
+context shape.
+
+## Operators
+
+| Operator | Meaning |
+|---|---|
+| `==`, `!=` | equality |
+| `<`, `<=`, `>`, `>=` | numeric / string compare |
+| `&&`, `\|\|`, `!` | boolean |
+| `in [ … ]` | set membership |
+| `like "pat*ern"` | shell-style glob on strings |
+| `has` | attribute existence (`resource has team_id`) |
+
+That's the whole list. No loops, no user-defined functions.
+
+## Common patterns
+
+### Read everything, write only specific repos
+
+```cedar
+permit ( principal, action in [
+  Action::"/github/issue/list", Action::"/github/issue/get",
+  Action::"/github/repo/get_file", Action::"/github/repo/list_files"
+], resource );
+
+permit ( principal, action == Action::"/github/repo/put_file", resource )
+  when { resource.owner == "acme" && resource.repo in ["app", "infra"] };
+```
+
+### Business-hours-only writes
+
+```cedar
+permit ( principal, action == Action::"/slack/message/post", resource )
+  when { context.now.hour >= 9 && context.now.hour < 18 };
+```
+
+### Cosigner-required deletes
+
+```cedar
+forbid ( principal, action like "/*/delete*", resource )
+  when { !context.cosigner };
+```
+
+### Cap delegation depth in a swarm
+
+```cedar
+permit ( principal, action, resource )
+  when { principal.delegationDepth < 3 };
+```
+
+### Pin to an envelope
+
+```cedar
+permit ( principal, action, resource )
+  when { context.envelope_active == true };
+```
+
+## Tooling
+
+- Visual builder — graphic editor with round-trip validation.
+- Monaco editor — Cedar syntax highlighting + autocomplete. Hover for action signatures.
+- `pnpm cb policy validate <file>` — local validation in CI.
+- `pnpm cb policy simulate <file> --request <file>` — dry-run an authorize request.
+
+## Pitfalls
+
+<Faqs items={[
+  ["forbid is not the same as `unless`", "forbid is a top-level statement that overrides any permit. unless is an inline negation inside a permit's when clause. Use forbid when the rule applies regardless of which permit matched."],
+  ["Wildcards in actions", "Cedar matches action by exact identifier OR via `like`. Action::\"/github/*\" is NOT a wildcard — use `action like \"/github/*\"`."],
+  ["context.cosigner can be true even when you didn't expect it", "If a parent UCAN in a swarm chain has cosigner=true, it propagates to children. Use `principal.delegationDepth == 0 && context.cosigner == true` to require the cosigner at the leaf, not somewhere in the chain."]
+]} />
+
+<NextSteps items={[
+  { href: "/docs/policies/dynamic-intent", label: "Dynamic intent + context", description: "Every key the PDP populates in `context`." },
+  { href: "/docs/policies/step-up-approvals", label: "Step-up flow", description: "How cosigner gets set on a request." },
+]} />

@@ -1,0 +1,64 @@
+---
+title: Organizations
+description: The isolation boundary. One organization = one customer row. Apps, connections, policies, audit all live inside.
+journey: operate
+order: 4
+readMinutes: 4
+redirectsFrom:
+  - organizations
+product:
+  - { href: "/app/settings/organization", label: "Organization settings" }
+---
+
+An **Organization** is the top-level container. Everything you do happens inside one.
+Apps, Connections, Policies, API keys, audit history, billing — all key on
+`organization_id` in the database.
+
+<Callout tone="info" title="Glossary note">
+  Internally the DB column is `customer_id` for back-compat (PDP, UCAN, audit chain
+  all key on it). The API + dashboard call it "organization." Same thing.
+</Callout>
+
+## Create + switch
+
+- New users get an organization on signup, named after them.
+- **+ Organization** from the top-left org switcher creates more — useful if you
+  consult across multiple companies.
+- Switching the active org reloads the dashboard with that org's data.
+
+## Settings → Organization
+
+<Link href="/app/settings/organization">/app/settings/organization</Link>:
+
+- Name + URL slug (used in invite links).
+- Owner — the one role that can delete the org.
+- Region — read-only; set at org creation time.
+- Danger zone — delete org. Requires owner role + double-confirm.
+
+## Multi-tenancy
+
+Nomos enforces tenant isolation at three layers:
+
+1. **Drizzle queries** — every tenant-scoped query filters on `customer_id`. Tests
+   live at `apps/control-plane/src/__tests__/tenancy.integration.test.ts`.
+2. **Better-Auth session** — every session has one active org context.
+3. **PDP / audit** — every UCAN carries `customer_id` in its `att`. The PDP refuses
+   any UCAN whose org doesn't match the API key's org.
+
+You can't accidentally cross orgs. The hard-failure mode is rare and logged as a
+critical event.
+
+## Export everything
+
+`/app/settings/organization` → **Export org data**. Downloads a JSON tarball with:
+
+- Every App + API key metadata (no plaintext).
+- Every Connection (no plaintext OAuth tokens).
+- Every Policy (full Cedar source).
+- Audit chain since signup, with signed roots.
+
+Useful for compliance reviews + migration to self-host.
+
+<NextSteps items={[
+  { href: "/docs/operate/members-and-roles", label: "Members + roles", description: "Who can do what inside an org." },
+]} />

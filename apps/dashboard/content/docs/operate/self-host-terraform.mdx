@@ -1,0 +1,128 @@
+---
+title: Self-host with Terraform
+description: Deploy the PDP + control plane into your own cloud. Three modules, one for each major cloud.
+journey: operate
+order: 7
+readMinutes: 10
+badge: beta
+---
+
+The hosted control plane covers most cases. If compliance, latency, or sovereignty
+forces a self-host, three Terraform modules are the supported path.
+
+<Prereqs items={[
+  "Terraform 1.5+.",
+  "Cloud CLI logged in (az / aws / gcloud).",
+  "An Ed25519 keypair for audit signing (see Verify section).",
+]} />
+
+## Pick a module
+
+| Module | Provider | What it builds |
+|---|---|---|
+| `azurerm-nomos-bootstrap` | Azure | Resource group, federation, Key Vault, Container Apps for PDP + control plane, Postgres flexible server |
+| `aws-nomos-bootstrap` | AWS | IAM role + OIDC trust, Secrets Manager, ECS Fargate cluster, RDS Postgres |
+| `google-nomos-bootstrap` | GCP | WIF pool + service account, Secret Manager, Cloud Run for PDP + control plane, Cloud SQL Postgres |
+
+## The Azure path (representative)
+
+```bash
+git clone https://github.com/varendra007/agent-credential-broker.git
+cd agent-credential-broker/infra/terraform/azurerm-nomos-bootstrap
+
+cat > terraform.tfvars <<EOF
+project_name = "nomos-prod"
+location     = "centralindia"
+
+# OIDC issuer that signs Nomos's federation assertions (use hosted unless you're
+# running your own identity service).
+nomos_oidc_issuer = "https://id.auto-nomos.com"
+
+# Bring-your-own audit signing keypair. Generate via:
+#   openssl genpkey -algorithm ed25519 -out audit.pem
+#   openssl pkey -in audit.pem -pubout -out audit.pub.pem
+audit_sign_key_pem = file("./audit.pem")
+audit_verify_key_pem = file("./audit.pub.pem")
+
+# Postgres
+db_admin_password = "<strong-secret>"
+
+# OAuth provider redirect base (your public host)
+oauth_redirect_base = "https://nomos.acme.internal"
+EOF
+
+terraform init
+terraform apply
+```
+
+15–25 minutes. Output:
+
+```
+control_plane_url = "https://control.nomos.acme.internal"
+pdp_url           = "https://pdp.nomos.acme.internal"
+dashboard_url     = "https://nomos.acme.internal"
+```
+
+## What it builds
+
+- **Postgres** with daily snapshots, retention 35 days.
+- **Container Apps** running the latest @auto-nomos packages (pinned to a tag you
+  supply in tfvars).
+- **Federation trust** so your in-cluster identity can reach the broker's APIs.
+- **Key Vault** holding OAuth token encryption key, audit signing key, JWT signing
+  key.
+- **Application Gateway + DNS** wiring `nomos.acme.internal` to the dashboard.
+
+## Wiring agents
+
+Once `terraform apply` succeeds, your agents point at the new URLs:
+
+```bash
+export NOMOS_CONTROL_URL="https://control.nomos.acme.internal"
+export NOMOS_PDP_URL="https://pdp.nomos.acme.internal"
+export NOMOS_API_KEY="…"   # issued from your self-hosted dashboard
+```
+
+Existing MCP server / SDK code requires no change.
+
+<Verify>
+  - `curl https://pdp.nomos.acme.internal/health` → `{"ok":true}`.
+  - `curl https://control.nomos.acme.internal/health` → `{"ok":true}`.
+  - Dashboard loads at `https://nomos.acme.internal`; sign up + enroll passkey works.
+  - First /v1/authorize curl returns `decision: allow` with a valid UCAN.
+</Verify>
+
+## Upgrades
+
+Each module accepts a `nomos_image_tag` variable. Bump it, `terraform apply`,
+Container Apps / ECS / Cloud Run rolls the new tag.
+
+```bash
+terraform apply -var=nomos_image_tag="v0.1.x-release"
+```
+
+## Pulling the dashboard out
+
+If you want the dashboard at a different domain than the API:
+
+```hcl
+dashboard_url_override = "https://nomos.console.acme.com"
+api_url_override       = "https://nomos.api.acme.com"
+```
+
+The two get separate Cloud Front / Application Gateway listeners.
+
+## Cost
+
+Steady state on Azure for a small team (≤ 50 agents, ≤ 1k authorizes / day):
+
+- Container Apps — ~$40/month
+- Postgres Flexible Server (Burstable, 2vCPU) — ~$50/month
+- Key Vault — < $1/month
+- Application Gateway — ~$25/month
+
+≈ $120/month. AWS and GCP modules size similarly.
+
+<NextSteps items={[
+  { href: "/docs/operate/troubleshooting", label: "Troubleshooting", description: "Common deploy failures." },
+]} />

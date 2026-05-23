@@ -1,0 +1,79 @@
+---
+title: Standing grants
+description: Pre-approved envelopes that silently satisfy a class of intents. Real attack surface — review the screen weekly.
+journey: policies
+order: 6
+readMinutes: 5
+redirectsFrom:
+  - standing-grants
+product:
+  - { href: "/app/grants", label: "Standing grants" }
+---
+
+Some grants are durable. "This agent can always read my Linear issues" shouldn't
+require a passkey every session. On the approve page, choose **Standing** instead of
+**Session**. The envelope is created with no expiry; only explicit revocation kills it.
+
+## When to use a standing grant
+
+- A read-only triage agent that runs every hour.
+- A long-running notification listener that posts to one Slack channel.
+- A nightly batch job that always touches the same buckets.
+
+## When NOT to use one
+
+- Anything write or delete. Step-up every time is the right friction.
+- One-off operations. Use session approval, let it expire.
+- Anything that touches money. Stripe, refunds, anything billing-adjacent should
+  step-up every call.
+
+## Create one
+
+<Steps>
+  <Step n="1" title="Trigger step-up">
+    Run the agent's action. Cedar denies, step-up envelope opens, you get the push.
+  </Step>
+  <Step n="2" title="Open the approve page">
+    Tap the deep link. You see agent + action + resource + purpose.
+  </Step>
+  <Step n="3" title="Choose Standing + scope">
+    Switch the toggle to **Standing**. Pick scope:
+
+    - **This intent exactly** — narrowest. Only the agent + action + resource as-is.
+    - **This agent + this resource** — broader. Any action by this agent on this
+      resource.
+    - **Custom Cedar fragment** — paste a fragment. Lets you write
+      `resource.repo in ["app","infra"]` for example.
+
+    <Shot src="approve-standing-form.png" alt="Approve page with Standing toggle on and scope picker" caption="Standing grants always require a passkey at create time. Afterward, silent mints." />
+  </Step>
+  <Step n="4" title="Sign with passkey + save">
+    The passkey signature anchors the grant. Revocation later requires the same
+    org-level admin role; agents can't self-revoke.
+  </Step>
+</Steps>
+
+## Manage them
+
+<Link href="/app/grants">Standing grants</Link> shows every active grant: agent,
+scope, created-by, created-at, last-used. Click for the full Cedar fragment + recent
+receipts using it.
+
+<Shot src="standing-grants-list.png" alt="Standing grants list with one row per grant + last-used timestamp" caption="Review weekly. Anything older than 90 days with no recent use is worth revoking." />
+
+## Revoke
+
+Click a grant → **Revoke**. The push channel notifies all PDPs within 5 seconds —
+any in-flight UCANs minted under that envelope are rejected on next use. The
+audit chain records the revocation.
+
+<Callout tone="warn" title="Standing grants are a real attack surface.">
+  Nomos always requires step-up + passkey to **create** one, but afterward it silently
+  mints UCANs in their scope. Treat the standing-grants page like an AWS IAM role
+  inventory — review the list, kill stale entries.
+</Callout>
+
+<NextSteps items={[
+  { href: "/docs/policies/swarm-delegation", label: "Swarm delegation", description: "Multi-agent UCAN chains + snapshot approvals." },
+  { href: "/docs/operate/audit-chain", label: "Audit chain", description: "Find every action a grant has authorized." },
+]} />

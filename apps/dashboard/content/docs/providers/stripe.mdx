@@ -1,0 +1,72 @@
+---
+title: Stripe Connect
+description: Stripe accounts via the Connect platform. Non-refreshable; rotate on schedule.
+journey: providers
+order: 7
+readMinutes: 4
+badge: GA
+---
+
+Stripe integration goes through **Connect**: Nomos is registered as a Connect
+platform, and each customer's Stripe account is linked via OAuth.
+
+<Callout tone="warn" title="Stripe Connect tokens don't refresh.">
+  Plan for periodic re-consent. Nomos surfaces expiry 14 days out in the
+  Connections panel.
+</Callout>
+
+## Connect
+
+<Steps>
+  <Step n="1" title="Open picker">
+    <Link href="/app/connections">Connections</Link> → **Stripe**.
+  </Step>
+  <Step n="2" title="Stripe OAuth screen">
+    Sign in with your Stripe account, pick which account (live or test). Approve.
+
+    <Shot src="stripe-oauth-consent.png" alt="Stripe Connect OAuth consent" caption="Test-mode accounts work the same as live; the prefix on the account id reveals which is which." />
+  </Step>
+</Steps>
+
+## Commands
+
+- `/stripe/customer/list`, `/stripe/customer/get`, `/stripe/customer/create`,
+  `/stripe/customer/update`
+- `/stripe/invoice/list`, `/stripe/invoice/get`, `/stripe/invoice/create`,
+  `/stripe/invoice/send` (step-up), `/stripe/invoice/void` (step-up)
+- `/stripe/payment_intent/get`, `/stripe/payment_intent/list`,
+  `/stripe/payment_intent/refund` (step-up)
+- `/stripe/subscription/list`, `/stripe/subscription/get`,
+  `/stripe/subscription/cancel` (step-up)
+- `/stripe/charge/list`, `/stripe/charge/get`, `/stripe/charge/refund` (step-up)
+- `/stripe/product/*`, `/stripe/price/*`
+
+## Starter policies
+
+- **`stripe:read-only`** — everything read; no creates, no refunds.
+- **`stripe:safe-default`** — read + customer create + invoice create.
+  Refunds, voids, sends require step-up.
+- **`stripe:billing-bot`** — pinned to one customer's data via `resource.customerId`.
+
+## Cedar fragment — never refund without cosigner
+
+```cedar
+permit (
+  principal,
+  action in [Action::"/stripe/customer/list", Action::"/stripe/invoice/list",
+             Action::"/stripe/invoice/get"],
+  resource
+);
+
+forbid (
+  principal,
+  action in [Action::"/stripe/charge/refund",
+             Action::"/stripe/payment_intent/refund",
+             Action::"/stripe/subscription/cancel"],
+  resource
+) when { !context.cosigner };
+```
+
+<NextSteps items={[
+  { href: "/docs/providers/discord", label: "Discord", description: "Server channels + DMs." },
+]} />

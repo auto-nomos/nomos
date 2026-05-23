@@ -1,0 +1,24 @@
+---
+title: FAQ
+description: Questions we hear most often. Skim before opening a ticket.
+journey: operate
+order: 8
+readMinutes: 5
+redirectsFrom:
+  - faq
+---
+
+<Faqs items={[
+  ["Can the agent ever see the OAuth token?", "No. Tokens are decrypted inside the PDP only, used to make the upstream call, and discarded. The agent gets the sanitized upstream response — never the credential."],
+  ["What happens if the LLM coherence check is down?", "Fails closed. The intent denies and falls through to step-up. Same posture as the SDK's default when the control plane is unreachable."],
+  ["Can I run Nomos on the customer edge?", "Yes. PDP ships as a Docker image and Helm chart. Run it inside the customer VPC; the control plane can stay managed or be self-hosted with the Terraform modules."],
+  ["How do I revoke a UCAN?", "Two paths. Revoke the parent envelope on the App's detail page (kills all children silently within ~5s via the push channel). Or revoke one specific UCAN cid via the UCANs router."],
+  ["Is there a Python SDK?", "Yes — `pip install nomos`. UCAN minting shells out to the nomos-ucan binary so the crypto path matches TypeScript exactly. LangGraph + CrewAI examples ship under `examples/`."],
+  ["How deep can a delegation chain go?", "Default cap is 8 (NOMOS_MAX_CHAIN_DEPTH, env-overridable). PDP rejects with chain_too_deep. The SDK's forkChild() refuses to construct a deeper chain client-side."],
+  ["Does a child agent inherit the parent's scope automatically?", "No — UCAN attenuation is monotonic. A child can only narrow the parent's capability, never broaden it. The PDP computes an attenuation_summary on every chain request."],
+  ["What's the SLA for the hosted control plane?", "99.9% / month, posted on /security. Outage credits available on request."],
+  ["Where does the audit chain live for hosted accounts?", "Postgres in your region (us / eu / in) + Parquet archive to Cloudflare R2 with 7-year lifecycle. Daily signed roots posted at /security."],
+  ["Can I bring my own audit signing key?", "Yes for self-host (audit_sign_key_pem in Terraform). For hosted, customer-managed keys are on the roadmap — open a ticket if you need this."],
+  ["What's the difference between an envelope and a UCAN?", "Envelope = a *grant* in the dashboard (durable, revocable, has Cedar conditions). UCAN = a short-lived delegation minted against an envelope each time the agent calls /v1/authorize."],
+  ["My agent gets `policy_not_assigned` even though I attached a policy", "Cache TTL is 30 seconds. Wait or call `/v1/policies/<id>/invalidate` from the dashboard's UI ('Invalidate cache' button on the policy detail page)."],
+]} />

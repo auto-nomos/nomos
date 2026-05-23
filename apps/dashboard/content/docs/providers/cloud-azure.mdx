@@ -1,0 +1,129 @@
+---
+title: Cloud IAM (Azure)
+description: Federated Azure access via OIDC + Workload Identity Federation. No stored secrets.
+journey: providers
+order: 11
+readMinutes: 8
+badge: beta
+redirectsFrom:
+  - cloud
+product:
+  - { href: "/app/cloud/connect/azure", label: "Connect Azure" }
+---
+
+Nomos brokers Azure access via **federated identity** — your subscription trusts
+`id.auto-nomos.com` as an OIDC issuer, and Nomos mints subject-bound JWTs that Azure
+exchanges for short-lived AAD tokens on every PDP request.
+
+No stored Azure credentials. No client secrets in Nomos's database. The trust lives in
+your subscription.
+
+<Prereqs items={[
+  "An Azure subscription with Owner or User Access Administrator on at least one resource group.",
+  "Azure CLI logged in (`az login`).",
+  "Terraform 1.5+ (or use the in-dashboard bootstrap wizard).",
+]} />
+
+## How it works
+
+<DiagramFlow />
+
+1. Agent → control plane: "I want to read this storage account."
+2. Control plane mints a UCAN scoped to the resource + action.
+3. Agent → PDP with UCAN.
+4. PDP mints a **federated assertion** (signed by Nomos OIDC key, audience =
+   `api://AzureADTokenExchange`).
+5. PDP exchanges that for an AAD access token via Azure STS.
+6. PDP calls Azure with the AAD token, returns the response.
+
+The AAD token lives only inside the PDP process for the duration of one upstream call.
+
+## Bootstrap (Terraform)
+
+The fast path: clone, `terraform apply`, paste two outputs into the dashboard.
+
+```bash
+git clone https://github.com/varendra007/agent-credential-broker.git
+cd agent-credential-broker/infra/terraform/azurerm-nomos-bootstrap
+
+cat > terraform.tfvars <<EOF
+nomos_oidc_issuer = "https://id.auto-nomos.com"
+nomos_subject     = "org/<your-nomos-org-id>"
+target_subscription_id = "<your-azure-subscription-id>"
+target_resource_group  = "rg-app-prod"
+EOF
+
+terraform init
+terraform apply
+```
+
+Output:
+
+```
+client_id      = "abcd1234-…"
+tenant_id      = "wxyz5678-…"
+```
+
+## Wire in the dashboard
+
+<Steps>
+  <Step n="1" title="Open Cloud → Connect Azure">
+    <Link href="/app/cloud/connect/azure">/app/cloud/connect/azure</Link>. Paste the
+    Terraform outputs.
+
+    <Shot src="dashboard-cloud-azure-bind.png" alt="Dashboard cloud-azure bind form with client_id + tenant_id inputs" caption="The dashboard verifies the federation by minting one assertion and asking Azure to exchange it." />
+  </Step>
+  <Step n="2" title="Verify">
+    Click **Test**. Dashboard mints a no-op assertion, exchanges it for an AAD token,
+    calls `https://management.azure.com/subscriptions/<id>` with the token. Green
+    check = federation works.
+  </Step>
+</Steps>
+
+## Commands
+
+- `/azure/storage_blob/list`, `/azure/storage_blob/get`, `/azure/storage_blob/put` (step-up)
+- `/azure/keyvault/secret/get`, `/azure/keyvault/secret/list` (step-up)
+- `/azure/resource_group/list`, `/azure/resource_group/get`
+- `/azure/vm/list`, `/azure/vm/start`, `/azure/vm/stop` (step-up),
+  `/azure/vm/restart` (step-up)
+- `/azure/cosmosdb/document/get`, `/azure/cosmosdb/document/upsert` (step-up)
+
+60+ commands across Storage, Key Vault, Resource Manager, Cosmos DB, VM, App Service,
+Functions. Full catalog: <Link href="/docs/policies/templates">Policy templates</Link>.
+
+## Starter policies
+
+- **`azure:read-only`** — list + get across the configured resource group.
+- **`azure:storage-read`** — blob read only.
+- **`azure:vm-operator`** — start/stop on one resource group, step-up on every
+  destructive action.
+
+## Cedar fragment
+
+```cedar
+permit (
+  principal,
+  action in [Action::"/azure/storage_blob/list", Action::"/azure/storage_blob/get"],
+  resource
+) when {
+  resource.resource_group == "rg-app-prod" &&
+  resource.account_name in ["acmeproddata"]
+};
+
+forbid (
+  principal,
+  action in [Action::"/azure/vm/restart", Action::"/azure/vm/stop"],
+  resource
+) when { !context.cosigner };
+```
+
+<Callout tone="info" title="Multi-subscription">
+  Run `terraform apply` once per subscription. Each apply produces one client_id;
+  bind all of them in the dashboard. Cedar can route by `resource.subscription_id`.
+</Callout>
+
+<NextSteps items={[
+  { href: "/docs/providers/cloud-aws", label: "Cloud IAM (AWS)", description: "Same model, STS instead of AAD." },
+  { href: "/docs/operate/self-host-terraform", label: "Self-host with Terraform", description: "All three clouds, one walkthrough." },
+]} />

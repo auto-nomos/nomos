@@ -1,0 +1,64 @@
+---
+title: Notion
+description: Workspace-scoped, non-refreshable OAuth. Best for read agents and structured-page writers.
+journey: providers
+order: 5
+readMinutes: 4
+badge: GA
+---
+
+Notion OAuth grants a workspace-scoped token. Tokens **don't refresh** — they expire on
+the schedule Notion enforces. Nomos flags expiring tokens 7 days out via dashboard
+banner + Slack/email.
+
+## Connect
+
+<Steps>
+  <Step n="1" title="Initiate from dashboard">
+    <Link href="/app/connections">Connections</Link> → **Notion**.
+  </Step>
+  <Step n="2" title="Pick workspace + pages">
+    Notion shows a page picker. You explicitly grant Nomos access to specific top-level
+    pages — Nomos can't see anything outside that subtree.
+
+    <Shot src="notion-page-picker.png" alt="Notion OAuth page picker with checkboxes" caption="Notion's permission model is per-page. Tick only what the agent needs to see." />
+  </Step>
+</Steps>
+
+## Commands
+
+- `/notion/search`, `/notion/get_page`, `/notion/get_database`
+- `/notion/create_page`, `/notion/update_page`
+- `/notion/query_database`, `/notion/create_database` (admin-only)
+- `/notion/list_block_children`, `/notion/append_block_children`,
+  `/notion/update_block`, `/notion/delete_block` (step-up)
+- `/notion/list_users`, `/notion/get_user`
+
+## Starter policies
+
+- **`notion:read-only`** — search, get_page, query_database, list_block_children.
+- **`notion:write-page-content`** — read + append_block_children + update_block.
+  Delete and create_database require step-up.
+
+## Cedar fragment
+
+```cedar
+permit (
+  principal,
+  action in [Action::"/notion/search", Action::"/notion/get_page",
+             Action::"/notion/append_block_children"],
+  resource
+);
+
+forbid (
+  principal,
+  action == Action::"/notion/delete_block",
+  resource
+) when { !context.cosigner };
+```
+
+<Callout tone="warn" title="When the token expires">
+  Notion non-refreshable tokens currently last ~1 year. Nomos shows a banner in
+  /app/connections starting 7 days before expiry. Re-connect from the same row;
+  existing agents continue to work without code changes.
+</Callout>

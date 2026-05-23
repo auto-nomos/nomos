@@ -1,0 +1,98 @@
+---
+title: SSH / SFTP
+description: Remote file ops + shell exec. SSH private key in env, scoping via UCAN host + path constraints.
+journey: providers
+order: 10
+readMinutes: 6
+badge: GA
+---
+
+The `ssh` provider gives an agent access to remote disk + (gated) shell exec over
+SSH. Same Cedar + UCAN constraint model as `filesystem`, with two extra dimensions:
+**host** and **username**.
+
+<Prereqs items={[
+  "An SSH private key with access to the target host(s).",
+  "The target host's public key (for known_hosts pinning).",
+]} />
+
+## Setup
+
+```bash
+# Set on the PDP host (env):
+SSH_PRIVATE_KEY="-----BEGIN OPENSSH PRIVATE KEY-----\n…"
+SSH_PASSPHRASE="optional"
+SSH_KNOWN_HOSTS="ops-01.example.com ssh-ed25519 AAAA…"
+```
+
+UCAN constraint shape:
+
+```json
+{
+  "provider": "ssh",
+  "host": "ops-01.example.com",
+  "username": "deploy",
+  "path_prefix": "/var/www/app"
+}
+```
+
+The PDP rejects any request whose host or path doesn't match.
+
+## Commands
+
+```
+ssh_file_read           ssh_dir_list
+ssh_file_write          ssh_dir_tree
+ssh_file_create         ssh_dir_create
+ssh_file_delete         ssh_dir_delete
+ssh_file_move           ssh_dir_delete_recursive
+ssh_file_copy
+ssh_exec     (step-up by default)
+```
+
+## Starter policies
+
+- **`ssh:host-pinned-read`** — read + list on one host + path prefix.
+- **`ssh:sftp-upload`** — SFTP write only. `/ssh/exec` explicitly forbidden.
+- **`ssh:host-subdir-full`** — full CRUD pinned to one host + path.
+- **`ssh:exec-step-up`** — shell exec allowed but requires passkey.
+- **`ssh:delete-step-up`** — file/dir delete requires passkey.
+
+## Common use cases
+
+1. **Deploy bot pushes a build.** `ssh:sftp-upload` to `/var/www/app` on a pinned
+   host. No shell exec — uploads only.
+2. **Incident-recovery agent.** `ssh:host-subdir-full` on the broken box. Any
+   `/ssh/exec` triggers `ssh:exec-step-up`.
+3. **Log scraper.** `ssh:host-pinned-read` on `/var/log/myapp`.
+
+## Cedar fragment
+
+```cedar
+permit (
+  principal,
+  action in [Action::"/ssh/file/read", Action::"/ssh/dir/list",
+             Action::"/ssh/dir/tree"],
+  resource
+) when {
+  resource.host == "ops-01.example.com" &&
+  resource.username == "deploy"
+};
+
+forbid (
+  principal,
+  action == Action::"/ssh/exec",
+  resource
+) when { !context.cosigner };
+```
+
+<Callout tone="warn" title="Operational gotchas">
+  One SSH key per PDP process today (multi-tenant key isolation lands in v1.1).
+  `SSH_KNOWN_HOSTS` is parsed but enforcement is best-effort in node-ssh; pair with
+  network-level allowlists. `/ssh/exec` output is capped at 1MB per stream
+  (`truncated: true` in the response when hit).
+</Callout>
+
+<NextSteps items={[
+  { href: "/docs/providers/cloud-azure", label: "Cloud IAM (Azure)", description: "Federated cloud access — no stored secrets." },
+]} />

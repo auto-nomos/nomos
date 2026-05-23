@@ -1,0 +1,108 @@
+---
+title: Wire raw MCP
+description: Generic MCP host walkthrough. Use this if your agent host isn't Cursor, Claude, or Codex.
+journey: connect
+order: 5
+readMinutes: 5
+---
+
+Any MCP-speaking agent host can use Nomos. The `@auto-nomos/mcp-server` package runs as
+a standalone subprocess; your host's job is to spawn it with the right env vars and
+read the tools it advertises.
+
+## The contract
+
+The MCP server:
+
+- **stdin / stdout transport** by default (most hosts).
+- **HTTP** with `--transport http --port 7878` if your host needs out-of-process.
+- Speaks MCP 2024-11 spec, all `tools/*` methods.
+
+## Spawn it
+
+```bash
+NOMOS_CONTROL_URL=https://control.auto-nomos.com \
+NOMOS_API_KEY=nk_live_… \
+NOMOS_PDP_URL=https://pdp.auto-nomos.com \
+npx -y @auto-nomos/mcp-server@latest
+```
+
+Or pinned for prod:
+
+```bash
+npx -y @auto-nomos/mcp-server@0.0.20
+```
+
+## What it advertises
+
+On `tools/list`, the server returns one tool per allowed `(provider, command)` pair.
+Examples:
+
+- `github_issue_list` — `GET /github/issue/list`
+- `github_pr_create` — `POST /github/pr/create`
+- `slack_message_post` — `POST /slack/message/post`
+- `filesystem_file_read` — file ops (gated by path-prefix UCAN constraint)
+- `ssh_exec` — remote shell (always step-up by default)
+
+Each tool's `inputSchema` is a JSON Schema generated from the YAML adapter for that
+command.
+
+## What happens on a tool call
+
+1. Host invokes `tools/call` with `name="github_issue_list"` and validated args.
+2. MCP server asks the Nomos control plane for a UCAN scoped to `/github/issue/list`
+   on the args' resource.
+3. PDP runs your policy:
+   - **Allow** → MCP server makes the PDP call, returns the response.
+   - **Step-up** → MCP server returns a structured `requires_approval` error; host
+     displays "waiting for approval"; user signs with passkey; MCP server retries
+     with cosigner UCAN.
+   - **Deny** → MCP server returns an MCP `error` with `reason` populated.
+
+## HTTP transport
+
+If your host prefers HTTP over stdio:
+
+```bash
+npx -y @auto-nomos/mcp-server@latest --transport http --port 7878
+```
+
+Then point your host at `http://localhost:7878/sse` (Server-Sent Events). The same
+env vars + same tool advertisement.
+
+<Callout tone="info" title="When to use HTTP">
+  Out-of-process orchestrators, container-isolated agent hosts, multi-tenant editors.
+  In single-process desktop agents (Cursor, Claude, Codex), stdio is faster and
+  simpler.
+</Callout>
+
+## Probe the server manually
+
+```bash
+# In one terminal:
+NOMOS_API_KEY=nk_live_… npx -y @auto-nomos/mcp-server@latest --transport http --port 7878
+
+# In another:
+curl http://localhost:7878/health    # → {"ok":true}
+```
+
+For full MCP probing, use the `mcp-inspector` package — it shows every tool, every
+schema, every advertised capability.
+
+```bash
+npx -y @modelcontextprotocol/inspector \
+  npx -y @auto-nomos/mcp-server@latest
+```
+
+## Common failures
+
+<Faqs items={[
+  ["tools/list returns empty", "MCP server spawned but control-plane returned 0 commands. Usually means: no App matches the API key, no policy attached, or no Connection on the org. Check /app/audit for the authorize attempts."],
+  ["tool call hangs forever on step-up", "Host doesn't handle `requires_approval` errors. Either upgrade the host's MCP client lib, or set NOMOS_APPROVAL_MODE=fail_fast in env to deny immediately instead of waiting."],
+  ["Errors mention 'apiCall schema_missing'", "Adapter version mismatch. Upgrade @auto-nomos/mcp-server to ≥ 0.0.18; older versions silently allowed commands the YAML adapter didn't define. Newer versions fail-closed."]
+]} />
+
+<NextSteps items={[
+  { href: "/docs/connect/sdk-typescript", label: "TypeScript SDK", description: "When you want code-level control instead of MCP." },
+  { href: "/docs/operate/troubleshooting", label: "Troubleshooting", description: "Decoding deny reasons and audit fields." },
+]} />

@@ -1,0 +1,117 @@
+---
+title: Install the dashboard
+description: Hosted (recommended), Docker on your laptop, or self-host in your cloud. Pick one.
+journey: get-started
+order: 3
+readMinutes: 6
+---
+
+You don't *install* Nomos — you sign up for the hosted control plane, run a local Docker
+stack for dev, or self-host. All three options use the same `@auto-nomos/*` npm packages
+and the same dashboard.
+
+## Pick a path
+
+<table>
+  <thead>
+    <tr><th>Path</th><th>Best for</th><th>Setup time</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>**Hosted**</td><td>Trying it out, side projects, most production</td><td>2 min</td></tr>
+    <tr><td>**Docker (laptop)**</td><td>Local dev, offline demos, contributing back</td><td>10 min</td></tr>
+    <tr><td>**Self-host (terraform)**</td><td>Regulated industries, VPC-only, customer edge</td><td>1–2 hours</td></tr>
+  </tbody>
+</table>
+
+## Path 1 — Hosted (recommended)
+
+<Steps>
+  <Step n="1" title="Create an account">
+    Visit <Link href="/sign-up">app.auto-nomos.com/sign-up</Link>. Email + password
+    or sign in with GitHub. Verify your email when prompted.
+
+    <Shot src="signup-form.png" alt="Sign-up form on app.auto-nomos.com" caption="The hosted control plane is at app.auto-nomos.com." />
+  </Step>
+  <Step n="2" title="Enroll a passkey">
+    Step-up approvals require a passkey. The dashboard walks you through enrollment on
+    first login — pick TouchID, FaceID, or a hardware key. Skip and you'll be prompted
+    again when an agent's first risky call lands.
+
+    <Shot src="passkey-enroll.png" alt="Passkey enrollment screen" caption="One passkey per teammate. Hardware keys, biometrics, or platform keys all work." />
+  </Step>
+  <Step n="3" title="Note your control-plane URL">
+    Hosted uses `https://control.auto-nomos.com`. You'll paste this into the SDK +
+    MCP server config. There's no per-tenant subdomain.
+  </Step>
+</Steps>
+
+<Callout tone="signal" title="That's it.">
+  Skip to <Link href="/docs/get-started/connect-your-first-provider">Connect your first
+  provider</Link>. The rest of this page covers Docker + self-host.
+</Callout>
+
+## Path 2 — Docker (laptop)
+
+For local dev, contributing, or offline demos. Runs the full stack — Postgres,
+control plane, PDP, dashboard — in one `docker-compose up`.
+
+<Prereqs items={[
+  "Docker Desktop 4.20+ (or Colima / Orbstack on macOS).",
+  "Node.js 22 + pnpm 11.",
+  "A free port: 5433 (Postgres), 3000 (dashboard), 8787 (PDP), 8788 (control plane).",
+]} />
+
+<Steps>
+  <Step n="1" title="Clone the repo">
+    ```bash
+    git clone https://github.com/varendra007/agent-credential-broker.git
+    cd agent-credential-broker
+    pnpm install
+    ```
+  </Step>
+  <Step n="2" title="Start Postgres">
+    ```bash
+    docker compose -f infrastructure/docker/docker-compose.yml up -d
+    ```
+
+    Postgres listens on `localhost:5433` (not 5432, to avoid clashing with existing
+    installs). The first boot runs all Drizzle migrations.
+  </Step>
+  <Step n="3" title="Generate keys + start the stack">
+    ```bash
+    pnpm gen-keys                 # writes .env.local with fresh signing + encryption keys
+    pnpm dev                      # runs control plane, PDP, dashboard concurrently
+    ```
+
+    Open <Link href="http://localhost:3000">http://localhost:3000</Link>, sign up, and
+    enroll a passkey.
+  </Step>
+</Steps>
+
+<Verify>
+  - Dashboard loads at `http://localhost:3000`.
+  - `curl http://localhost:8787/health` returns `{"ok":true}` (PDP).
+  - `curl http://localhost:8788/health` returns `{"ok":true}` (control plane).
+  - `docker compose ps` shows `postgres` running.
+</Verify>
+
+## Path 3 — Self-host with Terraform
+
+Run Nomos inside your VPC. Three Terraform modules ship — pick the cloud you operate in.
+
+- <Link href="/docs/providers/cloud-azure">Azure: `azurerm-nomos-bootstrap`</Link>
+- <Link href="/docs/providers/cloud-aws">AWS: `aws-nomos-bootstrap`</Link>
+- <Link href="/docs/providers/cloud-gcp">GCP: `google-nomos-bootstrap`</Link>
+
+Full walkthrough lives in <Link href="/docs/operate/self-host-terraform">Self-host with
+Terraform</Link>.
+
+<Callout tone="warn" title="Hosted vs self-host: not a one-way door.">
+  Connections, policies, apps, and audit history all export as JSON from the dashboard.
+  Start hosted; migrate later if compliance requires it.
+</Callout>
+
+<NextSteps items={[
+  { href: "/docs/get-started/connect-your-first-provider", label: "Connect your first provider", description: "GitHub OAuth in three clicks." },
+  { href: "/docs/operate/self-host-terraform", label: "Self-host with Terraform", description: "Full module-by-module walkthrough." },
+]} />

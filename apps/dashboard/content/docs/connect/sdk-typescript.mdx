@@ -1,0 +1,153 @@
+---
+title: TypeScript SDK
+description: "`@auto-nomos/sdk` — the same client every Nomos-aware agent uses. Fail-closed by default, hand-rollable for advanced use."
+journey: connect
+order: 6
+readMinutes: 8
+badge: GA
+redirectsFrom:
+  - sdk
+---
+
+`@auto-nomos/sdk` is the canonical client. If you're writing your agent in TypeScript /
+JavaScript and *not* going through an MCP host, this is what you import.
+
+## Install
+
+```bash
+pnpm add @auto-nomos/sdk
+# or: npm i @auto-nomos/sdk
+```
+
+Requires Node 22+. Browser usage is not supported — the SDK signs UCANs locally and
+that path uses Node crypto APIs.
+
+## Five-line example
+
+```typescript
+import { createIntentClient } from '@auto-nomos/sdk';
+
+const client = createIntentClient({
+  controlPlaneUrl: process.env.NOMOS_CONTROL_URL!,
+  apiKey: process.env.NOMOS_API_KEY!,
+});
+
+const grant = await client.authorize({
+  command: '/github/issue/list',
+  resource: { provider: 'github', owner: 'acme', repo: 'app' },
+  ttlSeconds: 300,
+});
+```
+
+`grant.ucan` is the JWT you put in the `Authorization: Bearer …` header for the PDP
+call. `grant.decision` is `'allow'`, `'deny'`, or `'requires_step_up'`.
+
+## Real-world example — call GitHub through the PDP
+
+```typescript
+import { createIntentClient } from '@auto-nomos/sdk';
+
+const client = createIntentClient({
+  controlPlaneUrl: process.env.NOMOS_CONTROL_URL!,
+  apiKey: process.env.NOMOS_API_KEY!,
+});
+
+async function listOpenIssues(owner: string, repo: string) {
+  const grant = await client.authorize({
+    command: '/github/issue/list',
+    resource: { provider: 'github', owner, repo },
+    ttlSeconds: 300,
+    purpose: 'triage open issues for the standup',
+  });
+
+  if (grant.decision !== 'allow') {
+    throw new Error(`Nomos denied: ${grant.reason ?? grant.decision}`);
+  }
+
+  const res = await fetch(
+    `${process.env.NOMOS_PDP_URL}/github/issue/list?owner=${owner}&repo=${repo}&state=open`,
+    { headers: { authorization: `Bearer ${grant.ucan}` } },
+  );
+  if (!res.ok) throw new Error(`PDP error ${res.status}`);
+  return (await res.json()) as { issues: { number: number; title: string }[] };
+}
+```
+
+The SDK gives you the UCAN — you do the upstream call. This is intentional: your
+agent decides retry, parsing, caching.
+
+## Failure modes (and the fail-closed default)
+
+The SDK defaults to fail-closed: if the control plane is unreachable or returns 5xx,
+`authorize()` *throws*. Your agent does not get a "we couldn't decide so we'll allow."
+
+If you want the opposite (graceful degradation behind a feature flag), opt in:
+
+```typescript
+const client = createIntentClient({
+  controlPlaneUrl: process.env.NOMOS_CONTROL_URL!,
+  apiKey: process.env.NOMOS_API_KEY!,
+  failureMode: 'open', // ⚠️ never do this for write actions
+});
+```
+
+<Callout tone="warn" title="Opening the gate is a real risk.">
+  `failureMode: 'open'` should only ever wrap *read* actions, and only behind a kill
+  switch. The whole point of the platform is that "the broker is down" means "the
+  agent doesn't act."
+</Callout>
+
+## Step-up handling
+
+When the policy returns `requires_step_up`, the SDK doesn't throw — it returns a grant
+with `decision: 'requires_step_up'` and an `approvalEnvelopeId`. You decide:
+
+```typescript
+const grant = await client.authorize({ command: '/github/pr/create', /* … */ });
+
+if (grant.decision === 'requires_step_up') {
+  await notifyHumanToApprove(grant.approvalEnvelopeId);
+  // poll or wait for webhook, then retry:
+  const retried = await client.authorize({
+    command: '/github/pr/create',
+    cosignerEnvelopeId: grant.approvalEnvelopeId,
+    /* … */
+  });
+  return retried;
+}
+```
+
+In MCP hosts (Cursor, Claude, Codex) this is handled for you. In a backend agent
+loop, you implement the wait — usually a webhook from the dashboard's approval flow.
+
+## Customizing the transport
+
+Wrap or replace `fetch`:
+
+```typescript
+import { createIntentClient } from '@auto-nomos/sdk';
+import { traceFetch } from './my-otel-fetch';
+
+const client = createIntentClient({
+  controlPlaneUrl: process.env.NOMOS_CONTROL_URL!,
+  apiKey: process.env.NOMOS_API_KEY!,
+  fetch: traceFetch, // observability, retries, mTLS
+});
+```
+
+## API surface
+
+| Method | What |
+|---|---|
+| `authorize(req)` | Mint a UCAN. Returns `{ decision, ucan?, reason?, approvalEnvelopeId? }`. |
+| `intent(req)` | Dynamic-mode only. Mint a constraint-shaped envelope without committing to one command. |
+| `revoke(cidOrEnvelopeId)` | Kill an envelope. Push fans out to live UCANs within ~5s. |
+| `verifyReceipt(receipt)` | Local check that a receipt's hash + signature are valid. |
+| `forkChild({ parentChain, … })` | Build a child UCAN chain for swarm sub-agents. |
+
+Full API ref: <Link href="https://www.npmjs.com/package/@auto-nomos/sdk">npmjs.com/package/@auto-nomos/sdk</Link>.
+
+<NextSteps items={[
+  { href: "/docs/connect/sdk-python", label: "Python SDK", description: "Same surface, idiomatic for Python." },
+  { href: "/docs/policies/dynamic-intent", label: "Dynamic intent", description: "When you want runtime scope, not pre-set commands." },
+]} />

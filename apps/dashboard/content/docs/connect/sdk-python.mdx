@@ -1,0 +1,146 @@
+---
+title: Python SDK
+description: "`pip install nomos` — same surface as the TypeScript SDK, idiomatic for Python agents."
+journey: connect
+order: 7
+readMinutes: 6
+badge: beta
+---
+
+The Python SDK targets the same control-plane API as TypeScript. UCAN minting shells
+out to the `nomos-ucan` Bun-compiled binary — that gives you the exact same crypto
+path as the TS SDK without rewriting Ed25519 in Python.
+
+## Install
+
+```bash
+pip install nomos
+```
+
+Python 3.11+. The `nomos-ucan` binary is shipped as a wheel for macOS-arm64,
+macOS-x64, Linux-x64, Linux-arm64.
+
+## Five-line example
+
+```python
+import os
+from nomos import AuthGuard
+
+guard = AuthGuard(
+    control_plane_url=os.environ["NOMOS_CONTROL_URL"],
+    api_key=os.environ["NOMOS_API_KEY"],
+)
+
+grant = guard.authorize(
+    command="/github/issue/list",
+    resource={"provider": "github", "owner": "acme", "repo": "app"},
+    ttl_seconds=300,
+)
+```
+
+`grant.ucan` is the JWT for the PDP call. `grant.decision` is one of
+`"allow"`, `"deny"`, `"requires_step_up"`.
+
+## Real-world example — LangGraph
+
+```python
+import os, httpx
+from nomos import AuthGuard
+from langgraph.graph import StateGraph
+
+guard = AuthGuard(
+    control_plane_url=os.environ["NOMOS_CONTROL_URL"],
+    api_key=os.environ["NOMOS_API_KEY"],
+)
+pdp = os.environ["NOMOS_PDP_URL"]
+
+def list_issues(state):
+    grant = guard.authorize(
+        command="/github/issue/list",
+        resource={"provider": "github", "owner": state["owner"], "repo": state["repo"]},
+        ttl_seconds=300,
+    )
+    if grant.decision != "allow":
+        raise RuntimeError(f"nomos denied: {grant.reason or grant.decision}")
+
+    r = httpx.get(
+        f"{pdp}/github/issue/list",
+        params={"owner": state["owner"], "repo": state["repo"], "state": "open"},
+        headers={"authorization": f"Bearer {grant.ucan}"},
+    )
+    r.raise_for_status()
+    return {**state, "issues": r.json()["issues"]}
+
+graph = StateGraph(dict)
+graph.add_node("list", list_issues)
+# … rest of LangGraph wiring
+```
+
+Same shape works in CrewAI, AutoGen, custom asyncio loops.
+
+## Async variant
+
+```python
+from nomos import AsyncAuthGuard
+
+guard = AsyncAuthGuard(
+    control_plane_url=os.environ["NOMOS_CONTROL_URL"],
+    api_key=os.environ["NOMOS_API_KEY"],
+)
+grant = await guard.authorize(command="/github/issue/list", resource={...})
+```
+
+`AsyncAuthGuard` uses `httpx.AsyncClient` under the hood; the binary call to
+`nomos-ucan` is non-blocking.
+
+## Fail-closed (default) vs fail-open
+
+```python
+guard = AuthGuard(
+    control_plane_url=os.environ["NOMOS_CONTROL_URL"],
+    api_key=os.environ["NOMOS_API_KEY"],
+    failure_mode="open",  # ⚠️ reads only, never writes
+)
+```
+
+## Step-up handling
+
+```python
+grant = guard.authorize(command="/github/pr/create", resource={...})
+if grant.decision == "requires_step_up":
+    notify_human(grant.approval_envelope_id)
+    # wait for webhook / poll dashboard
+    grant = guard.authorize(
+        command="/github/pr/create",
+        cosigner_envelope_id=grant.approval_envelope_id,
+        resource={...},
+    )
+```
+
+## Swarm forking
+
+```python
+from nomos import fork_child, read_parent_chain_from_env
+
+parent = read_parent_chain_from_env(os.environ)
+child = fork_child(
+    parent_chain=parent.chain,
+    audience_did="did:key:z6Mk…child",
+    capabilities=[{"with": "github://acme/app", "can": "repo:read"}],
+)
+# pass child.chain / child.parent_receipt_id to the spawned subprocess
+```
+
+See <Link href="/docs/policies/swarm-delegation">Swarm delegation</Link> for the full
+multi-agent pattern.
+
+<Callout tone="info" title="Why shell out for UCAN minting?">
+  Keeping crypto in one place (the `nomos-ucan` binary) means the Python SDK can't
+  drift from the TypeScript SDK's exact signature bytes. Both are validated by the
+  same PDP code path; both produce verifiable JWTs.
+</Callout>
+
+<NextSteps items={[
+  { href: "/docs/connect/telegram-approvals", label: "Telegram approvals", description: "Wire step-up notifications into Telegram." },
+  { href: "/docs/policies/swarm-delegation", label: "Swarm delegation", description: "Multi-agent UCAN chains." },
+]} />

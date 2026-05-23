@@ -1,0 +1,91 @@
+---
+title: Telegram approvals
+description: Step-up approvals delivered to a Telegram chat. Tap to approve from your phone, anywhere.
+journey: connect
+order: 8
+readMinutes: 5
+redirectsFrom:
+  - telegram
+---
+
+If you're not always at your laptop, push notifications + email can be slow. Telegram
+delivery is instant, works behind firewalls, and gives you a one-tap approve button
+right in chat.
+
+<Prereqs items={[
+  "A Telegram account.",
+  "An organization on Nomos.",
+  "Owner or admin role (settings:notifications permission).",
+]} />
+
+## Setup
+
+<Steps>
+  <Step n="1" title="Find the Nomos approvals bot">
+    In Telegram, search for `@NomosApprovalsBot`. Click **Start** — the bot replies
+    with a one-time code.
+
+    <Shot src="telegram-bot-start.png" alt="Telegram chat with NomosApprovalsBot showing a /start command and one-time code" caption="The bot replies with a 6-digit code. Paste it into the dashboard." />
+  </Step>
+  <Step n="2" title="Bind the code in Nomos">
+    Dashboard → <Link href="/app/settings/notifications">Settings → Notifications</Link>
+    → **Add Telegram channel** → paste the code → **Bind**.
+
+    <Shot src="dashboard-telegram-bind.png" alt="Dashboard notifications page with Telegram bind dialog" caption="One channel per Telegram account. Multiple channels for multiple operators." />
+  </Step>
+  <Step n="3" title="Enable for the events you care about">
+    Tick **Step-up approvals** and **Standing grant created**. Save.
+  </Step>
+</Steps>
+
+## What an approval looks like
+
+When an agent hits a step-up gate, the bot DMs you:
+
+```
+🔐 approval needed
+agent: prod-codegen
+action: /github/pr/create
+resource: acme/app
+purpose: open a PR that bumps the README copyright
+
+[ Approve ]   [ Deny ]
+```
+
+Tap **Approve**. Telegram opens a `/approve/<envelopeId>` URL in your browser, which
+prompts you to sign with your passkey. The cosigner UCAN is minted. The agent retries
+and proceeds.
+
+<Shot src="telegram-approval-card.png" alt="Telegram message with Approve / Deny buttons for a Nomos step-up" caption="Tap-to-approve. The actual passkey signature happens in the browser that opens." />
+
+## Self-hosted bot
+
+If you don't want to route through `@NomosApprovalsBot`, run your own:
+
+```bash
+# Set in the control plane env:
+TELEGRAM_BOT_TOKEN=123:ABC…           # from @BotFather
+TELEGRAM_WEBHOOK_URL=https://your.host/v1/telegram/webhook
+```
+
+Then in <Link href="/app/settings/notifications">Notifications</Link>, the binding
+flow targets your bot instead.
+
+<Callout tone="warn" title="Approve = sign.">
+  Tapping Approve in Telegram doesn't itself authorize the action. It opens the
+  passkey assertion page. Without the passkey signature, nothing happens. This means
+  Telegram is safe even if your phone session is hijacked.
+</Callout>
+
+## Common failures
+
+<Faqs items={[
+  ["Bot doesn't respond to /start", "Telegram rate-limited the bot from your number. Wait 60 seconds, try again."],
+  ["I bound, but no notifications arrive", "Check Settings → Notifications → Telegram channels. The channel status should be 'active'. If it shows 'pending', re-run /start with the bot to refresh the binding."],
+  ["I want a group chat, not a DM", "Add @NomosApprovalsBot to a Telegram group, make it admin, then run /bind <one-time-code> in that group. Every group member can tap approve, but the passkey signature is still yours."]
+]} />
+
+<NextSteps items={[
+  { href: "/docs/policies/step-up-approvals", label: "How step-up works", description: "End-to-end flow under the hood." },
+  { href: "/docs/operate/troubleshooting", label: "Troubleshooting notifications", description: "When pushes silently drop." },
+]} />

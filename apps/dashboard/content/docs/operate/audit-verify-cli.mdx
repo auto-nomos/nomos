@@ -1,0 +1,95 @@
+---
+title: Audit verify CLI
+description: Offline cryptographic verification of any audit proof bundle. `@auto-nomos/audit-verify`.
+journey: operate
+order: 3
+readMinutes: 4
+---
+
+`@auto-nomos/audit-verify` is a Node CLI that re-hashes a downloaded proof bundle and
+verifies the signed root that covers it. No network calls — auditors can run it
+offline.
+
+## Install + run
+
+```bash
+pnpm dlx @auto-nomos/audit-verify --help
+```
+
+Or globally:
+
+```bash
+pnpm add -g @auto-nomos/audit-verify
+audit-verify --help
+```
+
+## Verify one event
+
+```bash
+audit-verify \
+  --bundle ./event-92ab.json \
+  --pubkey $AUDIT_VERIFY_KEY
+```
+
+`AUDIT_VERIFY_KEY` is the Ed25519 public key for your org's audit signer. Hosted:
+posted at <Link href="/security">app.auto-nomos.com/security</Link>. Self-hosted:
+output by `pnpm gen-keys`.
+
+Output:
+
+```
+event   id        evt_01J7K…
+chain   verified  9 events
+root    signed    2026-05-23T00:00:00Z  by did:key:z6Mk…
+result  OK
+```
+
+Any mismatch (hash chain break, signature mismatch, missing root) prints `FAIL`
+with the failing event and exits non-zero.
+
+## Verify a chain
+
+```bash
+audit-verify \
+  --chain ./writer-receipt-chain.json \
+  --pubkey $AUDIT_VERIFY_KEY
+```
+
+The chain bundle includes the leaf event + every ancestor receipt back to the
+swarm root. Output:
+
+```
+OK: 3 events, hash chain verified.
+
+ALLOW github://acme/app agent=planner    depth=0 id=8c1f…
+└── ALLOW github://acme/app agent=researcher depth=1 id=92ab…
+    └── STEPUP github://acme/app agent=writer depth=2 id=7fde…
+```
+
+## Verify a daily root
+
+```bash
+audit-verify \
+  --root ./root-2026-05-22.json \
+  --pubkey $AUDIT_VERIFY_KEY
+```
+
+Confirms the root's signature matches the supplied pubkey and the root's hash
+matches the canonical SHA-256 of the event window it covers.
+
+## Usage in CI
+
+```yaml
+- name: verify audit proof
+  run: |
+    pnpm dlx @auto-nomos/audit-verify \
+      --bundle ./build/audit-proof.json \
+      --pubkey ${{ secrets.AUDIT_VERIFY_KEY }}
+```
+
+The CLI exit code drives the job result. Use this if you ship audit proofs as
+attestations alongside releases.
+
+<NextSteps items={[
+  { href: "/docs/operate/organizations", label: "Organizations", description: "How audit boundary is drawn." },
+]} />

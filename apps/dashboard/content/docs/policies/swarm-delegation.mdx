@@ -1,0 +1,158 @@
+---
+title: Swarm delegation
+description: Multi-agent UCAN chains. Parent delegates to child; scope can only narrow. PDP enforces depth + attenuation.
+journey: policies
+order: 7
+readMinutes: 8
+badge: beta
+redirectsFrom:
+  - swarms
+product:
+  - { href: "/app/swarms", label: "Swarms" }
+---
+
+A **swarm** is a tree of Apps with one root and N children. Children call upstream
+SaaS on behalf of the parent — every call carries the parent's UCAN as a proof, and
+**scope can only narrow downstream** (UCAN attenuation).
+
+## How the chain works
+
+Each child UCAN is issued *by* the parent (parent's `aud` becomes child's `iss`).
+The PDP validates every level on every request:
+
+1. Signature chain from leaf back to root is valid.
+2. Each parent's capability set is a strict superset of its child's.
+3. The chain depth doesn't exceed `NOMOS_MAX_CHAIN_DEPTH` (default 8).
+
+If any check fails, the request denies with `chain_invalid` or `chain_too_deep`.
+
+## Wire format
+
+Three environment variables, orchestrator-agnostic — LangGraph, CrewAI, AutoGen,
+Claude sub-agents all work without importing the SDK:
+
+```bash
+NOMOS_PARENT_UCAN_CHAIN='["<rootJWT>","<midJWT>"]'   # JSON array, root-first
+NOMOS_PARENT_RECEIPT_ID='evt_…'                     # parent's last allow receipt
+NOMOS_SWARM_ID='swm_…'                              # optional grouping
+NOMOS_MAX_CHAIN_DEPTH=8                             # default; PDP enforces
+```
+
+For chains that would exceed the env-var size limit (~128KB on Linux), use the file
+fallback:
+
+```bash
+NOMOS_PARENT_UCAN_CHAIN_FILE=/tmp/nomos-chain.json
+```
+
+## Fork a child (TypeScript)
+
+```typescript
+import { forkChild, createIntentClient } from '@auto-nomos/sdk';
+import { mintUcan } from '@auto-nomos/ucan';
+
+const parentChain = readParentChainFromEnv(process.env);
+const childUcan = await mintUcan({
+  audience: 'did:key:z6Mk…researcher',
+  capabilities: [{ with: 'github://acme/app', can: 'repo:read' }],
+});
+
+const childChain = forkChild({
+  parentChain,
+  childUcanJwt: childUcan.jwt,
+  parentReceiptId: process.env.NOMOS_PARENT_RECEIPT_ID,
+  swarmId: process.env.NOMOS_SWARM_ID,
+});
+
+spawn('node', ['./researcher.js'], {
+  env: {
+    ...process.env,
+    NOMOS_PARENT_UCAN_CHAIN: JSON.stringify(childChain.chain),
+    NOMOS_PARENT_RECEIPT_ID: childChain.parentReceiptId ?? '',
+    NOMOS_SWARM_ID: childChain.swarmId ?? '',
+  },
+});
+```
+
+## Fork a child (Python)
+
+```python
+from nomos import fork_child, read_parent_chain_from_env
+
+parent = read_parent_chain_from_env(os.environ)
+child = fork_child(
+    parent_chain=parent.chain,
+    audience_did="did:key:z6Mk…researcher",
+    capabilities=[{"with":"github://acme/app","can":"repo:read"}],
+)
+
+env = {
+    **os.environ,
+    "NOMOS_PARENT_UCAN_CHAIN": json.dumps(child["chain"]),
+    "NOMOS_PARENT_RECEIPT_ID": child.get("parentReceiptId",""),
+    "NOMOS_SWARM_ID": child.get("swarmId",""),
+}
+subprocess.Popen(["python","./researcher.py"], env=env)
+```
+
+## Cedar fragments for swarms
+
+The `swarm-safe` schema-pack ships four templates that read chain attributes
+`delegationDepth`, `rootAgent`, `invokedBy`:
+
+```cedar
+// 1. cap chain depth
+forbid ( principal, action, resource )
+  when { principal.delegationDepth > 3 };
+
+// 2. pin root agent (lock a swarm to one owner)
+forbid ( principal, action, resource )
+  unless { principal.rootAgent == "did:key:z6Mk…planner" };
+
+// 3. block tainted ancestors
+forbid ( principal, action, resource )
+  when { principal.invokedBy.contains("did:key:z6Mk…quarantined") };
+
+// 4. require direct call for the most sensitive actions
+forbid ( principal, action == Action::"/github/repo/put_file", resource )
+  when { principal.delegationDepth > 0 };
+```
+
+## Swarm view
+
+<Link href="/app/swarms">Swarms</Link> renders the tree:
+
+- **Agent tree** — parent/child DAG built from `agents.parentAgentId`.
+- **Attach child agent** — metadata only; the runtime UCAN chain must validate
+  independently.
+- **Approve for chain** — snapshot approval: covers the current set of agents in
+  the tree. Children forked after approval are NOT covered.
+- **Scope containment** — per-agent quick check (last decision, depth, last command).
+- **Recent receipts** — last 100 authorize calls scoped to this swarm.
+
+<Shot src="swarms-view.png" alt="Swarm view with agent tree and recent receipts" caption="One swarm view per root. Tree shape lives in DB; runtime chain validation is independent." />
+
+## Walking the audit tree
+
+Every receipt carries `parent_receipt_id`. Recursively unwind any chain offline:
+
+```bash
+pnpm dlx @auto-nomos/audit-verify \
+  --chain writerReceipt.json \
+  --pubkey $AUDIT_VERIFY_KEY
+
+# OK: 3 events, hash chain verified.
+# ALLOW github://acme/app agent=planner   depth=0 id=8c1f…
+# └── ALLOW github://acme/app agent=researcher depth=1 id=92ab…
+#     └── STEPUP github://acme/app agent=writer depth=2 id=7fde…
+```
+
+<Callout tone="warn" title="Beta status">
+  The wire format and Cedar templates are stable for the documented patterns. Edge
+  cases (cyclic forks, leaf-only attenuation, cross-swarm chains) are still being
+  spec'd. Open an issue if you hit something weird.
+</Callout>
+
+<NextSteps items={[
+  { href: "/docs/operate/audit-chain", label: "Audit chain", description: "Every chain forms one tree in the audit log." },
+]} />

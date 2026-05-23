@@ -1,0 +1,64 @@
+---
+title: Troubleshooting
+description: Decoded deny reasons, audit fields, common deploy failures. Skim by error string.
+journey: operate
+order: 9
+readMinutes: 6
+---
+
+The fastest path: paste the deny reason or error string into browser cmd-F on this
+page.
+
+## Deny reasons
+
+| `reason` | What | Fix |
+|---|---|---|
+| `policy_not_assigned` | App has no Default policy | App detail page → Default policy → pick one. |
+| `command_not_permitted` | Cedar doesn't permit this command | Edit the policy to include the action, or pick a broader template. |
+| `requires_step_up` | Cedar requires `context.cosigner == true` | Operator approves via passkey; agent retries automatically. |
+| `chain_invalid` | UCAN delegation chain doesn't validate | Verify each child UCAN's `iss` matches its parent's `aud`. |
+| `chain_too_deep` | Chain exceeds `NOMOS_MAX_CHAIN_DEPTH` | Cap your fork depth (default 8). |
+| `attenuation_violation` | Child UCAN has broader scope than parent | Child's `att` must be a strict subset of parent's. |
+| `envelope_revoked` | The grant envelope was revoked | Re-mint via /v1/authorize with a fresh intent. |
+| `connection_token_expired` | OAuth token past expiry, refresh failed | /app/connections → row → Reconnect. |
+| `connection_not_found` | No active Connection for the resource's provider | Connect the provider, or correct the resource shape. |
+| `apicall_schema_missing` | YAML adapter doesn't define this command | Upgrade @auto-nomos/adapters + mcp-server to ≥ 0.0.18. |
+| `coherence_low` | LLM coherence score below threshold | Restate the purpose more specifically, or disable INTENT_COHERENCE_ENABLED for this app. |
+
+## Audit row anomalies
+
+| Symptom | What it means |
+|---|---|
+| `prevHash` doesn't match the row above | Chain corruption (rare). Check `audit_roots` for the last signed root and verify with audit-verify; contact support. |
+| Row with `decision: allow` but no upstream call in logs | Common: agent fetched the UCAN but never used it (TTL expired without a call). Not a bug. |
+| `chainDepth > 8` | A swarm exceeded the cap. PDP should have rejected — file a bug. |
+| `signedRoot` missing for a day | Daily root cron didn't run. Check `AUDIT_SIGN_KEY` is set and the broker has perms to write `audit_roots`. |
+
+## Common deploy failures (self-host)
+
+<Faqs items={[
+  ["terraform apply fails with 'OIDC provider already exists'", "You ran the module twice. Either import the existing OIDC provider (`terraform import`) or destroy + re-apply."],
+  ["PDP container won't start: 'AUDIT_SIGN_KEY missing'", "The secret didn't land in Key Vault / Secrets Manager. Re-apply the Terraform module; if that doesn't work, check the IAM role allows secret writes."],
+  ["Dashboard returns 502 after deploy", "Container Apps revision is still rolling. Wait 90s or check the revision's logs for boot errors (usually wrong DATABASE_URL or missing JWT_SIGN_KEY)."],
+  ["OAuth callback URL mismatch", "Self-hosted dashboards: update the GitHub/Slack/etc OAuth app's callback URL to match your `oauth_redirect_base`. Hosted: this can't happen."],
+  ["Self-host can't reach the control plane from PDP", "VPC peering or DNS resolution issue. The PDP must resolve and reach `NOMOS_CONTROL_URL`. Test with `curl` inside the PDP container."]
+]} />
+
+## Cursor / Claude Desktop / Codex
+
+<Faqs items={[
+  ["MCP server doesn't start", "Check the host's MCP log (Cursor: Output panel → MCP. Claude Desktop: ~/Library/Logs/Claude/mcp-server-nomos.log). Most common: env not set or trailing whitespace on NOMOS_API_KEY."],
+  ["Tools listed but every call denies", "App has no policy. Open /app/agents/<id> → Default policy → pick `github:read-only` as a sanity check."],
+  ["Step-up never fires when expected", "Verify your policy's `when { !context.cosigner }` is on a `forbid` (overrides) or a `unless` (inside a permit). A standalone permit + cosigner only matches when cosigner is already true."],
+]} />
+
+## Performance
+
+<Faqs items={[
+  ["First call after deploy is slow (~1s)", "Cold start. Subsequent calls are p95 < 50ms. Pre-warm with a health-check curl loop in CI."],
+  ["Sustained p95 > 200ms", "Check /app/monitoring for the breakdown. Usually upstream SaaS latency (GitHub PR list against a 5k-issue repo is ~400ms regardless of Nomos)."],
+  ["Audit table is slow", "We auto-index recent rows. If you're scanning months of history, export to Parquet via R2 and query there."],
+]} />
+
+If none of the above match, open a ticket via <Link href="https://github.com/varendra007/agent-credential-broker/issues">GitHub Issues</Link>
+with: deny `reason`, audit `eventId`, your Nomos org slug, and the smallest repro.

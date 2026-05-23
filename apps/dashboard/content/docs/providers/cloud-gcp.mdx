@@ -1,0 +1,92 @@
+---
+title: Cloud IAM (GCP)
+description: Federated GCP access via Workload Identity Federation. No service-account JSON keys.
+journey: providers
+order: 13
+readMinutes: 7
+badge: beta
+product:
+  - { href: "/app/cloud/connect/gcp", label: "Connect GCP" }
+---
+
+GCP access uses **Workload Identity Federation (WIF)**: a Nomos OIDC token is
+exchanged for a short-lived Google service-account access token. No long-lived JSON
+key files anywhere.
+
+<Prereqs items={[
+  "A GCP project with `iam.googleapis.com` enabled.",
+  "Roles: `roles/iam.workloadIdentityPoolAdmin` + the service-account roles you want to grant.",
+  "Terraform 1.5+ with the Google provider.",
+]} />
+
+## Bootstrap
+
+```bash
+cd infra/terraform/google-nomos-bootstrap
+
+cat > terraform.tfvars <<EOF
+nomos_oidc_issuer = "https://id.auto-nomos.com"
+nomos_subject     = "org/<your-nomos-org-id>"
+project_id        = "<your-gcp-project-id>"
+service_account_roles = ["roles/storage.objectViewer", "roles/datastore.user"]
+EOF
+
+terraform init
+terraform apply
+```
+
+Output:
+
+```
+workload_identity_provider = "projects/.../locations/global/workloadIdentityPools/nomos/providers/nomos-oidc"
+service_account_email      = "nomos-federated@<project>.iam.gserviceaccount.com"
+```
+
+## Wire in the dashboard
+
+<Link href="/app/cloud/connect/gcp">/app/cloud/connect/gcp</Link> → paste both outputs
+→ **Test**.
+
+<Shot src="dashboard-cloud-gcp-bind.png" alt="Dashboard cloud-gcp bind form" caption="WIF provider + service-account email. One pair per GCP project." />
+
+## Commands
+
+- `/gcp/storage/get_object`, `/gcp/storage/list_objects`,
+  `/gcp/storage/put_object` (step-up)
+- `/gcp/firestore/get_document`, `/gcp/firestore/query`,
+  `/gcp/firestore/write_document` (step-up)
+- `/gcp/bigquery/query`, `/gcp/bigquery/get_table`
+- `/gcp/compute/list_instances`, `/gcp/compute/start_instance`,
+  `/gcp/compute/stop_instance` (step-up)
+- `/gcp/secretmanager/access_secret_version` (step-up)
+- `/gcp/cloudrun/list_services`, `/gcp/cloudrun/invoke_service`
+
+## Starter policies
+
+- **`gcp:storage-read`** — get + list on configured buckets.
+- **`gcp:firestore-read`** — get + query on configured collections.
+- **`gcp:compute-operator`** — list + start, stop with step-up.
+
+## Cedar fragment
+
+```cedar
+permit (
+  principal,
+  action in [Action::"/gcp/storage/get_object", Action::"/gcp/storage/list_objects"],
+  resource
+) when {
+  resource.bucket in ["acme-prod-uploads"]
+};
+
+forbid (
+  principal,
+  action in [Action::"/gcp/compute/stop_instance",
+             Action::"/gcp/secretmanager/access_secret_version"],
+  resource
+) when { !context.cosigner };
+```
+
+<NextSteps items={[
+  { href: "/docs/policies/templates", label: "Pick a starter policy", description: "Templates across every provider." },
+  { href: "/docs/operate/self-host-terraform", label: "Self-host with Terraform", description: "Deploy the PDP itself into your VPC." },
+]} />

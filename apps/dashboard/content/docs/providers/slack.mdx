@@ -1,0 +1,79 @@
+---
+title: Slack
+description: Read channels, post messages, manage users — every call gated by Cedar + audit.
+journey: providers
+order: 3
+readMinutes: 5
+badge: GA
+---
+
+Slack OAuth is workspace-scoped. One Connection = one workspace.
+
+<Prereqs items={[
+  "A Slack workspace where you can install apps (or workspace admin can approve).",
+]} />
+
+## Connect
+
+<Steps>
+  <Step n="1" title="Open the picker">
+    <Link href="/app/connections">Connections</Link> → **Connect** → **Slack**.
+  </Step>
+  <Step n="2" title="Pick workspace + approve">
+    Slack asks which workspace, then shows the scope list:
+    `channels:read`, `channels:history`, `chat:write`, `users:read`, `team:read`.
+
+    <Shot src="slack-oauth-consent.png" alt="Slack OAuth consent screen" caption="Slack scopes Nomos asks for. Narrow further with Cedar." />
+  </Step>
+  <Step n="3" title="Verify">
+    Back in Connections: workspace name shows, refresh token marked yes. Slack
+    refreshes every 12h on Nomos's hourly sweep.
+  </Step>
+</Steps>
+
+## Commands
+
+- `/slack/channel/list`, `/slack/channel/info`, `/slack/channel/history`
+- `/slack/message/post`, `/slack/message/reply`, `/slack/message/update`,
+  `/slack/message/delete` (step-up)
+- `/slack/user/list`, `/slack/user/get_by_email`, `/slack/user/info`
+- `/slack/dm/open`, `/slack/reaction/add`, `/slack/reaction/remove`
+- `/slack/pin/add`, `/slack/topic/set`
+- `/slack/search/messages` (admin-only)
+
+## Starter policies
+
+- **`slack:read-only`** — channel listing, history, user lookup. No posts.
+- **`slack:safe-default`** — read + post to channels matching a pattern. Delete
+  requires step-up. Useful for a notification bot.
+- **`slack:channel-pinned`** — narrow to one channel. Sandbox-friendly.
+
+## Cedar fragment
+
+```cedar
+permit (
+  principal,
+  action in [Action::"/slack/channel/history", Action::"/slack/message/post"],
+  resource
+) when {
+  resource.channel == "C0123ABC"  // only #ops
+};
+
+forbid (
+  principal,
+  action == Action::"/slack/message/delete",
+  resource
+) when { !context.cosigner };
+```
+
+## Operational gotchas
+
+<Faqs items={[
+  ["Bot can't post in a channel", "Slack requires the bot to be invited to private channels. `/invite @nomos-bot` in the channel."],
+  ["Rate limits hit", "Slack tier-2 rate limits (50 RPM per workspace). Nomos respects retry-after; your agent should not retry-on-deny."],
+  ["Want to attribute posts to a real user, not a bot", "Use a user-token connection instead of bot-token. Re-connect via Slack with `user_scope=…` when prompted."]
+]} />
+
+<NextSteps items={[
+  { href: "/docs/providers/google-workspace", label: "Google Workspace", description: "Gmail, Drive, Calendar, Docs, Sheets." },
+]} />

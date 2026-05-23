@@ -1,0 +1,99 @@
+---
+title: Connect Claude Code
+description: The terminal-native Claude agent. One `claude mcp add` command and your CLI agent gets gated SaaS access.
+journey: connect
+order: 3
+readMinutes: 4
+badge: GA
+---
+
+Claude Code is Anthropic's CLI agent. It speaks MCP, so wiring Nomos in is one command —
+no JSON file to edit.
+
+<Prereqs items={[
+  "Claude Code CLI installed (`npm i -g @anthropic-ai/claude-code` or via Homebrew).",
+  "A Nomos App with an API key.",
+  "At least one Connection.",
+]} />
+
+## The fast path
+
+```bash
+claude mcp add nomos \
+  -e NOMOS_CONTROL_URL=https://control.auto-nomos.com \
+  -e NOMOS_API_KEY=$NOMOS_API_KEY \
+  -e NOMOS_PDP_URL=https://pdp.auto-nomos.com \
+  -- npx -y @auto-nomos/mcp-server@latest
+```
+
+That's it. The next `claude` invocation has every Nomos tool available.
+
+## Verify
+
+```bash
+claude mcp list
+```
+
+You should see:
+
+```
+nomos    npx -y @auto-nomos/mcp-server@latest    [12 tools]
+```
+
+The tool count reflects your active Connections + the App's policy.
+
+<Shot src="claude-code-mcp-list.png" alt="claude mcp list output showing nomos with 12 tools" caption="`claude mcp list` shows every registered MCP server. The tool count updates as you connect more providers." />
+
+## Use it
+
+```bash
+claude "List the open issues on acme/app"
+```
+
+Claude Code picks the `github_issue_list` tool, the MCP server asks Nomos for a UCAN,
+the PDP allows, GitHub responds. Result is rendered in the terminal.
+
+<Shot src="claude-code-tool-call.png" alt="Claude Code terminal output with a tool call" caption="Tool name + sanitized arguments are printed; the response inlines below." />
+
+## Scoping per project
+
+Drop a project-local override via `.mcp.json` in the repo root. Claude Code reads it
+before the global config:
+
+```jsonc
+{
+  "mcpServers": {
+    "nomos": {
+      "command": "npx",
+      "args": ["-y", "@auto-nomos/mcp-server@latest"],
+      "env": {
+        "NOMOS_CONTROL_URL": "https://control.auto-nomos.com",
+        "NOMOS_API_KEY": "${NOMOS_API_KEY_THIS_REPO}",
+        "NOMOS_PDP_URL": "https://pdp.auto-nomos.com"
+      }
+    }
+  }
+}
+```
+
+This is how you give one repo's Claude Code session an API key that's scoped to one
+App + one policy.
+
+<Callout tone="signal" title="Commit the file, not the key.">
+  `.mcp.json` belongs in git (so teammates see the same MCP setup). The actual API key
+  goes through the `${NOMOS_API_KEY_THIS_REPO}` env expansion — your secret manager
+  injects it at runtime.
+</Callout>
+
+## Common failures
+
+<Faqs items={[
+  ["`claude mcp list` shows 0 tools", "MCP server failed to spawn. Re-run with --verbose: `claude --verbose mcp list`. Most common: NOMOS_API_KEY missing or wrong url scheme."],
+  ["Tools are listed but every call denies", "Policy not attached to the App. Open /app/agents/<id> and pick a Default policy."],
+  ["Want to swap to a self-hosted PDP", "Re-run `claude mcp add` with --override and change NOMOS_PDP_URL + NOMOS_CONTROL_URL. Or edit `~/.config/claude-code/mcp.json` directly."]
+]} />
+
+<NextSteps items={[
+  { href: "/docs/connect/openai-codex", label: "Connect OpenAI Codex", description: "OpenAI's MCP-speaking CLI." },
+  { href: "/docs/connect/raw-mcp", label: "Wire raw MCP", description: "If your agent isn't on this list." },
+]} />

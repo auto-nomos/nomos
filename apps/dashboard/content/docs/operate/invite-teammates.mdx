@@ -1,0 +1,57 @@
+---
+title: Invite teammates
+description: Email invite, one-click accept, four-branch flow. Seven-day expiry by default.
+journey: operate
+order: 6
+readMinutes: 4
+redirectsFrom:
+  - invites
+product:
+  - { href: "/app/settings/members", label: "Members" }
+---
+
+Anyone with the `invites:create` permission (owner + admin by default) can invite a
+teammate. The recipient gets a one-click accept link; if they don't have a Nomos
+account yet, the link routes them to signup and finishes the join automatically.
+
+## Send
+
+<Steps>
+  <Step n="1" title="Open Members">
+    <Link href="/app/settings/members">/app/settings/members</Link> → **Invite
+    teammate** → enter email + pick a role (default `member`).
+
+    <Shot src="invite-form.png" alt="Invite teammate dialog with email + role picker" caption="Default role is member. Promote later." />
+  </Step>
+  <Step n="2" title="Email sends">
+    The dashboard sends via Resend with a 7-day expiry. If `RESEND_API_KEY` isn't
+    set (self-host, dev), Nomos logs the raw accept URL to the server console — paste
+    by hand for smoke tests.
+  </Step>
+</Steps>
+
+## What the recipient sees
+
+The link lands on `/accept-invite?token=…`. Four branches:
+
+| Branch | What | Next |
+|---|---|---|
+| `joined` | Signed in + email matches | Joined. Dashboard reloads with org switched. |
+| `wrong_account` | Signed in + email mismatches | Sign out, sign back in with the right account, click link again. |
+| `needs_signup` | Not signed in | Redirect to `/sign-up?invite_token=…`. After signup, joined automatically. |
+| `error` | Expired / revoked / unknown | Friendly error. Re-issue from Members page. |
+
+## Manage pending invites
+
+Members table → **Pending** tab. Each row: email, role, sent-at, expires-at,
+revoke button. Revocation kills the token immediately; the recipient gets an error
+on click.
+
+<Callout tone="warn" title="One pending invite per email per org.">
+  Issuing a second invite to the same address returns `CONFLICT` — revoke the
+  existing one first. This is intentional so you don't spam invitees.
+</Callout>
+
+<NextSteps items={[
+  { href: "/docs/operate/self-host-terraform", label: "Self-host with Terraform", description: "Move from hosted to your own infra." },
+]} />

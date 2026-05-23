@@ -1,0 +1,93 @@
+---
+title: Cloud IAM (AWS)
+description: Federated AWS access via OIDC + STS AssumeRoleWithWebIdentity. No stored access keys.
+journey: providers
+order: 12
+readMinutes: 7
+badge: beta
+product:
+  - { href: "/app/cloud/connect/aws", label: "Connect AWS" }
+---
+
+AWS access works the same as Azure: your account trusts the Nomos OIDC issuer, and
+the PDP swaps an OIDC assertion for short-lived STS credentials on every request.
+
+<Prereqs items={[
+  "AWS account with IAM admin access.",
+  "Terraform 1.5+ with the AWS provider.",
+]} />
+
+## Bootstrap
+
+```bash
+cd infra/terraform/aws-nomos-bootstrap
+
+cat > terraform.tfvars <<EOF
+nomos_oidc_issuer = "https://id.auto-nomos.com"
+nomos_subject     = "org/<your-nomos-org-id>"
+target_account_id = "<your-aws-account-id>"
+allowed_actions   = ["s3:GetObject", "s3:ListBucket", "dynamodb:Query"]
+EOF
+
+terraform init
+terraform apply
+```
+
+Output:
+
+```
+role_arn = "arn:aws:iam::<account-id>:role/nomos-federated"
+```
+
+## Wire in the dashboard
+
+<Link href="/app/cloud/connect/aws">/app/cloud/connect/aws</Link> → paste `role_arn`
+→ **Test**. Dashboard does an `AssumeRoleWithWebIdentity` round trip; green check =
+federation works.
+
+<Shot src="dashboard-cloud-aws-bind.png" alt="Dashboard cloud-aws bind form with role_arn input" caption="One IAM role per AWS account, multiple accounts per Nomos org." />
+
+## Commands
+
+- `/aws/s3/get_object`, `/aws/s3/list_objects`, `/aws/s3/put_object` (step-up)
+- `/aws/dynamodb/get_item`, `/aws/dynamodb/query`, `/aws/dynamodb/put_item` (step-up),
+  `/aws/dynamodb/delete_item` (step-up)
+- `/aws/ec2/describe_instances`, `/aws/ec2/start_instances`,
+  `/aws/ec2/stop_instances` (step-up)
+- `/aws/lambda/list_functions`, `/aws/lambda/invoke`
+- `/aws/iam/get_user`, `/aws/iam/list_roles`
+- `/aws/secretsmanager/get_secret_value` (step-up)
+
+## Starter policies
+
+- **`aws:s3-read`** — get + list on configured buckets.
+- **`aws:dynamodb-read`** — query + get_item on configured tables.
+- **`aws:ec2-operator`** — describe + start, stop with step-up.
+
+## Cedar fragment
+
+```cedar
+permit (
+  principal,
+  action in [Action::"/aws/s3/get_object", Action::"/aws/s3/list_objects"],
+  resource
+) when {
+  resource.bucket in ["acme-prod-data", "acme-prod-logs"]
+};
+
+forbid (
+  principal,
+  action == Action::"/aws/secretsmanager/get_secret_value",
+  resource
+) when { !context.cosigner };
+```
+
+<Callout tone="warn" title="Trust policy = ceiling.">
+  The IAM role's trust policy is the *outer* limit. Cedar narrows from there. Make
+  the IAM role's permissions as broad as the union of all agents that will use it;
+  Cedar handles per-agent scoping.
+</Callout>
+
+<NextSteps items={[
+  { href: "/docs/providers/cloud-gcp", label: "Cloud IAM (GCP)", description: "Same flow, GCP Workload Identity Federation." },
+]} />

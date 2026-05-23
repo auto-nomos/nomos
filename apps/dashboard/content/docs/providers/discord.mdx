@@ -1,0 +1,65 @@
+---
+title: Discord
+description: Channels, DMs, reactions, threads. Bot OAuth with per-server consent.
+journey: providers
+order: 8
+readMinutes: 4
+badge: beta
+---
+
+Discord integration uses bot OAuth. Each Discord server (guild) approves Nomos
+separately.
+
+## Connect
+
+<Steps>
+  <Step n="1" title="Open picker">
+    <Link href="/app/connections">Connections</Link> → **Discord**.
+  </Step>
+  <Step n="2" title="Pick server + approve">
+    Discord shows the server picker. Bot scopes: `bot`, `applications.commands`,
+    `messages.read`. Pick the server, approve.
+
+    <Shot src="discord-oauth-consent.png" alt="Discord OAuth consent screen with server picker" caption="One server per consent. Run the flow again for additional servers." />
+  </Step>
+  <Step n="3" title="Invite the bot to channels">
+    The bot has to be in a channel to read/write. Discord defaults to "All channels"
+    but you can narrow it per-server via Server Settings → Integrations.
+  </Step>
+</Steps>
+
+## Commands
+
+- `/discord/channel/list`, `/discord/channel/get`
+- `/discord/message/list`, `/discord/message/get`, `/discord/message/create`,
+  `/discord/message/update`, `/discord/message/delete` (step-up)
+- `/discord/thread/create`, `/discord/thread/archive`
+- `/discord/reaction/add`, `/discord/reaction/remove`
+- `/discord/user/get`, `/discord/dm/create`
+
+## Starter policies
+
+- **`discord:read-only`** — channel + message list/get; user lookups.
+- **`discord:notification-bot`** — read + message create on a pinned channel.
+
+## Cedar fragment
+
+```cedar
+permit (
+  principal,
+  action in [Action::"/discord/message/list", Action::"/discord/message/create"],
+  resource
+) when {
+  resource.channelId == "1234567890123456"
+};
+
+forbid (
+  principal,
+  action == Action::"/discord/message/delete",
+  resource
+) when { !context.cosigner };
+```
+
+<NextSteps items={[
+  { href: "/docs/providers/filesystem", label: "Filesystem", description: "Local disk under Cedar control." },
+]} />

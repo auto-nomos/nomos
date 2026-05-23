@@ -1,0 +1,62 @@
+---
+title: Members + roles
+description: Six roles, one matrix. API keys carry the same roles. Single source of truth in `packages/rbac`.
+journey: operate
+order: 5
+readMinutes: 4
+redirectsFrom:
+  - members
+product:
+  - { href: "/app/settings/members", label: "Members" }
+---
+
+Six roles, ordered from most-to-least powerful. API keys carry the same roles —
+which means *"the agent acts as a `member`"* is a real, enforceable statement.
+
+| Role | Best for | What it can do |
+|---|---|---|
+| `owner` | founders, primary admins | Everything, including org delete + billing. |
+| `admin` | eng leads | Everything except org delete + ownership transfer. |
+| `agent_manager` | MCP operators, DevOps | CRUD on agents, grants, swarms, MCP servers. Read policies + audit. |
+| `policy_author` | security, compliance | CRUD on policies, schemas, envelopes. Read agents + audit. |
+| `auditor` | SOC, support engineers | Read-only across audit, agents, policies, grants. |
+| `member` | default for new invites | See members + org name. Promote when ready. |
+
+## The permission matrix
+
+Single source of truth lives at `packages/rbac/src/permissions.ts`. That file is
+imported by:
+
+- Dashboard route guards (front-end + tRPC).
+- Control-plane authorization middleware.
+- API key issuance UI.
+- PDP UCAN validation.
+
+Drift between layers is impossible — they all read the same matrix.
+
+## Change a teammate's role
+
+<Link href="/app/settings/members">/app/settings/members</Link> → row dropdown. Owners
+and admins can demote / promote. The **last owner** can't be demoted or removed —
+transfer ownership first.
+
+<Shot src="members-table-roledropdown.png" alt="Members table with role dropdown open on one row" caption="Promotion is immediate. The audited event includes who promoted whom." />
+
+## API key roles
+
+When you issue an API key on an App's detail page, you pick a role from the same
+list. Existing keys default to `admin`. Re-scope to least privilege via the issue
+dialog or by SQL on self-hosted:
+
+```sql
+UPDATE api_keys SET role = 'agent_manager' WHERE id = '...';
+```
+
+## Audit visibility
+
+Every role change writes one row to the audit chain. Filter
+`/app/audit?command=org.member.role_update` for the full history of who promoted whom.
+
+<NextSteps items={[
+  { href: "/docs/operate/invite-teammates", label: "Invite teammates", description: "Send + manage org invites." },
+]} />

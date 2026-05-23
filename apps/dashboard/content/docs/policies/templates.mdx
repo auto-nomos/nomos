@@ -1,0 +1,74 @@
+---
+title: Policy templates
+description: 20 starter policies across 12 providers. Pick one, tweak, attach. Most agents never need raw Cedar.
+journey: policies
+order: 1
+readMinutes: 5
+redirectsFrom:
+  - policies
+product:
+  - { href: "/app/policies", label: "Policies" }
+---
+
+Templates are the recommended starting point. Every template is real, reviewed Cedar —
+you can edit it directly or use the visual builder.
+
+## Pick one
+
+<Steps>
+  <Step n="1" title="Open Policies">
+    <Link href="/app/policies">Policies</Link> → **New policy** → **From template**.
+  </Step>
+  <Step n="2" title="Filter by provider + risk">
+    The picker groups templates by provider + a risk badge:
+
+    - 🟢 read-only — never writes, never delete
+    - 🟡 safe-default — writes allowed, deletes gated by step-up
+    - 🔴 broad — pre-reviewed but everything is on; for ops bots
+
+    <Shot src="policy-templates-picker.png" alt="Policy template picker grouped by provider with risk badges" caption="Risk badges are advisory. The actual gate is whatever Cedar says." />
+  </Step>
+  <Step n="3" title="Save + assign">
+    Save the policy. Then on the App detail page, set **Default policy** to it.
+  </Step>
+</Steps>
+
+## Template catalog (high-level)
+
+| Provider | Templates |
+|---|---|
+| GitHub | `read-only`, `safe-default`, `org-pinned`, `repo-pinned` |
+| Slack | `read-only`, `safe-default`, `channel-pinned` |
+| Google (Drive / Gmail / Cal / Docs / Sheets / Tasks / Contacts) | per sub-service `read-only` + `safe-default` |
+| Notion | `read-only`, `write-page-content` |
+| Linear | `read-only`, `safe-default`, `team-pinned` |
+| Stripe Connect | `read-only`, `safe-default`, `billing-bot` |
+| Discord | `read-only`, `notification-bot` |
+| Filesystem | `read-only`, `subdir-read`, `write-subdir`, `extension-filter`, `delete-step-up`, `developer-sandbox` |
+| SSH | `host-pinned-read`, `sftp-upload`, `host-subdir-full`, `exec-step-up`, `delete-step-up`, `read-write-no-exec` |
+| Azure | `read-only`, `storage-read`, `vm-operator` |
+| AWS | `s3-read`, `dynamodb-read`, `ec2-operator` |
+| GCP | `storage-read`, `firestore-read`, `compute-operator` |
+
+Every template's Cedar is in the dashboard editor — open, edit, save.
+
+## After picking a template
+
+You can:
+
+- **Use as-is** — best for read-only flows.
+- **Open in visual builder** → tighten one condition (e.g. *only this repo*) →
+  <Link href="/docs/policies/visual-builder">Visual builder guide</Link>.
+- **Open in Cedar editor** → write conditions the visual builder doesn't support →
+  <Link href="/docs/policies/cedar-syntax">Cedar syntax guide</Link>.
+
+<Callout tone="info" title="Templates evolve with the platform.">
+  When a new command is added to a provider (e.g. GitHub releases a new API), Nomos
+  ships a `next-template-version` notification in the dashboard. You decide whether
+  to adopt — your assigned policies don't change silently.
+</Callout>
+
+<NextSteps items={[
+  { href: "/docs/policies/visual-builder", label: "Visual builder", description: "Author + edit policies graphically." },
+  { href: "/docs/policies/cedar-syntax", label: "Cedar syntax", description: "Direct policy editing." },
+]} />

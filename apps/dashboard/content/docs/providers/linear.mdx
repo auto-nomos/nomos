@@ -1,0 +1,56 @@
+---
+title: Linear
+description: Issue tracking + project state. OAuth-scoped, refreshable, narrow Cedar by team or project.
+journey: providers
+order: 6
+readMinutes: 4
+badge: GA
+---
+
+Linear's OAuth model is org-scoped. One Connection = one Linear org.
+
+## Connect
+
+<Steps>
+  <Step n="1" title="Open picker">
+    <Link href="/app/connections">Connections</Link> → **Linear**.
+  </Step>
+  <Step n="2" title="Approve scopes">
+    `read`, `write`, `issues:create` (Linear bundles writes into one scope).
+  </Step>
+</Steps>
+
+## Commands
+
+- `/linear/issue/list`, `/linear/issue/get`, `/linear/issue/create`,
+  `/linear/issue/update`, `/linear/issue/archive` (step-up)
+- `/linear/comment/create`, `/linear/comment/update`
+- `/linear/team/list`, `/linear/team/get`, `/linear/team/members`
+- `/linear/project/list`, `/linear/project/get`, `/linear/project/create`
+- `/linear/cycle/list`, `/linear/cycle/get`
+- `/linear/user/me`, `/linear/user/list`
+- `/linear/workflow_state/list`
+
+## Starter policies
+
+- **`linear:read-only`** — list + get on issues, teams, projects, cycles.
+- **`linear:safe-default`** — read + issue create / update + comment create.
+  Archive requires step-up.
+- **`linear:team-pinned`** — narrow to one team's issues.
+
+## Cedar fragment
+
+```cedar
+permit (
+  principal,
+  action in [Action::"/linear/issue/list", Action::"/linear/issue/create",
+             Action::"/linear/comment/create"],
+  resource
+) when {
+  resource.teamId == "TEAM_ABCD"
+};
+```
+
+<NextSteps items={[
+  { href: "/docs/providers/stripe", label: "Stripe Connect", description: "Stripe accounts via Connect platform OAuth." },
+]} />

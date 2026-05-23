@@ -1,85 +1,99 @@
-'use client';
-
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, Boxes, Cpu, FileLock2, Plug, Settings2 } from 'lucide-react';
 import Link from 'next/link';
-import { GuideContent } from '../../components/nomos/guide';
 import { PublicShell } from '../../components/nomos/public-shell';
+import { getAllDocs, JOURNEYS } from '../../lib/docs';
 
-/* Public docs: same long-form guide rendered inside the marketing shell.
-   Auth-gated /app/guide is the in-product mirror — both use the same
-   underlying component so the docs never drift between the two contexts.
-   Three anchor cards up top satisfy the design-appendix IA spec for
-   docs-landing (Quick start / Concepts / API ref). */
+const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
+  'get-started': Cpu,
+  connect: Plug,
+  providers: Boxes,
+  policies: FileLock2,
+  operate: Settings2,
+};
 
-const ANCHORS = [
-  {
-    href: '/docs#quickstart',
-    eyebrow: '01 · quickstart',
-    title: 'Five-minute setup',
-    body: 'Sign up, connect GitHub, register your App, mint your first UCAN, run a real curl.',
-  },
-  {
-    href: '/docs#mental-model',
-    eyebrow: '02 · concepts',
-    title: 'Mental model',
-    body: 'UCAN, PDP, Cedar, audit chain, step-up. The five primitives that make the rest make sense.',
-  },
-  {
-    href: '/docs#filesystem-ssh',
-    eyebrow: '03 · GA · providers',
-    title: 'Filesystem & SSH',
-    body: 'Local disk + remote SFTP/exec under the same Cedar gate. Path-prefix scoping, step-up on destructive ops, 14 templates.',
-  },
-  {
-    href: '/docs#swarms',
-    eyebrow: '04 · beta · maos',
-    title: 'Swarms (delegation chains)',
-    body: 'Multi-agent orchestration security: parent → child UCAN propagation, scope containment, swarm-scoped approval.',
-  },
-  {
-    href: '/docs#cloud',
-    eyebrow: '05 · beta · cloud',
-    title: 'Cloud IAM (Azure / AWS / GCP)',
-    body: 'Federated cloud access. STS / AAD / WIF token exchange per request, no stored secrets. OIDC issuer live at id.auto-nomos.com.',
-  },
-];
-
-export default function DocsPage() {
+export default function DocsLandingPage() {
+  const docs = getAllDocs();
   return (
     <PublicShell>
       <div className="mx-auto max-w-[1280px] px-6 py-16 md:px-10 md:py-24">
-        <header className="max-w-[720px]">
+        <header className="max-w-[820px]">
           <div className="eyebrow">docs</div>
           <h1 className="display mt-4 text-[56px] leading-tight text-aegis-paper">
-            Read once. <em>Build</em>.
+            <em>Pick</em> your path.
           </h1>
-          <p className="mt-5 max-w-[520px] text-sm leading-relaxed text-aegis-mute">
-            One scroll covers the full concept surface; jump straight to a section using the cards
-            below or the TOC on the right.
+          <p className="mt-5 max-w-[560px] text-sm leading-relaxed text-aegis-mute">
+            Each journey is one continuous tutorial — every page assumes you've done the previous
+            one. New to Nomos? Start with{' '}
+            <Link
+              href="/docs/get-started/what-is-nomos"
+              className="text-aegis-signal underline-offset-2 hover:underline"
+            >
+              Get started
+            </Link>
+            .
           </p>
         </header>
 
-        <section className="mt-12 grid gap-px overflow-hidden rounded-sm border border-aegis-line bg-aegis-line md:grid-cols-2 lg:grid-cols-4">
-          {ANCHORS.map((a) => (
-            <Link
-              key={a.href}
-              href={a.href}
-              className="group flex flex-col gap-3 bg-aegis-ink p-6 transition-colors hover:bg-aegis-surface-2"
-            >
-              <div className="eyebrow">{a.eyebrow}</div>
-              <p className="font-display text-2xl text-aegis-paper">{a.title}</p>
-              <p className="text-sm leading-relaxed text-aegis-mute">{a.body}</p>
-              <span className="mt-auto inline-flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-[0.18em] text-aegis-mute transition-colors group-hover:text-aegis-paper">
-                read{' '}
-                <ArrowRight className="h-3 w-3 transition-transform group-hover:translate-x-0.5" />
-              </span>
-            </Link>
-          ))}
+        <section className="mt-14 grid gap-px overflow-hidden rounded-sm border border-aegis-line bg-aegis-line md:grid-cols-2 lg:grid-cols-5">
+          {JOURNEYS.map((journey) => {
+            const Icon = ICONS[journey.id] ?? Cpu;
+            const first = docs.find((d) => d.journey === journey.id);
+            const count = docs.filter((d) => d.journey === journey.id).length;
+            const href = first ? `/docs/${first.slug.join('/')}` : `/docs/${journey.id}/index`;
+            return (
+              <Link
+                key={journey.id}
+                href={href}
+                className="group flex flex-col gap-4 bg-aegis-ink p-6 transition-colors hover:bg-aegis-surface-2"
+              >
+                <Icon className="h-5 w-5 text-aegis-signal" />
+                <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-aegis-faint">
+                  {count} {count === 1 ? 'tutorial' : 'tutorials'}
+                </div>
+                <p className="font-display text-2xl text-aegis-paper">{journey.label}</p>
+                <p className="text-sm leading-relaxed text-aegis-mute">{journey.description}</p>
+                <span className="mt-auto inline-flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-[0.18em] text-aegis-mute transition-colors group-hover:text-aegis-paper">
+                  read{' '}
+                  <ArrowRight className="h-3 w-3 transition-transform group-hover:translate-x-0.5" />
+                </span>
+              </Link>
+            );
+          })}
         </section>
 
-        <div className="mt-16">
-          <GuideContent />
-        </div>
+        <section className="mt-20">
+          <div className="eyebrow mb-6">most read</div>
+          <div className="grid gap-px overflow-hidden rounded-sm border border-aegis-line bg-aegis-line md:grid-cols-3">
+            {[
+              {
+                slug: 'connect/cursor',
+                title: 'Connect Cursor',
+                description: 'Drop Nomos into Cursor MCP in three commands.',
+              },
+              {
+                slug: 'connect/claude-desktop',
+                title: 'Connect Claude Desktop',
+                description: 'One JSON file, copy-paste-ready.',
+              },
+              {
+                slug: 'policies/templates',
+                title: 'Pick a starter policy',
+                description: '20 templates across 12 providers.',
+              },
+            ].map((card) => (
+              <Link
+                key={card.slug}
+                href={`/docs/${card.slug}`}
+                className="group flex flex-col gap-2 bg-aegis-ink p-6 transition-colors hover:bg-aegis-surface-2"
+              >
+                <span className="font-display text-[18px] text-aegis-paper">{card.title}</span>
+                <span className="text-[13px] leading-relaxed text-aegis-mute">
+                  {card.description}
+                </span>
+              </Link>
+            ))}
+          </div>
+        </section>
       </div>
     </PublicShell>
   );

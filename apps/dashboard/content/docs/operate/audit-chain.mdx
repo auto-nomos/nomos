@@ -1,0 +1,84 @@
+---
+title: Audit chain
+description: Every decision is one row. Rows hash-chain. A signed root lands daily. Cryptographically verifiable forever.
+journey: operate
+order: 2
+readMinutes: 6
+redirectsFrom:
+  - audit
+product:
+  - { href: "/app/audit", label: "Audit" }
+---
+
+Every authorize, every step-up, every revocation lands in `audit_events`. Each row
+hashes the previous row's hash plus its own canonicalized payload — a Merkle list
+that's tamper-evident from any signed root onward.
+
+## The row shape
+
+```jsonc
+{
+  "eventId": "evt_01J7K…",
+  "ts": "2026-05-23T14:12:31.412Z",
+  "decision": "allow",
+  "command": "/github/issue/list",
+  "resource": { "provider": "github", "owner": "acme", "repo": "app" },
+  "context": { "now": {...}, "cosigner": false, "envelope_active": true },
+  "principal": "did:key:z6Mk…",
+  "agentName": "triage-bot",
+  "swarmId": null,
+  "chainDepth": 0,
+  "parentReceiptId": null,
+  "prevHash": "sha256:abc…",
+  "hash": "sha256:def…"
+}
+```
+
+`prevHash` is the row above. The chain is canonicalized in JSON Canonicalization
+Scheme (JCS) before hashing, so two equivalent JSONs hash identically.
+
+## Signed roots
+
+Once a day, the broker signs the latest hash with an Ed25519 key (`AUDIT_SIGN_KEY`)
+and stores it in `audit_roots`. The same payloads are mirrored as Parquet to R2 with
+a 7-year lifecycle.
+
+To prove an event existed at a point in time:
+
+1. Note the event's `eventId` + `hash`.
+2. Verify the row by re-canonicalizing + re-hashing.
+3. Walk forward to the next signed root; confirm the hash chain.
+4. Verify the signed root with `AUDIT_VERIFY_KEY` (the public side, posted in the
+   dashboard's <Link href="/security">Security</Link> page).
+
+## Reading the dashboard
+
+<Link href="/app/audit">Audit</Link>:
+
+- Sortable table — Time, App, Decision, Command, Resource, ChainDepth, SwarmId.
+- Filter by App, by decision (allow / deny / step_up), by provider.
+- CSV / JSON export from the top — includes every field shown above, plus
+  `keyId`, `coherenceScore`, `intentRisk`.
+
+<Shot src="audit-table.png" alt="Audit table with filters + sort indicators" caption="Each row is one immutable decision. Click for the full receipt + proof bundle." />
+
+## Drill-in
+
+Click a row → drawer:
+
+- Full canonicalized payload (collapsible JSON).
+- Hash + prevHash (clickable, jumps to neighbor).
+- For step-ups: linked cosigner UCAN cid + approver passkey credential id.
+- **Download proof** — JSON bundle for offline verification via
+  <Link href="/docs/operate/audit-verify-cli">audit-verify CLI</Link>.
+
+## Operational dashboards
+
+`/app/audit` is for spot checks. For trending, the dashboard pre-bins:
+
+- `/app/monitoring` — allow rate, p95 PDP latency, step-up rate, top deny reasons.
+- CSV exports → Splunk / Datadog / your warehouse.
+
+<NextSteps items={[
+  { href: "/docs/operate/audit-verify-cli", label: "Audit verify CLI", description: "Offline cryptographic proof checking." },
+]} />

@@ -1,0 +1,47 @@
+---
+title: Providers overview
+description: Every provider Nomos can broker today, with links to its step-by-step setup guide.
+journey: providers
+order: 1
+redirectsFrom:
+  - connections
+  - providers
+product:
+  - { href: "/app/connections", label: "Connections" }
+---
+
+Nomos brokers two kinds of providers:
+
+- **OAuth providers** — you do a one-time consent flow in the dashboard; the broker
+  encrypts and stores the token; agents get short-lived UCANs scoped to one command at a
+  time.
+- **Non-OAuth providers** (filesystem, SSH, cloud) — the PDP holds keys / credentials
+  via environment or federated identity; scoping happens through Cedar policy +
+  UCAN constraint.
+
+## OAuth providers
+
+| Provider | Status | Refreshable | Setup |
+|---|---|---|---|
+| GitHub | GA | yes | <Link href="/docs/providers/github">GitHub setup</Link> |
+| Slack | GA | yes | <Link href="/docs/providers/slack">Slack setup</Link> |
+| Google Workspace | GA | yes | <Link href="/docs/providers/google-workspace">Google setup</Link> |
+| Notion | GA | no | <Link href="/docs/providers/notion">Notion setup</Link> |
+| Linear | GA | yes | <Link href="/docs/providers/linear">Linear setup</Link> |
+| Stripe Connect | GA | no | <Link href="/docs/providers/stripe">Stripe setup</Link> |
+| Discord | beta | yes | <Link href="/docs/providers/discord">Discord setup</Link> |
+
+## Non-OAuth providers
+
+| Provider | Status | How it auths | Setup |
+|---|---|---|---|
+| Filesystem | GA | PDP host (no token) | <Link href="/docs/providers/filesystem">Filesystem setup</Link> |
+| SSH / SFTP | GA | SSH private key (env) | <Link href="/docs/providers/ssh">SSH setup</Link> |
+| Azure | beta | OIDC federation (WIF) | <Link href="/docs/providers/cloud-azure">Azure setup</Link> |
+| AWS | beta | OIDC federation (STS) | <Link href="/docs/providers/cloud-aws">AWS setup</Link> |
+| GCP | beta | OIDC federation (WIF) | <Link href="/docs/providers/cloud-gcp">GCP setup</Link> |
+
+<Callout tone="info" title="Provider you need isn't on the list?">
+  Open an issue on <Link href="https://github.com/varendra007/agent-credential-broker/issues">GitHub
+  Issues</Link>. New OAuth providers usually ship in 1–2 weeks once we have the spec.
+</Callout>

@@ -1,0 +1,96 @@
+---
+title: Visual builder
+description: A graph-based editor for Cedar policies. Round-tripped to ensure visual + actual Cedar never drift.
+journey: policies
+order: 2
+readMinutes: 5
+product:
+  - { href: "/app/policies", label: "Policies" }
+---
+
+The visual builder is a graph view of your Cedar policy. Drag actions, scope by
+resource, gate by condition — the editor emits Cedar in real time. **Every save
+round-trips** through the parser: visual → IR → Cedar → parsed IR. If the round-trip
+doesn't match, the save fails. You cannot ship a policy where the visual and the
+actual Cedar disagree.
+
+## Open the builder
+
+On any policy detail page → **Visual** tab.
+
+<Shot src="visual-builder-canvas.png" alt="Visual policy builder canvas with permit + forbid nodes connected to action + resource scopes" caption="Each permit / forbid is a node. Wires connect them to action sets and resource conditions." />
+
+## The five primitives
+
+<Steps>
+  <Step n="1" title="Permit / Forbid blocks">
+    Start with **+ Permit**. Cedar's default is deny; permits are what allow.
+    Forbid blocks override permits.
+  </Step>
+  <Step n="2" title="Action sets">
+    Drag actions into the permit's action input. Auto-grouped by provider. Pick
+    individual actions or whole groups (e.g. all GitHub read actions).
+  </Step>
+  <Step n="3" title="Resource conditions">
+    `resource.owner == "acme"` — type in the visual builder's condition input. The
+    builder hints valid keys from the YAML adapter (owner, repo, channel, account_id…).
+  </Step>
+  <Step n="4" title="Context conditions">
+    `context.cosigner == true` — the gate for step-up. Or `context.now.hour >= 9` for
+    business hours. Context keys come from the PDP — see
+    <Link href="/docs/policies/dynamic-intent">Dynamic intent</Link>.
+  </Step>
+  <Step n="5" title="Principal scoping">
+    Rarely needed — most policies apply to "this App" by default. If you're writing a
+    cross-app policy, scope to specific principals here.
+  </Step>
+</Steps>
+
+## A worked example
+
+Goal: allow read on every GitHub action, allow PR create only on `acme/app`, forbid
+deletes unless cosigner is true.
+
+1. **+ Permit** → drag GitHub read actions → no conditions → save.
+2. **+ Permit** → action `/github/pr/create` → resource `owner == "acme" && repo == "app"`.
+3. **+ Forbid** → actions matching `*/delete*` → condition `!context.cosigner`.
+
+The emitted Cedar (right pane):
+
+```cedar
+permit ( principal, action in [Action::"/github/issue/list", Action::"/github/issue/get",
+                                /* … */], resource );
+permit ( principal, action == Action::"/github/pr/create", resource )
+  when { resource.owner == "acme" && resource.repo == "app" };
+forbid ( principal, action like "/github/*/delete", resource )
+  when { !context.cosigner };
+```
+
+## What the round-trip guarantees
+
+<Callout tone="signal" title="Visual = Cedar.">
+  When you click save, the builder serializes the canvas to IR, emits Cedar, parses
+  it back, and compares. Mismatch = block save with a diff message. You cannot ship
+  a policy whose visual and Cedar disagree.
+</Callout>
+
+This matters because:
+
+- A buggy visual editor could otherwise show "deny on delete" while emitting Cedar
+  that allows delete. That class of bug becomes unshippable.
+- New visual features (e.g. a new condition operator) ship only when the round-trip
+  succeeds for every existing policy.
+
+## When to drop to Cedar
+
+- Multi-clause `unless` conditions.
+- Custom UCAN attribute lookups (`principal.delegationDepth < 3`).
+- Cross-resource invariants.
+
+Switch tabs to **Source**. Edit Cedar directly. The visual tab re-parses on the next
+load.
+
+<NextSteps items={[
+  { href: "/docs/policies/cedar-syntax", label: "Cedar syntax", description: "When the visual builder isn't enough." },
+  { href: "/docs/policies/step-up-approvals", label: "Step-up gates", description: "Add cosigner conditions visually." },
+]} />

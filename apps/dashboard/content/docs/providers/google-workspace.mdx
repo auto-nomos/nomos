@@ -1,0 +1,88 @@
+---
+title: Google Workspace
+description: One Google OAuth connection, seven sub-services — Gmail, Drive, Calendar, Docs, Sheets, Tasks, Contacts.
+journey: providers
+order: 4
+readMinutes: 6
+badge: GA
+---
+
+Google Workspace ships as one OAuth connection that fans out into seven sub-service
+adapters. You consent once; you can then write policies per sub-service.
+
+<Prereqs items={[
+  "A Google account (workspace or personal).",
+  "If you're an admin: Google Workspace API Library has Drive / Gmail / Calendar / etc enabled.",
+]} />
+
+## Connect
+
+<Steps>
+  <Step n="1" title="Open picker">
+    <Link href="/app/connections">Connections</Link> → **Connect** → **Google**.
+  </Step>
+  <Step n="2" title="Approve the seven scopes">
+    Google shows one consent screen listing every Workspace surface Nomos requests:
+
+    - `https://www.googleapis.com/auth/drive`
+    - `https://www.googleapis.com/auth/gmail.modify`
+    - `https://www.googleapis.com/auth/calendar`
+    - `https://www.googleapis.com/auth/documents`
+    - `https://www.googleapis.com/auth/spreadsheets`
+    - `https://www.googleapis.com/auth/tasks`
+    - `https://www.googleapis.com/auth/contacts`
+
+    Approve. Each is a *ceiling* — Cedar narrows.
+
+    <Shot src="google-oauth-consent.png" alt="Google OAuth consent screen with seven Workspace scopes" caption="One consent screen, seven scopes. You can revoke specific scopes via Google account → Security → Third-party access." />
+  </Step>
+</Steps>
+
+## Sub-services + commands
+
+| Sub-service | Sample commands |
+|---|---|
+| Drive | `/google/drive/list_files`, `/google/drive/get_file`, `/google/drive/create_folder`, `/google/drive/share_file` (step-up) |
+| Gmail | `/google_gmail/list_messages`, `/google_gmail/get_message`, `/google_gmail/send_message` (step-up) |
+| Calendar | `/google_calendar/list_events`, `/google_calendar/create_event`, `/google_calendar/update_event` |
+| Docs | `/google_docs/get_document`, `/google_docs/create_document`, `/google_docs/update_document` |
+| Sheets | `/google_sheets/get_values`, `/google_sheets/update_values`, `/google_sheets/append_values` |
+| Tasks | `/google_tasks/list_tasks`, `/google_tasks/create_task`, `/google_tasks/update_task` |
+| Contacts | `/google_contacts/list_contacts`, `/google_contacts/get_contact` |
+
+Full action catalogs at: <Link href="/docs/policies/templates">Policy templates</Link>.
+
+## Starter policies
+
+- `google_drive:read-only`, `google_drive:write-folder-pinned`
+- `gmail:read-only`, `gmail:safe-default` (send requires step-up)
+- `google_calendar:safe-default`
+- `google_sheets:read-only`, `google_sheets:write-specific-sheet`
+
+## Cedar fragment — only one shared Drive
+
+```cedar
+permit (
+  principal,
+  action in [Action::"/google/drive/list_files", Action::"/google/drive/get_file"],
+  resource
+) when {
+  resource.driveId == "0AHjBExampleDriveId"
+};
+
+forbid (
+  principal,
+  action == Action::"/google/drive/share_file",
+  resource
+) when { !context.cosigner };
+```
+
+<Callout tone="warn" title="Personal vs Workspace accounts">
+  Workspace admins can disable third-party access org-wide. If `Nomos` doesn't appear
+  in the consent screen, ask an admin to allow it under Admin Console → Security →
+  API controls → Manage third-party app access.
+</Callout>
+
+<NextSteps items={[
+  { href: "/docs/providers/notion", label: "Notion", description: "Workspace-scoped, non-refreshable." },
+]} />

@@ -1,0 +1,93 @@
+---
+title: Dynamic intent
+description: When an agent narrates *what* and *why* at runtime — and Nomos decides whether to mint silently, gate, or escalate.
+journey: policies
+order: 4
+readMinutes: 6
+badge: beta
+redirectsFrom:
+  - dynamic-intent
+---
+
+Static-mode agents call fixed commands. Dynamic-mode agents start every call with an
+**Intent** — a structured declaration of what (action), where (resource), why (purpose).
+
+Three gates run on every intent:
+
+<Steps>
+  <Step n="1" title="Heuristic risk classifier">
+    Built-in rules flag risky shapes: sensitive paths, write verbs, org-admin actions,
+    unusual times of day, calls outside the last-N envelope pattern.
+  </Step>
+  <Step n="2" title="Envelope cover">
+    Does an active grant already permit this exact intent? If yes, mint silently.
+  </Step>
+  <Step n="3" title="LLM coherence check (optional)">
+    Does the request match the declared `purpose`? Catches semantic drift — an envelope
+    granted for "email Bob" being used to email Carol.
+  </Step>
+</Steps>
+
+## What `context` carries
+
+| Key | Set by | When |
+|---|---|---|
+| `context.cosigner` | PDP | Cosigner UCAN attached after step-up. |
+| `context.now` | PDP | Every request (epoch, hour, day_of_week, iso). |
+| `context.ip` | PDP | Set if `EGRESS_TRUST_PROXY=true`. |
+| `context.purpose` | Agent | Free-text reason, validated by LLM check. |
+| `context.envelope_active` | PDP | Envelope cover succeeded. |
+| `context.intent_risk` | PDP | `low` / `medium` / `high` from heuristics. |
+| `context.coherence_score` | PDP | 0–1 from LLM check (if enabled). |
+
+## Enabling the LLM check
+
+```bash
+# control plane env:
+INTENT_COHERENCE_ENABLED=true
+INTENT_COHERENCE_MODEL=claude-haiku-4-5-20251001
+INTENT_COHERENCE_TIMEOUT_MS=1500
+ANTHROPIC_API_KEY=…
+```
+
+The LLM is asked: *"Given purpose: `<x>`, is this command + resource consistent with
+that purpose? Reply yes / no with confidence."* Times out at 1.5s. **Fails closed** —
+on timeout or no, the intent denies and falls through to step-up.
+
+## Cedar policy using context
+
+```cedar
+// allow high-confidence intents silently
+permit ( principal, action, resource )
+  when { context.intent_risk == "low" && context.coherence_score >= 0.8 };
+
+// require step-up for medium risk
+forbid ( principal, action, resource )
+  when { context.intent_risk == "medium" && !context.cosigner };
+
+// always deny high risk without a swarm-scoped approval
+forbid ( principal, action, resource )
+  when { context.intent_risk == "high" && !context.envelope_active };
+```
+
+## When to use dynamic mode
+
+- Coding agents that don't know in advance which files they'll touch.
+- Customer-support bots whose actions vary per ticket.
+- Triage agents that adapt to incoming data.
+
+When NOT to use dynamic mode:
+
+- Agents that always do the same N calls. Static mode is faster and cheaper.
+- Compliance-heavy flows where every action must be pre-listed in policy.
+
+<Callout tone="info" title="Cost note">
+  Coherence checks run a Haiku call per intent (~$0.0001 / 1k tokens). At 10 RPS for
+  a busy agent, that's roughly $25/month. Disable for cold paths, enable for high-
+  risk providers.
+</Callout>
+
+<NextSteps items={[
+  { href: "/docs/policies/step-up-approvals", label: "Step-up approvals", description: "When dynamic intent denies, this is what comes next." },
+  { href: "/docs/policies/standing-grants", label: "Standing grants", description: "Pre-approved envelopes that satisfy intent silently." },
+]} />

@@ -1,0 +1,105 @@
+---
+title: GitHub
+description: Connect GitHub via OAuth, scope policies per-repo, route writes through step-up.
+journey: providers
+order: 2
+readMinutes: 6
+badge: GA
+product:
+  - { href: "/app/connections", label: "Connections" }
+  - { href: "/app/policies", label: "Policies" }
+---
+
+GitHub is the reference connector. Most patterns here apply unchanged to Slack, Linear,
+Notion, Stripe.
+
+<Prereqs items={[
+  "A GitHub account with access to the org / repos you want exposed.",
+  "If your org has 'third-party access approval' enabled, an org owner needs to approve Nomos.",
+]} />
+
+## Connect
+
+<Steps>
+  <Step n="1" title="Initiate from the dashboard">
+    <Link href="/app/connections">Connections</Link> → **Connect** → **GitHub**. The
+    button opens GitHub's OAuth consent screen in a new tab.
+  </Step>
+  <Step n="2" title="Pick the right account / org">
+    GitHub shows account picker. Pick the org you want Nomos to see. Per-org consent
+    matters: a personal-account consent does *not* grant Nomos access to your work org.
+
+    <Shot src="github-org-picker.png" alt="GitHub OAuth consent showing org picker" caption="Pick the org carefully. You can re-connect later to add more, but each org is its own consent." />
+  </Step>
+  <Step n="3" title="Approve">
+    Nomos requests `repo`, `read:user`, `read:org`. These are the *ceiling*. Your
+    Cedar policy then narrows what an agent can actually do.
+  </Step>
+</Steps>
+
+## Available commands
+
+<table>
+  <thead><tr><th>Command</th><th>What it does</th></tr></thead>
+  <tbody>
+    <tr><td>`/github/issue/list`</td><td>list issues</td></tr>
+    <tr><td>`/github/issue/get`</td><td>read one issue</td></tr>
+    <tr><td>`/github/issue/create`</td><td>open issue</td></tr>
+    <tr><td>`/github/issue/update`</td><td>edit issue (title, body, labels, state)</td></tr>
+    <tr><td>`/github/pr/list`</td><td>list pull requests</td></tr>
+    <tr><td>`/github/pr/create`</td><td>open PR</td></tr>
+    <tr><td>`/github/pr/merge`</td><td>merge PR (default step-up)</td></tr>
+    <tr><td>`/github/branch/create`</td><td>create branch from a sha</td></tr>
+    <tr><td>`/github/repo/get_file`</td><td>read a file at a ref</td></tr>
+    <tr><td>`/github/repo/put_file`</td><td>write a file (default step-up)</td></tr>
+    <tr><td>`/github/repo/list_files`</td><td>list paths in a repo</td></tr>
+    <tr><td>`/github/release/create`</td><td>cut a release (default step-up)</td></tr>
+  </tbody>
+</table>
+
+Full catalog: `pnpm cb actions github`.
+
+## Starter policies
+
+- **`github:read-only`** — `repo/get_file`, `repo/list_files`, `issue/*` read, `pr/list`. No writes.
+- **`github:safe-default`** — all of read-only + `issue/create`, `issue/update`, `pr/create`.
+  PR merge, file put, release create require step-up.
+- **`github:org-pinned`** — same as safe-default but constrained to a single org.
+- **`github:repo-pinned`** — narrowed to one repo. Useful for codegen agents.
+
+Pick one in <Link href="/app/policies">Policies</Link> → **From template** → GitHub.
+
+## Cedar fragment
+
+```cedar
+permit (
+  principal,
+  action in [Action::"/github/issue/list", Action::"/github/issue/get",
+             Action::"/github/repo/get_file", Action::"/github/repo/list_files"],
+  resource
+) when {
+  resource.owner == "acme" && resource.repo == "app"
+};
+
+permit (
+  principal,
+  action == Action::"/github/pr/create",
+  resource
+) when {
+  resource.owner == "acme" && resource.repo == "app"
+  && context.cosigner == true
+};
+```
+
+## Operational gotchas
+
+<Faqs items={[
+  ["Token expired immediately", "Check the clock skew on your control-plane host. NTP drift >60s breaks GitHub OAuth signatures."],
+  ["Agent gets 404 on a repo it should see", "GitHub OAuth scopes are at consent time. If Nomos was consented before the repo was created, re-consent on the Connections row."],
+  ["Want different agents to see different repos", "Use Cedar `when { resource.repo == \"…\" }` per-policy. Nomos doesn't manage GitHub OAuth scope — Cedar does."]
+]} />
+
+<NextSteps items={[
+  { href: "/docs/providers/slack", label: "Slack", description: "Same flow, different scopes." },
+  { href: "/docs/policies/cedar-syntax", label: "Cedar policy syntax", description: "When the templates aren't enough." },
+]} />

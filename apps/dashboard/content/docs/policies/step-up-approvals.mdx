@@ -1,0 +1,95 @@
+---
+title: Step-up approvals
+description: When a policy denies, a human signs. Passkey-gated. Five seconds from push to retry.
+journey: policies
+order: 5
+readMinutes: 5
+redirectsFrom:
+  - step-up
+product:
+  - { href: "/app/approvals", label: "Approvals" }
+---
+
+Step-up is the bridge between "policy denied this" and "the agent gets through anyway,
+because a human just confirmed it's fine." The whole loop is five steps and under
+five seconds in the common case.
+
+<DiagramStepUp />
+
+## The five steps
+
+<Steps>
+  <Step n="1" title="Cedar returns step-up">
+    Your policy includes `when { context.cosigner == true }` on a sensitive action.
+    The agent's call lacks cosigner — Cedar denies with `requires_step_up`.
+  </Step>
+  <Step n="2" title="Nomos opens an approval envelope">
+    The control plane writes a row to `approval_envelopes` with a 60-second TTL.
+    Push notifications fan out (web push, Knock email, Telegram, your custom webhook).
+  </Step>
+  <Step n="3" title="You tap, your browser signs">
+    Notification deep-links to `/approve/<envelopeId>`. The page shows the agent,
+    the action, the resource, the purpose. You tap **Approve**. The browser asks for
+    your passkey assertion (Touch ID / Face ID / hardware key). Sign.
+  </Step>
+  <Step n="4" title="Nomos mints a cosigner UCAN">
+    The control plane verifies the passkey assertion, mints a cosigner UCAN bound
+    to the envelope, hands it back to the agent's MCP server / SDK.
+  </Step>
+  <Step n="5" title="Agent retries with cosigner attached">
+    Same intent + cosigner UCAN. Cedar's `when { context.cosigner == true }` now
+    matches. PDP allows. Upstream call runs.
+  </Step>
+</Steps>
+
+## TTLs
+
+- Approval envelope — 60s default; configurable per template up to 5 minutes.
+- Cosigner UCAN — 5 minutes from mint.
+- After cosigner expiry, the same retry would re-trigger step-up.
+
+## Two ways policies can require step-up
+
+### Inline `when { !context.cosigner }`
+
+```cedar
+forbid ( principal, action == Action::"/github/repo/put_file", resource )
+  when { !context.cosigner };
+```
+
+This is the explicit way: the rule is in your Cedar. The default templates use this
+for destructive actions.
+
+### Implicit step-up from a template tag
+
+Templates marked `risk: step_up` in their YAML get a fallback step-up gate
+automatically — even if your Cedar doesn't mention cosigner. Lets the platform raise
+the floor for newly-discovered risky actions without forcing a policy rewrite.
+
+## What the operator sees
+
+The dashboard's <Link href="/app/approvals">Approvals</Link> queue shows pending +
+recent approvals with: agent name, action, resource, purpose, intent risk, requester
+IP, time remaining. Tap a row → passkey sign or deny.
+
+<Shot src="dashboard-approvals-pending.png" alt="Approvals page with pending row showing agent + action + resource + countdown" caption="Pending approvals carry a countdown. The agent waits up to 60s by default." />
+
+## What the auditor sees
+
+Every step-up writes three audit rows:
+
+1. The initial `deny` with `reason: requires_step_up`.
+2. The cosigner UCAN mint event with the passkey credential id.
+3. The retry that succeeded, linked to the cosigner UCAN cid.
+
+`/app/audit?filter=decision:step_up` filters to just these chains.
+
+<Callout tone="info" title="Passkey assertion never leaves the browser.">
+  The cryptographic assertion is computed on your device. Nomos's server verifies
+  the assertion against the registered public key. There's no shared secret.
+</Callout>
+
+<NextSteps items={[
+  { href: "/docs/policies/standing-grants", label: "Standing grants", description: "Pre-approve a class of actions so step-up doesn't fire every time." },
+  { href: "/docs/connect/telegram-approvals", label: "Telegram approvals", description: "Route step-ups to Telegram instead of email." },
+]} />

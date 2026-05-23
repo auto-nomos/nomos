@@ -1,0 +1,63 @@
+---
+title: API keys
+description: Issue, rotate, revoke. One key per machine or environment. Plaintext is shown exactly once.
+journey: operate
+order: 1
+readMinutes: 4
+redirectsFrom:
+  - apps
+product:
+  - { href: "/app/agents", label: "Apps" }
+---
+
+API keys authenticate calls *to the control plane*. They authorize "this is an App
+asking for a UCAN" — not the upstream SaaS call itself.
+
+## Issue
+
+App detail page → **API keys** → **Issue key**. Pick:
+
+- **Label** — `local-dev`, `prod-replica`, `cursor-laptop`.
+- **Role** — `member` for read flows, `agent_manager` for runtime, `admin` only for
+  agents that provision other agents.
+- **Expires** — defaults to never. Set if the key belongs to a temp environment.
+
+<Shot src="api-key-issue-form.png" alt="Issue API key form on the App detail page" caption="Pick the narrowest role. Keys can be re-issued — the labels make it clear which physical machine holds which." />
+
+The reveal modal shows the plaintext key once. Copy it. Nomos stores only the hash.
+
+## Rotate
+
+There's no "rotate" button — that would be a footgun. Rotation = issue new + revoke
+old. The two operations are independent, so you can stage:
+
+1. Issue new key, deploy to the agent's secret manager.
+2. Verify the agent is using the new key (audit attributes by `keyId`).
+3. Revoke the old key.
+
+## Revoke
+
+App detail page → **API keys** → row menu → **Revoke**. The key is hashed; we can't
+restore. Existing UCANs the key already minted remain valid until their expiry —
+revoke the App's **envelope** too if you need to kill those.
+
+## Roles
+
+```text
+owner      — everything, including org delete
+admin      — everything except org delete + ownership transfer
+agent_manager — CRUD agents, grants, swarms, MCP servers; read policies + audit
+policy_author — CRUD policies, schemas, envelopes; read agents + audit
+auditor    — read-only across everything
+member     — see members + org name; default for new invites
+```
+
+The API key carries the role it was issued with. Switch roles on issue, not edit.
+
+## Pitfalls
+
+<Faqs items={[
+  ["Lost the plaintext key", "Can't recover. Revoke + issue new."],
+  ["Key works but every call denies", "Role too narrow. `member` can't call /v1/authorize — it's read-only. Issue an `agent_manager` key."],
+  ["Want to attribute calls to specific machines", "One key per machine, distinct labels. The audit row carries `keyId`, which the dashboard maps to the label."]
+]} />

@@ -1,0 +1,65 @@
+---
+title: Connect OpenAI Codex
+description: OpenAI's MCP-speaking CLI. Same MCP server as Cursor + Claude — different config file.
+journey: connect
+order: 4
+readMinutes: 4
+badge: GA
+---
+
+OpenAI's Codex CLI is MCP-native as of v0.5+. Add Nomos as one of its MCP servers and
+your Codex agent gets the same policy gate as every other Nomos-connected agent.
+
+<Prereqs items={[
+  "Codex CLI 0.5+ (`npm i -g @openai/codex`).",
+  "A Nomos App with an API key.",
+  "At least one Connection.",
+]} />
+
+## Config location
+
+Codex reads `~/.codex/config.toml` (macOS / Linux) or `%APPDATA%\codex\config.toml`
+(Windows).
+
+## The block to add
+
+```toml
+[mcp_servers.nomos]
+command = "npx"
+args = ["-y", "@auto-nomos/mcp-server@latest"]
+
+[mcp_servers.nomos.env]
+NOMOS_CONTROL_URL = "https://control.auto-nomos.com"
+NOMOS_API_KEY = "nk_live_…"
+NOMOS_PDP_URL = "https://pdp.auto-nomos.com"
+```
+
+Append this to your existing `config.toml` — don't replace the file.
+
+<Shot src="codex-config-toml.png" alt="config.toml open with the Nomos block highlighted" caption="TOML, not JSON. Indent the env table under the server's namespace." />
+
+## Run Codex
+
+```bash
+codex "open a PR on acme/app that bumps the README copyright year"
+```
+
+Codex picks `github_pr_create`, the MCP server asks Nomos, the PDP runs your policy.
+If the policy allows the command outright, you get the PR. If the policy requires
+step-up (because PR creation is a write), Codex pauses while you approve on your
+phone, then continues.
+
+<Shot src="codex-tool-call.png" alt="Codex CLI showing a github_pr_create call with approval pending" caption="Codex pauses at the step-up gate. Once you approve, it continues with the cosigner UCAN." />
+
+## Common failures
+
+<Faqs items={[
+  ["Codex doesn't see Nomos tools", "Codex caches MCP servers for 60s. `codex mcp refresh` forces a re-discovery. Or restart the session."],
+  ["TOML parse error on launch", "Codex is strict about TOML. Make sure the env values are bare strings (NOMOS_API_KEY = \"nk_live_…\"), not arrays or tables."],
+  ["Want one Codex per project", "Codex respects a project-local config at `.codex/config.toml`. Drop the same block there; the project config layers on top of the global one."]
+]} />
+
+<NextSteps items={[
+  { href: "/docs/connect/raw-mcp", label: "Wire raw MCP", description: "Generic MCP host walkthrough." },
+  { href: "/docs/connect/sdk-typescript", label: "TypeScript SDK", description: "If you're writing the agent yourself, not using a host." },
+]} />

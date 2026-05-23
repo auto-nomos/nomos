@@ -1,0 +1,110 @@
+---
+title: Filesystem
+description: Local disk access for agents. No OAuth — scoping done via UCAN path-prefix constraints + Cedar.
+journey: providers
+order: 9
+readMinutes: 6
+badge: GA
+redirectsFrom:
+  - filesystem-ssh
+  - providers/filesystem-ssh
+---
+
+The `filesystem` provider lets an agent read and write files on the **PDP's local
+disk**. No OAuth — the PDP runs as the host process, so there's no token to encrypt.
+Everything is scoped by:
+
+1. Cedar policy on `/filesystem/*` actions.
+2. A **path prefix** baked into the UCAN as a `resource_constraint`.
+3. Defense-in-depth at the PDP: symlink escape detection, shell-metachar rejection,
+   timeouts.
+
+<Prereqs items={[
+  "PDP running on a host where the agent's target files live.",
+  "An App with a policy that scopes filesystem actions.",
+]} />
+
+## Setup
+
+No OAuth. The PDP runs as the user it was launched as (often a low-privilege service
+account). Path scope is per-request via the UCAN constraint:
+
+```json
+{
+  "provider": "filesystem",
+  "path_prefix": "/srv/workspaces/agent-42"
+}
+```
+
+The PDP refuses any request whose target path escapes that prefix (after
+`realpath()`, so symlinks can't dodge it).
+
+## Commands
+
+```
+filesystem_file_read           filesystem_dir_list
+filesystem_file_write          filesystem_dir_tree
+filesystem_file_create         filesystem_dir_create
+filesystem_file_delete         filesystem_dir_delete
+filesystem_file_move           filesystem_dir_delete_recursive
+filesystem_file_copy
+```
+
+## Starter policies
+
+- **`filesystem:read-only`** — read + list. No writes.
+- **`filesystem:subdir-read`** — read inside a path prefix only.
+- **`filesystem:write-subdir`** — write inside a path prefix.
+- **`filesystem:extension-filter`** — only `.py` / `.ts` / extensions you whitelist.
+- **`filesystem:delete-step-up`** — unlink requires passkey.
+- **`filesystem:developer-sandbox`** — full CRUD in `/tmp/agent-<id>`.
+
+## Five common use cases
+
+1. **Researcher reads a code tree.** `filesystem:subdir-read` +
+   `path_prefix=/repos/acme`. Read + tree, no writes.
+2. **Codegen agent rewrites files.** `filesystem:write-subdir` +
+   `filesystem:extension-filter` pinned to `.ts`. Deletes require passkey.
+3. **Logs collector.** `filesystem:subdir-read` + `path_prefix=/var/log/myapp`.
+4. **Sandbox.** `filesystem:developer-sandbox` + `path_prefix=/tmp/agent-{id}`.
+5. **Build artifact mover.** `filesystem:write-subdir` from `/build/out` to
+   `/srv/releases`.
+
+## Defenses in depth
+
+The PDP enforces five overlapping checks per request:
+
+- **Path-prefix boundary** — strict `prefix + '/'` match. `/foobar` never matches `/foo`.
+- **Symlink escape** — `fs.realpath()` on source + dest; reject if resolved leaves prefix.
+- **Shell metachar reject** — `$`, backtick, `${`, `$(`, newline, backslash → deny.
+- **Shell quoting** — every shell-invoked path is POSIX single-quote escaped.
+- **Timeouts** — 30s per op, 1MB output cap on tree/list.
+
+## Cedar fragment
+
+```cedar
+permit (
+  principal,
+  action in [Action::"/filesystem/file/read", Action::"/filesystem/dir/list",
+             Action::"/filesystem/dir/tree"],
+  resource
+);
+
+permit (
+  principal,
+  action == Action::"/filesystem/file/write",
+  resource
+) when {
+  resource.extension in [".ts", ".tsx", ".md"]
+};
+
+forbid (
+  principal,
+  action == Action::"/filesystem/file/delete",
+  resource
+) when { !context.cosigner };
+```
+
+<NextSteps items={[
+  { href: "/docs/providers/ssh", label: "SSH / SFTP", description: "Remote disk + shell, same model." },
+]} />
