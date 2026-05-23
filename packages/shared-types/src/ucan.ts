@@ -230,6 +230,25 @@ export const GcpConstraint = z.object({
   resource_id: z.string().min(1).optional(),
 });
 
+/**
+ * Discord bot-install variant. The bot is scoped to one guild at install
+ * time (captured as the connection's `accountId`); these fields narrow
+ * further: `guild_id` pins which guild the call may target; `channel_id`
+ * narrows to a single channel; `message_id` / `role_id` / `user_id` pin
+ * to a specific message / role / member. Chain attenuation narrows only.
+ *
+ * Discord ids are snowflakes (decimal strings) — kept as `string` since
+ * JS numbers can't represent the full 64-bit range.
+ */
+export const DiscordConstraint = z.object({
+  provider: z.literal('discord'),
+  guild_id: z.string().min(1).optional(),
+  channel_id: z.string().min(1).optional(),
+  message_id: z.string().min(1).optional(),
+  role_id: z.string().min(1).optional(),
+  user_id: z.string().min(1).optional(),
+});
+
 export const ResourceConstraint = z.discriminatedUnion('provider', [
   FilesystemConstraint,
   GithubConstraint,
@@ -248,6 +267,7 @@ export const ResourceConstraint = z.discriminatedUnion('provider', [
   AzureConstraint,
   AwsConstraint,
   GcpConstraint,
+  DiscordConstraint,
 ]);
 
 export type FilesystemConstraint = z.infer<typeof FilesystemConstraint>;
@@ -267,6 +287,7 @@ export type GoogleContactsConstraint = z.infer<typeof GoogleContactsConstraint>;
 export type AzureConstraint = z.infer<typeof AzureConstraint>;
 export type AwsConstraint = z.infer<typeof AwsConstraint>;
 export type GcpConstraint = z.infer<typeof GcpConstraint>;
+export type DiscordConstraint = z.infer<typeof DiscordConstraint>;
 export type ResourceConstraint = z.infer<typeof ResourceConstraint>;
 
 export const UcanPayload = z

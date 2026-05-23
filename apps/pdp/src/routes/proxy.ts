@@ -27,6 +27,7 @@ import { canonicalize, computeCid, parseUcanJwt } from '@auto-nomos/ucan';
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { type CloudAdapterDeps, CloudCallError, cloudApiCall } from '../adapters/cloud.js';
+import { validateDiscordProxyCall } from '../adapters/discord.js';
 import { executeFilesystemCommand } from '../adapters/filesystem-dispatch.js';
 import { validateGithubProxyCall } from '../adapters/github.js';
 import { validateGoogleCalendarProxyCall } from '../adapters/google_calendar.js';
@@ -994,6 +995,14 @@ export function createProxyRoutes(deps: ProxyRouteDeps): Hono {
         case 'slack': {
           const r = validateSlackProxyCall(
             constraint as Parameters<typeof validateSlackProxyCall>[0],
+            apiCall,
+          );
+          if (!r.ok) adapterReason = r.reason;
+          break;
+        }
+        case 'discord': {
+          const r = validateDiscordProxyCall(
+            constraint as Parameters<typeof validateDiscordProxyCall>[0],
             apiCall,
           );
           if (!r.ok) adapterReason = r.reason;
