@@ -14,7 +14,7 @@
  * unifies these via schema packs.
  */
 
-export type ProviderId = 'github' | 'slack' | 'google' | 'notion' | 'linear' | 'stripe';
+export type ProviderId = 'github' | 'slack' | 'google' | 'notion' | 'linear' | 'stripe' | 'discord';
 
 export interface ProviderApiConfig {
   base: string;
@@ -27,6 +27,11 @@ export interface ProviderApiConfig {
   jsonContentType?: string;
   /** Stripe-style form encoding for request bodies. Default JSON. */
   bodyEncoding?: 'json' | 'form';
+  /**
+   * Auth header scheme. Default `Bearer`. Discord uses `Bot <token>` for
+   * bot-token calls; everyone else is `Bearer <token>`.
+   */
+  authScheme?: 'Bearer' | 'Bot';
 }
 
 export const PROVIDER_API: Record<ProviderId, ProviderApiConfig> = {
@@ -56,6 +61,14 @@ export const PROVIDER_API: Record<ProviderId, ProviderApiConfig> = {
     base: 'https://api.stripe.com',
     bodyEncoding: 'form',
   },
+  discord: {
+    base: 'https://discord.com/api/v10',
+    authScheme: 'Bot',
+    jsonContentType: 'application/json; charset=utf-8',
+    staticHeaders: {
+      'user-agent': 'NomosBroker (https://auto-nomos.com, 1.0)',
+    },
+  },
 };
 
 export interface ProxyRequest {
@@ -83,7 +96,8 @@ export function isKnownProvider(id: string): id is ProviderId {
     id === 'google' ||
     id === 'notion' ||
     id === 'linear' ||
-    id === 'stripe'
+    id === 'stripe' ||
+    id === 'discord'
   );
 }
 
@@ -99,13 +113,13 @@ export async function proxyApiCall(
     for (const [k, v] of Object.entries(req.query)) url.searchParams.set(k, v);
   }
   const headers: Record<string, string> = {
-    authorization: `Bearer ${accessToken}`,
+    authorization: `${cfg.authScheme ?? 'Bearer'} ${accessToken}`,
     accept: 'application/json',
     ...(cfg.staticHeaders ?? {}),
     ...(req.headers ?? {}),
   };
   let body: string | undefined;
-  if (req.body !== undefined && req.method !== 'GET') {
+  if (req.body !== undefined && req.method !== 'GET' && req.method !== 'DELETE') {
     if (cfg.bodyEncoding === 'form') {
       body = encodeFormBody(req.body);
       headers['content-type'] = 'application/x-www-form-urlencoded';
