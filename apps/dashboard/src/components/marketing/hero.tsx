@@ -16,13 +16,15 @@ export function Hero() {
             <span className="pulse" />
             <span>Open source soon · MCP-native · v0.1.x beta</span>
           </div>
-          <h1 className="display mt-7 max-w-[14ch] text-[64px] text-aegis-paper md:text-[96px] lg:text-[112px]">
-            Your agent should never hold a <em>key</em> it could leak.
+          <h1 className="display mt-7 max-w-[12ch] text-[64px] text-aegis-paper md:text-[96px] lg:text-[112px]">
+            Agents need <em>guardrails</em>.
+            <br />
+            Not guesswork.
           </h1>
           <p className="mt-9 max-w-[640px] text-lg leading-relaxed text-aegis-mute md:text-xl">
-            Nomos is the authorization layer for AI agents. Capability tokens instead of API keys.
-            Cedar policy on every call. Cryptographic audit you can replay. Open source — star us on
-            GitHub.
+            Scoped permissions, signed actions, replayable audit. Nomos is the control plane between
+            your AI agents and the world — every action authorized, every scope narrowed, every
+            decision witnessed. Open source — star us on GitHub.
           </p>
           <div className="mt-10 flex flex-wrap items-center gap-3">
             <Link

@@ -60,8 +60,8 @@ export default function TwitterImage() {
             maxWidth: 1040,
           }}
         >
-          <span>Your agent should never hold a&nbsp;</span>
-          <span style={{ color: '#bfff00' }}>key it could leak.</span>
+          <span>Agents need&nbsp;</span>
+          <span style={{ color: '#bfff00' }}>guardrails. Not guesswork.</span>
         </div>
         <div
           style={{
