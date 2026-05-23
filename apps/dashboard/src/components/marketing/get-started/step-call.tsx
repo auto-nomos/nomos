@@ -63,6 +63,26 @@ const issues = await fetch(
 ).then((r) => r.json());`}
                 </PaneShell>
               ),
+              py: (
+                <PaneShell caption="authorize + requests — LangGraph / CrewAI / AutoGen ready">
+                  {`import os, requests
+
+decision = guard.authorize(
+    command="/github/issue/list",
+    resource={"provider": "github", "owner": "acme", "repo": "app"},
+    ttl_seconds=300,
+)
+
+if not decision.allow:
+    raise RuntimeError(decision.reason)
+
+issues = requests.get(
+    f"{os.environ['NOMOS_PDP_URL']}/github/issue/list",
+    params={"owner": "acme", "repo": "app"},
+    headers={"authorization": f"Bearer {decision.ucan}"},
+).json()`}
+                </PaneShell>
+              ),
             }}
           />
         </div>

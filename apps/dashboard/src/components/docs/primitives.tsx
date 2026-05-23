@@ -204,12 +204,13 @@ export function Verify({ children }: { children: React.ReactNode }) {
   );
 }
 
-type PathId = 'cli' | 'mcp' | 'sdk';
+type PathId = 'cli' | 'mcp' | 'sdk' | 'py';
 
 const PATH_ORDER: { id: PathId; label: string }[] = [
   { id: 'cli', label: 'CLI' },
   { id: 'mcp', label: 'MCP' },
-  { id: 'sdk', label: 'SDK' },
+  { id: 'sdk', label: 'SDK · TS' },
+  { id: 'py', label: 'SDK · Py' },
 ];
 
 const PATH_STORAGE_KEY = 'nomos.get-started.path';
@@ -231,7 +232,7 @@ export function PathTabs({
   useEffect(() => {
     try {
       const stored = window.localStorage.getItem(PATH_STORAGE_KEY);
-      if (stored === 'cli' || stored === 'mcp' || stored === 'sdk') {
+      if (stored === 'cli' || stored === 'mcp' || stored === 'sdk' || stored === 'py') {
         setActive(stored);
       }
     } catch {
@@ -243,7 +244,10 @@ export function PathTabs({
   Children.forEach(children, (child) => {
     if (!isValidElement(child)) return;
     const props = child.props as { id?: PathId; children?: React.ReactNode };
-    if (props.id && (props.id === 'cli' || props.id === 'mcp' || props.id === 'sdk')) {
+    if (
+      props.id &&
+      (props.id === 'cli' || props.id === 'mcp' || props.id === 'sdk' || props.id === 'py')
+    ) {
       panes.set(props.id, props.children);
     }
   });

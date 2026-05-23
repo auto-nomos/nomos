@@ -59,6 +59,17 @@ const key = await client.apps.keys.create({
 // store key.value — only returned once`}
                 </PaneShell>
               ),
+              py: (
+                <PaneShell caption="same mutation, AuthGuard's control-plane client">
+                  {`app = guard.apps.create(
+    name="Inbox triage bot",
+    mode="dynamic",
+)
+
+key = guard.apps.keys.create(app_id=app.id)
+# store key.value — only returned once`}
+                </PaneShell>
+              ),
             }}
           />
         </div>

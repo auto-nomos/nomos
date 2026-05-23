@@ -3,12 +3,13 @@
 import { useEffect, useState } from 'react';
 import { cn } from '../../lib/utils';
 
-export type AccessPath = 'cli' | 'mcp' | 'sdk';
+export type AccessPath = 'cli' | 'mcp' | 'sdk' | 'py';
 
 const PATH_ORDER: { id: AccessPath; label: string; sub: string }[] = [
   { id: 'cli', label: 'CLI', sub: '@auto-nomos/cli' },
   { id: 'mcp', label: 'MCP', sub: '@auto-nomos/mcp-server' },
-  { id: 'sdk', label: 'SDK', sub: '@auto-nomos/sdk' },
+  { id: 'sdk', label: 'SDK · TS', sub: '@auto-nomos/sdk' },
+  { id: 'py', label: 'SDK · Py', sub: 'auto-nomos-sdk' },
 ];
 
 const STORAGE_KEY = 'nomos.get-started.path';
@@ -18,6 +19,7 @@ interface Panes {
   cli?: React.ReactNode;
   mcp?: React.ReactNode;
   sdk?: React.ReactNode;
+  py?: React.ReactNode;
 }
 
 export function PathTabs({
@@ -32,7 +34,7 @@ export function PathTabs({
   useEffect(() => {
     try {
       const stored = window.localStorage.getItem(STORAGE_KEY);
-      if (stored === 'cli' || stored === 'mcp' || stored === 'sdk') {
+      if (stored === 'cli' || stored === 'mcp' || stored === 'sdk' || stored === 'py') {
         setActive(stored);
       }
     } catch {
@@ -40,7 +42,7 @@ export function PathTabs({
     }
     const onSync = (e: Event) => {
       const detail = (e as CustomEvent<AccessPath>).detail;
-      if (detail === 'cli' || detail === 'mcp' || detail === 'sdk') {
+      if (detail === 'cli' || detail === 'mcp' || detail === 'sdk' || detail === 'py') {
         setActive(detail);
       }
     };
@@ -58,11 +60,11 @@ export function PathTabs({
     window.dispatchEvent(new CustomEvent(SYNC_EVENT, { detail: id }));
   };
 
-  const activePane = panes[active] ?? panes.sdk ?? panes.cli ?? panes.mcp ?? null;
+  const activePane = panes[active] ?? panes.sdk ?? panes.cli ?? panes.mcp ?? panes.py ?? null;
 
   return (
     <div className="overflow-hidden rounded-sm border border-aegis-line bg-aegis-surface/40">
-      <div className="grid grid-cols-3 border-b border-aegis-line bg-aegis-ink/60">
+      <div className="grid grid-cols-2 border-b border-aegis-line bg-aegis-ink/60 md:grid-cols-4">
         {PATH_ORDER.map((p) => {
           const has = panes[p.id] !== undefined;
           const isActive = active === p.id;

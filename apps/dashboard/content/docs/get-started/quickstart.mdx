@@ -15,21 +15,23 @@ product:
 ---
 
 This is the ten-minute path from zero to "an agent called GitHub through Nomos
-and the receipt is in the audit chain." Three access modes are first-class —
+and the receipt is in the audit chain." Four access modes are first-class —
 pick the one that matches how you'll actually use Nomos:
 
 - **CLI** — `@auto-nomos/cli`. Best for scripting, CI, and one-off shell use.
 - **MCP** — `@auto-nomos/mcp-server`. The path Claude Desktop, Cursor, and
   Claude Code take. Zero code on your side.
-- **SDK** — `@auto-nomos/sdk`. What your codebase calls when you're writing
-  the agent yourself.
+- **SDK · TS** — `@auto-nomos/sdk`. What your TypeScript / Node codebase
+  calls when you're writing the agent yourself.
+- **SDK · Py** — `auto-nomos-sdk` on PyPI. Mirrors the TS surface for
+  LangGraph / CrewAI / AutoGen orchestrators.
 
 Pick a tab in any step below; your choice is remembered across steps.
 
 <Prereqs items={[
   "A Nomos account (sign up at the dashboard — takes 30 seconds).",
   "An API key from /app/api-keys (NOMOS_API_KEY=nk_live_…). Visible once on creation.",
-  "Node 18+ if you're using the CLI, MCP server, or TypeScript SDK.",
+  "Node 18+ if you're using the CLI, MCP server, or TypeScript SDK. Python 3.10+ for the Python SDK.",
 ]} />
 
 ## 1. Connect an agent
@@ -75,12 +77,29 @@ const client = createIntentClient({
 });
 ```
   </Pane>
+  <Pane id="py">
+```bash
+pip install auto-nomos-sdk
+export NOMOS_API_KEY=nk_live_…
+```
+
+```python
+from nomos import AuthGuard
+import os
+
+guard = AuthGuard(
+    api_key=os.environ["NOMOS_API_KEY"],
+    pdp_url=os.environ["NOMOS_PDP_URL"],
+)
+```
+  </Pane>
 </PathTabs>
 
 <NextSteps items={[
   { href: "/docs/connect/cursor", label: "Connect Cursor", description: "MCP config + first prompt." },
   { href: "/docs/connect/claude-desktop", label: "Connect Claude Desktop", description: "Copy-paste mcp.json." },
   { href: "/docs/connect/sdk-typescript", label: "TypeScript SDK", description: "Wire the SDK into your codebase." },
+  { href: "/docs/connect/sdk-python", label: "Python SDK", description: "For LangGraph / CrewAI / AutoGen agents." },
 ]} />
 
 ## 2. Create an App
@@ -121,6 +140,17 @@ const app = await client.apps.create({
 
 const key = await client.apps.keys.create({ appId: app.id });
 // store key.value somewhere — it's only returned once
+```
+  </Pane>
+  <Pane id="py">
+```python
+app = guard.apps.create(
+    name="Inbox triage bot",
+    mode="dynamic",
+)
+
+key = guard.apps.keys.create(app_id=app.id)
+# store key.value somewhere — only returned once
 ```
   </Pane>
 </PathTabs>
@@ -169,6 +199,19 @@ await client.apps.attachPolicy({
   appId: app.id,
   policyId: policy.id,
 });
+```
+  </Pane>
+  <Pane id="py">
+```python
+policy = guard.policies.create_from_template(
+    template="github:read-only",
+    name="GitHub read",
+)
+
+guard.apps.attach_policy(
+    app_id=app.id,
+    policy_id=policy.id,
+)
 ```
   </Pane>
 </PathTabs>
@@ -233,6 +276,26 @@ const issues = await fetch(
   `${process.env.NOMOS_PDP_URL}/github/issue/list?owner=acme&repo=app`,
   { headers: { authorization: `Bearer ${grant.ucan}` } },
 ).then((r) => r.json());
+```
+  </Pane>
+  <Pane id="py">
+```python
+import os, requests
+
+decision = guard.authorize(
+    command="/github/issue/list",
+    resource={"provider": "github", "owner": "acme", "repo": "app"},
+    ttl_seconds=300,
+)
+
+if not decision.allow:
+    raise RuntimeError(decision.reason)
+
+issues = requests.get(
+    f"{os.environ['NOMOS_PDP_URL']}/github/issue/list",
+    params={"owner": "acme", "repo": "app"},
+    headers={"authorization": f"Bearer {decision.ucan}"},
+).json()
 ```
   </Pane>
 </PathTabs>

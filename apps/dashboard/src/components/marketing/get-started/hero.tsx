@@ -8,7 +8,7 @@ export function Hero() {
         <div className="col-span-12 lg:col-span-8" data-stagger>
           <div className="eyebrow flex items-center gap-3">
             <span className="pulse" />
-            <span>Get started · 10 minutes · three paths</span>
+            <span>Get started · 10 minutes · four paths</span>
           </div>
           <h1 className="display mt-7 max-w-[16ch] text-[56px] text-aegis-paper md:text-[88px] lg:text-[104px]">
             Your first <em>authorized</em>
@@ -17,8 +17,8 @@ export function Hero() {
           </h1>
           <p className="mt-8 max-w-[640px] text-lg leading-relaxed text-aegis-mute md:text-xl">
             Connect an agent. Create an app. Attach a policy. Trigger a call. Every step shows the
-            exact command for the path that fits how you work — CLI, MCP, or codebase SDK. Pick
-            once; it sticks across steps.
+            exact command for the path that fits how you work — CLI, MCP, TypeScript SDK, or Python
+            SDK. Pick once; it sticks across steps.
           </p>
           <div className="mt-10 flex flex-wrap items-center gap-3">
             <Link
@@ -70,7 +70,8 @@ export function Hero() {
             <div className="mt-6 border-t border-aegis-line pt-5">
               <div className="eyebrow mb-3">picks-up where you left off</div>
               <p className="font-mono text-[11px] leading-relaxed text-aegis-mute">
-                Path selection (CLI / MCP / SDK) syncs across every step on this page.
+                Path selection (CLI / MCP / SDK · TS / SDK · Py) syncs across every step on this
+                page.
               </p>
             </div>
           </div>

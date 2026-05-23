@@ -59,6 +59,17 @@ const client = createIntentClient({
 });`}
                 </PaneShell>
               ),
+              py: (
+                <PaneShell caption="agent.py  ·  pip install auto-nomos-sdk">
+                  {`from nomos import AuthGuard
+import os
+
+guard = AuthGuard(
+    api_key=os.environ["NOMOS_API_KEY"],
+    pdp_url=os.environ["NOMOS_PDP_URL"],
+)`}
+                </PaneShell>
+              ),
             }}
           />
         </div>

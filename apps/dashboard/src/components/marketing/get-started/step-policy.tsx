@@ -66,6 +66,19 @@ await client.apps.attachPolicy({
 });`}
                 </PaneShell>
               ),
+              py: (
+                <PaneShell caption="two calls — policy from template, then attach">
+                  {`policy = guard.policies.create_from_template(
+    template="github:read-only",
+    name="GitHub read",
+)
+
+guard.apps.attach_policy(
+    app_id=app.id,
+    policy_id=policy.id,
+)`}
+                </PaneShell>
+              ),
             }}
           />
         </div>
