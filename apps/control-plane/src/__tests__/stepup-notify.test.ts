@@ -78,4 +78,79 @@ describe('createStepUpNotifier', () => {
     await expect(notify(args)).resolves.toBeUndefined();
     expect(calls.some((c) => c.level === 'warn' || c.level === 'error')).toBe(true);
   });
+
+  describe('audit H9 rate limit + dedup', () => {
+    it('suppresses second send for same approvalId inside dedup window', async () => {
+      const { logger } = makeLogger();
+      const fetchFn = vi.fn(async () => new Response('{}', { status: 200 }));
+      const notify = createStepUpNotifier({
+        apiKey: 'sk_live_x',
+        logger,
+        fetch: fetchFn,
+        rateLimit: { perApprovalDedupMs: 60_000, now: () => 1_000 },
+      });
+      await notify(args);
+      await notify(args);
+      expect(fetchFn).toHaveBeenCalledTimes(1);
+    });
+
+    it('caps per-user burst (5 sends / 60s default)', async () => {
+      const { logger } = makeLogger();
+      const fetchFn = vi.fn(async () => new Response('{}', { status: 200 }));
+      let t = 0;
+      const notify = createStepUpNotifier({
+        apiKey: 'sk_live_x',
+        logger,
+        fetch: fetchFn,
+        rateLimit: {
+          perUserMaxBurst: 3,
+          perUserWindowMs: 60_000,
+          perApprovalDedupMs: 0,
+          now: () => t,
+        },
+      });
+      for (let i = 0; i < 6; i++) {
+        t = i * 100;
+        await notify({ ...args, approvalId: `a-${i}` });
+      }
+      expect(fetchFn).toHaveBeenCalledTimes(3);
+    });
+
+    it('window rolls forward: after windowMs elapses, sends resume', async () => {
+      const { logger } = makeLogger();
+      const fetchFn = vi.fn(async () => new Response('{}', { status: 200 }));
+      let t = 0;
+      const notify = createStepUpNotifier({
+        apiKey: 'sk_live_x',
+        logger,
+        fetch: fetchFn,
+        rateLimit: {
+          perUserMaxBurst: 2,
+          perUserWindowMs: 1_000,
+          perApprovalDedupMs: 0,
+          now: () => t,
+        },
+      });
+      await notify({ ...args, approvalId: 'a-1' });
+      await notify({ ...args, approvalId: 'a-2' });
+      await notify({ ...args, approvalId: 'a-3' });
+      expect(fetchFn).toHaveBeenCalledTimes(2);
+      t = 2_000;
+      await notify({ ...args, approvalId: 'a-4' });
+      expect(fetchFn).toHaveBeenCalledTimes(3);
+    });
+
+    it('disable bypasses both limits', async () => {
+      const { logger } = makeLogger();
+      const fetchFn = vi.fn(async () => new Response('{}', { status: 200 }));
+      const notify = createStepUpNotifier({
+        apiKey: 'sk_live_x',
+        logger,
+        fetch: fetchFn,
+        rateLimit: { disable: true },
+      });
+      for (let i = 0; i < 20; i++) await notify(args);
+      expect(fetchFn).toHaveBeenCalledTimes(20);
+    });
+  });
 });

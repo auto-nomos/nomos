@@ -39,6 +39,20 @@ export interface StepUpNotifierOptions {
    * prefs.telegramChatId is non-null and prefs.telegramEnabled is true.
    */
   telegramBot?: TelegramBot;
+  /**
+   * Audit H9 (2026-05-24) — guard against approval-notification floods.
+   * Defaults: at most 5 sends per 60s per decidingUserId, and the same
+   * approvalId can only fire once per 60s no matter how many denies push
+   * the step-up. Override for tests; set `disableRateLimit: true` to skip
+   * entirely (single-tenant dev).
+   */
+  rateLimit?: {
+    perUserMaxBurst?: number;
+    perUserWindowMs?: number;
+    perApprovalDedupMs?: number;
+    disable?: boolean;
+    now?: () => number;
+  };
 }
 
 export type StepUpNotifier = (args: StepUpNotifyArgs) => Promise<void>;
@@ -49,8 +63,58 @@ export function createStepUpNotifier(opts: StepUpNotifierOptions): StepUpNotifie
   const fetchFn = opts.fetch ?? globalThis.fetch;
   const workflow = opts.workflow ?? 'step-up-request';
 
+  // Audit H9 — in-process token bucket + per-approval dedup. Single-replica
+  // dev is the common shape today; multi-replica deployments should sit
+  // behind a single notify worker until we move this to a Postgres-backed
+  // limiter (tracked separately).
+  const rl = opts.rateLimit ?? {};
+  const burst = rl.perUserMaxBurst ?? 5;
+  const windowMs = rl.perUserWindowMs ?? 60_000;
+  const dedupMs = rl.perApprovalDedupMs ?? 60_000;
+  const nowFn = rl.now ?? (() => Date.now());
+  const perUserHits = new Map<string, number[]>();
+  const perApproval = new Map<string, number>();
+
+  function shouldSuppress(userId: string, approvalId: string): false | string {
+    if (rl.disable) return false;
+    const now = nowFn();
+
+    const lastFire = perApproval.get(approvalId);
+    if (lastFire !== undefined && now - lastFire < dedupMs) {
+      return `dedup:approval ${approvalId} fired ${now - lastFire}ms ago`;
+    }
+
+    const hits = (perUserHits.get(userId) ?? []).filter((ts) => now - ts < windowMs);
+    if (hits.length >= burst) {
+      perUserHits.set(userId, hits);
+      return `rate_limit:user ${userId} burst=${burst} window=${windowMs}ms`;
+    }
+    hits.push(now);
+    perUserHits.set(userId, hits);
+    perApproval.set(approvalId, now);
+
+    // Best-effort GC so the maps don't grow unbounded.
+    if (perApproval.size > 1024) {
+      for (const [k, v] of perApproval) if (now - v > dedupMs) perApproval.delete(k);
+    }
+    return false;
+  }
+
   return async (args: StepUpNotifyArgs) => {
     const prefs = args.prefs ?? {};
+
+    const suppressed = shouldSuppress(args.decidingUserId, args.approvalId);
+    if (suppressed) {
+      opts.logger.info(
+        {
+          approvalId: args.approvalId,
+          decidingUserId: args.decidingUserId,
+          reason: suppressed,
+        },
+        'step-up notify suppressed (audit H9)',
+      );
+      return;
+    }
 
     // M6 — direct Telegram path: short-circuit Knock when bot configured.
     const telegramEligible =
