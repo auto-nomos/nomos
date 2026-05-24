@@ -63,6 +63,24 @@ describe('signState / verifyState', () => {
     expect(verifyState(SECRET, state, 4_000).ok).toBe(true);
     expect(verifyState(SECRET, state, 5_001).reason).toMatch(/expired/);
   });
+
+  // Regression: state signature compare must be constant-time on raw bytes,
+  // not string compare on base64url. Verifies negative cases all return the
+  // same failure code (i.e., no carrier signal beyond "mismatch") and that
+  // a signature with a non-base64url byte sequence is rejected uniformly.
+  it('rejects signatures with non-base64url bytes uniformly', () => {
+    const state = signState(SECRET, payload);
+    const [b64Payload] = state.split('.');
+    const garbage = `${b64Payload}.!!!not-base64!!!`;
+    expect(verifyState(SECRET, garbage).reason).toMatch(/signature/);
+  });
+
+  it('rejects signatures of the wrong length uniformly', () => {
+    const state = signState(SECRET, payload);
+    const [b64Payload, sig] = state.split('.');
+    const truncated = `${b64Payload}.${sig?.slice(0, 10) ?? ''}`;
+    expect(verifyState(SECRET, truncated).reason).toMatch(/signature/);
+  });
 });
 
 describe('freshNonce', () => {
