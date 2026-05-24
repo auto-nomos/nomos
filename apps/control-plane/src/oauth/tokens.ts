@@ -35,12 +35,31 @@ export interface TokensServiceDeps {
   encryptionKey: Uint8Array;
 }
 
-function tokensToRow(deps: TokensServiceDeps, t: OAuthTokens) {
+/**
+ * AAD ties the AEAD authentication tag to the row identity
+ * (customer, connector, account) so a DB-write attacker cannot copy a
+ * ciphertext from one tenant's row into another's and have it decrypt to the
+ * original plaintext. Old rows sealed before this binding (pre-2026-05-24)
+ * fall back to no-AAD decrypt in `rowToTokens` and get re-sealed with AAD on
+ * the next refresh.
+ */
+const AAD_LABEL = 'oauth-token-v1';
+function buildAad(customerId: string, connector: string, accountId: string): Uint8Array {
+  return new TextEncoder().encode(`${AAD_LABEL}|${customerId}|${connector}|${accountId}`);
+}
+
+interface TokensRowCtx {
+  customerId: string;
+  connector: string;
+}
+
+function tokensToRow(deps: TokensServiceDeps, t: OAuthTokens, ctx: TokensRowCtx) {
+  const aad = buildAad(ctx.customerId, ctx.connector, t.accountId);
   const refresh =
     t.refreshToken === ''
       ? { encryptedRefreshToken: '', refreshTokenNonce: '' }
       : (() => {
-          const sealed = sealString(deps.encryptionKey, t.refreshToken);
+          const sealed = sealString(deps.encryptionKey, t.refreshToken, aad);
           return {
             encryptedRefreshToken: sealed.ciphertextHex,
             refreshTokenNonce: sealed.nonceHex,
@@ -50,7 +69,7 @@ function tokensToRow(deps: TokensServiceDeps, t: OAuthTokens) {
     t.accessToken === ''
       ? { encryptedAccessToken: null as string | null, accessTokenNonce: null as string | null }
       : (() => {
-          const sealed = sealString(deps.encryptionKey, t.accessToken);
+          const sealed = sealString(deps.encryptionKey, t.accessToken, aad);
           return {
             encryptedAccessToken: sealed.ciphertextHex,
             accessTokenNonce: sealed.nonceHex,
@@ -71,13 +90,24 @@ function rowToTokens(
   deps: TokensServiceDeps,
   row: typeof schema.oauthConnections.$inferSelect,
 ): OAuthTokens {
+  const aad = buildAad(row.customerId, row.connector, row.accountId);
+  const open = (ct: string, nonce: string): string => {
+    try {
+      return openString(deps.encryptionKey, ct, nonce, aad);
+    } catch {
+      // Legacy row sealed before AAD binding — decrypt without AAD so reads
+      // succeed during the transition window. Next write (refresh) re-seals
+      // with AAD via tokensToRow.
+      return openString(deps.encryptionKey, ct, nonce);
+    }
+  };
   const refreshToken =
     row.encryptedRefreshToken === '' || row.refreshTokenNonce === ''
       ? ''
-      : openString(deps.encryptionKey, row.encryptedRefreshToken, row.refreshTokenNonce);
+      : open(row.encryptedRefreshToken, row.refreshTokenNonce);
   const accessToken =
     row.encryptedAccessToken && row.accessTokenNonce
-      ? openString(deps.encryptionKey, row.encryptedAccessToken, row.accessTokenNonce)
+      ? open(row.encryptedAccessToken, row.accessTokenNonce)
       : '';
   return {
     accessToken,
@@ -98,7 +128,10 @@ export async function saveConnection(
   deps: TokensServiceDeps,
   input: SaveConnectionInput,
 ): Promise<StoredConnection> {
-  const row = tokensToRow(deps, input.tokens);
+  const row = tokensToRow(deps, input.tokens, {
+    customerId: input.customerId,
+    connector: input.connector,
+  });
   const now = new Date();
 
   const existing = await deps.db.query.oauthConnections.findFirst({
@@ -176,7 +209,17 @@ export async function updateConnectionTokens(
   connectionId: string,
   tokens: OAuthTokens,
 ): Promise<StoredConnection> {
-  const row = tokensToRow(deps, tokens);
+  // SELECT existing first so we can compute AAD from (customerId, connector,
+  // accountId) without trusting the caller to pass them. H3 piggybacks here:
+  // a follow-up commit adds `existing.accountId !== tokens.accountId` rejection.
+  const existing = await deps.db.query.oauthConnections.findFirst({
+    where: eq(schema.oauthConnections.id, connectionId),
+  });
+  if (!existing) throw new Error(`oauth connection ${connectionId} not found`);
+  const row = tokensToRow(deps, tokens, {
+    customerId: existing.customerId,
+    connector: existing.connector,
+  });
   const [updated] = await deps.db
     .update(schema.oauthConnections)
     .set({ ...row, accountId: tokens.accountId, updatedAt: new Date() })

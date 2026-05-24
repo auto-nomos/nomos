@@ -48,22 +48,37 @@ export function generateSecretboxKeyHex(): string {
  * Encrypt a UTF-8 string with the given 32-byte key. Returns hex-encoded
  * ciphertext + nonce so both can be persisted as text columns in Postgres
  * without dragging Buffer types through the data layer.
+ *
+ * `aad` (optional) is included in the AEAD authentication tag — same bytes
+ * must be supplied at open-time. Callers that persist multi-tenant ciphertexts
+ * SHOULD bind AAD to the row identity (e.g. tenantId|connector|accountId) so
+ * that a DB-write attacker swapping ciphertext between rows triggers an auth
+ * failure on decrypt instead of cross-tenant plaintext leakage.
  */
-export function sealString(key: Uint8Array, plaintext: string): SecretBoxCiphertext {
+export function sealString(
+  key: Uint8Array,
+  plaintext: string,
+  aad?: Uint8Array,
+): SecretBoxCiphertext {
   if (key.length !== SECRETBOX_KEY_LEN) {
     throw new Error(`secretbox key must be ${SECRETBOX_KEY_LEN} bytes`);
   }
   const nonce = randomBytes(SECRETBOX_NONCE_LEN);
-  const ct = xchacha20poly1305(key, nonce).encrypt(encoder.encode(plaintext));
+  const ct = xchacha20poly1305(key, nonce, aad).encrypt(encoder.encode(plaintext));
   return { ciphertextHex: bytesToHex(ct), nonceHex: bytesToHex(nonce) };
 }
 
 /**
  * Decrypt a ciphertext+nonce pair produced by `sealString`. Throws if the
- * ciphertext was tampered with, the wrong key is supplied, or the nonce is
- * malformed.
+ * ciphertext was tampered with, the wrong key is supplied, the nonce is
+ * malformed, or `aad` does not match what was provided at seal time.
  */
-export function openString(key: Uint8Array, ciphertextHex: string, nonceHex: string): string {
+export function openString(
+  key: Uint8Array,
+  ciphertextHex: string,
+  nonceHex: string,
+  aad?: Uint8Array,
+): string {
   if (key.length !== SECRETBOX_KEY_LEN) {
     throw new Error(`secretbox key must be ${SECRETBOX_KEY_LEN} bytes`);
   }
@@ -72,6 +87,6 @@ export function openString(key: Uint8Array, ciphertextHex: string, nonceHex: str
     throw new Error(`secretbox nonce must be ${SECRETBOX_NONCE_LEN} bytes`);
   }
   const ct = hexToBytes(ciphertextHex);
-  const pt = xchacha20poly1305(key, nonce).decrypt(ct);
+  const pt = xchacha20poly1305(key, nonce, aad).decrypt(ct);
   return decoder.decode(pt);
 }
