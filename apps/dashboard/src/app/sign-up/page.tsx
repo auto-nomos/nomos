@@ -2,7 +2,6 @@
 
 import { ArrowRight, Fingerprint } from 'lucide-react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { AuthShell } from '../../components/nomos/auth-shell';
 import { authClient } from '../../lib/auth-client';
@@ -19,7 +18,6 @@ function generateStrongRandomPassword(): string {
 }
 
 export default function SignUpPage() {
-  const router = useRouter();
   const markEnrolled = trpc.auth.markPasskeyEnrolled.useMutation();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -45,11 +43,11 @@ export default function SignUpPage() {
       } catch (enrollErr) {
         const msg = enrollErr instanceof Error ? enrollErr.message : 'unknown';
         setError(`Passkey enrollment failed: ${msg}. Try /onboarding/enroll-passkey to retry.`);
-        router.push('/onboarding/enroll-passkey');
+        window.location.assign('/onboarding/enroll-passkey');
         return;
       }
       await markEnrolled.mutateAsync();
-      router.push('/onboarding');
+      window.location.assign('/onboarding');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'unexpected error');
       setStep('form');

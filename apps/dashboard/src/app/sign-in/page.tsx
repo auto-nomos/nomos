@@ -2,14 +2,12 @@
 
 import { ArrowRight, Fingerprint, KeyRound } from 'lucide-react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { AuthShell } from '../../components/nomos/auth-shell';
 import { authClient } from '../../lib/auth-client';
 import { authenticatePasskey } from '../../lib/passkey-client';
 
 export default function SignInPage() {
-  const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showLegacy, setShowLegacy] = useState(false);
@@ -21,7 +19,9 @@ export default function SignInPage() {
     authenticatePasskey({ conditionalUI: true })
       .then(() => {
         if (cancelled) return;
-        router.push('/app');
+        // Hard nav: ensures the just-set session cookie rides the first /app
+        // request and Next doesn't reuse a logged-out RSC cache.
+        window.location.assign('/app');
       })
       .catch(() => {
         /* user dismissed conditional UI; ignore */
@@ -29,17 +29,16 @@ export default function SignInPage() {
     return () => {
       cancelled = true;
     };
-  }, [router]);
+  }, []);
 
   async function onPasskey() {
     setError(null);
     setSubmitting(true);
     try {
       await authenticatePasskey(email ? { email } : undefined);
-      router.push('/app');
+      window.location.assign('/app');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'unexpected error');
-    } finally {
       setSubmitting(false);
     }
   }
@@ -52,14 +51,14 @@ export default function SignInPage() {
       const result = await authClient.signIn.email({ email, password });
       if (result.error) {
         setError(result.error.message ?? 'sign-in failed');
+        setSubmitting(false);
         return;
       }
       // Middleware-equivalent gate at the layout level routes the session
       // to /onboarding/enroll-passkey when no passkey exists yet.
-      router.push('/app');
+      window.location.assign('/app');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'unexpected error');
-    } finally {
       setSubmitting(false);
     }
   }

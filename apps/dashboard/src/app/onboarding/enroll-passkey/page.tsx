@@ -21,7 +21,7 @@ export default function EnrollPasskeyPage() {
     try {
       await registerPasskey({ name: defaultDeviceLabel() });
       await markEnrolled.mutateAsync();
-      router.push('/app');
+      window.location.assign('/app');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'passkey enrollment failed');
     } finally {
