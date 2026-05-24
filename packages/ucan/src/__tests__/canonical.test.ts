@@ -24,6 +24,20 @@ describe('canonicalize', () => {
     expect(canonicalize({ a: 1, b: undefined, c: 3 })).toBe('{"a":1,"c":3}');
   });
 
+  it('audit M11 — NFC-normalizes keys before sort (NFD twin = same output)', () => {
+    // é (NFC é) vs e + ́ (NFD é). Both should canonicalize to NFC.
+    const nfc = canonicalize({ café: 1 });
+    const nfd = canonicalize({ ['café']: 1 });
+    expect(nfc).toBe(nfd);
+    expect(nfc).toBe(`{${JSON.stringify('café')}:1}`);
+  });
+
+  it('audit M11 — de-duplicates keys that collide after NFC normalize', () => {
+    // If both NFC and NFD forms are present, keep the first (insertion order).
+    const out = canonicalize({ café: 1, ['café']: 2 });
+    expect(out).toBe(`{${JSON.stringify('café')}:1}`);
+  });
+
   it('throws on top-level undefined', () => {
     expect(() => canonicalize(undefined)).toThrow(/cannot canonicalize undefined/);
   });
