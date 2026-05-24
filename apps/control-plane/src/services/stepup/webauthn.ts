@@ -40,8 +40,27 @@ interface ChallengeEntry {
 
 const challengeStore = new Map<string, ChallengeEntry>();
 
-function challengeKey(userId: string, tag: string): string {
-  return `${userId}|assert|${tag}`;
+/**
+ * Audit C4 (downgraded HIGH) — the key includes `originalUcanCid` so a
+ * challenge issued for approval row in state S(t0) is unusable if anything
+ * mutates the row's bound UCAN CID before verify lands. Without this pin
+ * an attacker with DB-write access (or any code path that can swap
+ * `original_ucan_cid` between authenticationOptions and verifyAuthentication)
+ * could swap the target request while the user's passkey assertion stays
+ * valid. Legacy rows where originalUcanCid is null fall back to the empty
+ * sentinel so the existing per-approval pin still applies.
+ */
+function challengeKey(userId: string, approvalId: string, originalUcanCid: string | null): string {
+  return `${userId}|assert|${approvalId}|${originalUcanCid ?? ''}`;
+}
+
+async function loadApprovalCid(db: DrizzleClient, approvalId: string): Promise<string | null> {
+  const row = await db
+    .select({ originalUcanCid: schema.pushApprovals.originalUcanCid })
+    .from(schema.pushApprovals)
+    .where(eq(schema.pushApprovals.id, approvalId))
+    .limit(1);
+  return row[0]?.originalUcanCid ?? null;
 }
 
 function setChallenge(key: string, challenge: string): void {
@@ -101,7 +120,8 @@ export async function authenticationOptions(args: {
     })),
     userVerification: 'required',
   });
-  setChallenge(challengeKey(args.userId, args.approvalId), options.challenge);
+  const cid = await loadApprovalCid(args.db, args.approvalId);
+  setChallenge(challengeKey(args.userId, args.approvalId, cid), options.challenge);
   return { options, hasCredentials: creds.length > 0 };
 }
 
@@ -112,7 +132,11 @@ export async function verifyAuthentication(args: {
   config: WebAuthnConfig;
   db: DrizzleClient;
 }): Promise<{ ok: boolean }> {
-  const expected = takeChallenge(challengeKey(args.userId, args.approvalId));
+  // Audit C4 — re-derive the challenge key from the approval row as it
+  // exists *now*. If `original_ucan_cid` was mutated between options and
+  // verify, the key differs and takeChallenge returns undefined → fail.
+  const cid = await loadApprovalCid(args.db, args.approvalId);
+  const expected = takeChallenge(challengeKey(args.userId, args.approvalId, cid));
   if (!expected) return { ok: false };
   const credentialID = args.response.id;
   const [stored] = await args.db
