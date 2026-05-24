@@ -25,6 +25,8 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { path: '/vs/raw-oauth', priority: 0.7, changeFrequency: 'monthly' },
     { path: '/sign-up', priority: 0.4, changeFrequency: 'yearly' },
     { path: '/sign-in', priority: 0.3, changeFrequency: 'yearly' },
+    { path: '/privacy', priority: 0.5, changeFrequency: 'yearly' },
+    { path: '/terms', priority: 0.5, changeFrequency: 'yearly' },
   ];
   for (const doc of getAllDocs()) {
     routes.push({

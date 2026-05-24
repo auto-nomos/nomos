@@ -191,6 +191,8 @@ function PublicFooter() {
           <FooterLink href="/sign-up">Create account</FooterLink>
           <FooterLink href="/sign-in">Sign in</FooterLink>
           <FooterLink href="/docs#faq">FAQ</FooterLink>
+          <FooterLink href="/privacy">Privacy</FooterLink>
+          <FooterLink href="/terms">Terms</FooterLink>
         </FooterColumn>
       </div>
 
@@ -221,9 +223,18 @@ function PublicFooter() {
           <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-aegis-faint">
             © {new Date().getFullYear()} Nomos · An authorization layer for agents.
           </p>
-          <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-aegis-faint">
-            Made for the era of autonomous tools.
-          </p>
+          <nav
+            aria-label="Legal"
+            className="flex flex-wrap items-center gap-x-5 gap-y-2 font-mono text-[10px] uppercase tracking-[0.18em] text-aegis-faint"
+          >
+            <Link href="/privacy" className="transition-colors hover:text-aegis-paper">
+              Privacy Policy
+            </Link>
+            <Link href="/terms" className="transition-colors hover:text-aegis-paper">
+              Terms of Service
+            </Link>
+            <span>Made for the era of autonomous tools.</span>
+          </nav>
         </div>
       </div>
     </footer>
