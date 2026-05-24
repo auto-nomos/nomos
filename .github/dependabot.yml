@@ -1,0 +1,25 @@
+# Dependabot keeps the SHA-pinned GitHub Action references current.
+#
+# Audit L7 (2026-05-24): every `uses:` directive is pinned to a full
+# 40-char commit SHA so that a tag-move attack on a popular action
+# (e.g. `actions/checkout@v4` re-pointed at a backdoored commit) cannot
+# silently land in our CI. Dependabot opens weekly PRs that bump the SHA
+# AND the trailing `# vX` comment together so reviewers can sanity-check
+# the version they're approving.
+
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "07:00"
+      timezone: Etc/UTC
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(ci)"
+      include: scope
+    labels:
+      - dependencies
+      - github-actions
