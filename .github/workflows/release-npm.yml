@@ -1,0 +1,98 @@
+name: release npm
+
+# Audit H12 (2026-05-24) — replace classic-token publishing (single
+# ~/.npmrc token with 13-package blast radius) with npm OIDC trusted
+# publishing per package. The workflow fires on `npm-v*` tag pushes;
+# each matrix job mints a short-lived OIDC token, pnpm publishes the
+# one package + provenance attestation, npm verifies the OIDC claim
+# matches the trusted-publisher config on npmjs.com.
+#
+# **One-time setup per package**: npmjs.com → package → Settings →
+# Trusted Publishers → add GitHub Actions; repo=`varendra007/nomos`,
+# workflow=`release-npm.yml`, environment=`npm-publish`.
+# Until that's set, the publish step returns ENEEDAUTH and the matrix
+# job fails loudly — by design.
+
+on:
+  push:
+    tags:
+      - 'npm-v*'
+  workflow_dispatch:
+    inputs:
+      package:
+        description: 'Single package to publish (basename only — e.g. mcp-server)'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  id-token: write          # npm OIDC + provenance
+
+env:
+  NODE_VERSION: 22.18.0
+  PNPM_VERSION: 11.0.8
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: npm-publish
+    strategy:
+      fail-fast: false
+      matrix:
+        package:
+          - adapters
+          - audit-verify
+          - cedar
+          - cli
+          - core
+          - crypto
+          - mcp-server
+          - policy-builder
+          - schema-packs
+          - sdk
+          - shared-types
+          - ucan
+          - ucan-cli
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+          run_install: false
+
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Filter to selected package on workflow_dispatch
+        if: github.event_name == 'workflow_dispatch' && inputs.package != ''
+        run: |
+          if [ "${{ matrix.package }}" != "${{ inputs.package }}" ]; then
+            echo "skip=true" >> "$GITHUB_ENV"
+          fi
+
+      - name: Install dependencies
+        if: env.skip != 'true'
+        run: pnpm install --frozen-lockfile
+
+      - name: Build package + its workspace deps
+        if: env.skip != 'true'
+        run: pnpm --filter "@auto-nomos/${{ matrix.package }}..." build
+
+      - name: Publish with OIDC + provenance
+        if: env.skip != 'true'
+        # No NPM_TOKEN env — OIDC handles auth. `--provenance` attaches an
+        # in-toto attestation pointing back at this workflow run so consumers
+        # can verify provenance via `npm view <pkg> --json | jq .provenance`.
+        # `--no-git-checks` skips the dirty-tree guard; tags drive releases.
+        run: |
+          pnpm --filter "@auto-nomos/${{ matrix.package }}" publish \
+            --provenance \
+            --access public \
+            --no-git-checks
