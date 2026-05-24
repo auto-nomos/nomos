@@ -139,31 +139,46 @@ export async function verifyAuthentication(args: {
   const expected = takeChallenge(challengeKey(args.userId, args.approvalId, cid));
   if (!expected) return { ok: false };
   const credentialID = args.response.id;
-  const [stored] = await args.db
-    .select()
-    .from(schema.passkey)
-    .where(
-      and(eq(schema.passkey.userId, args.userId), eq(schema.passkey.credentialID, credentialID)),
-    )
-    .limit(1);
-  if (!stored) return { ok: false };
-  const publicKey = new Uint8Array(Buffer.from(stored.publicKey, 'base64url'));
-  const verification = await verifyAuthenticationResponse({
-    response: args.response,
-    expectedChallenge: expected,
-    expectedOrigin: args.config.origin,
-    expectedRPID: args.config.rpId,
-    requireUserVerification: true,
-    credential: {
-      id: stored.credentialID,
-      publicKey,
-      counter: stored.counter,
-    },
+
+  // Audit M10 (2026-05-24) — wrap read + verify + counter-update in a
+  // transaction with SELECT … FOR UPDATE so concurrent assertions can't both
+  // read the old counter, both verify, and both write counter+1 (lost
+  // increment → replay window). Also assert monotonicity defensively in
+  // case the @simplewebauthn check is ever relaxed.
+  return args.db.transaction(async (tx) => {
+    const [stored] = await tx
+      .select()
+      .from(schema.passkey)
+      .where(
+        and(eq(schema.passkey.userId, args.userId), eq(schema.passkey.credentialID, credentialID)),
+      )
+      .for('update')
+      .limit(1);
+    if (!stored) return { ok: false };
+    const publicKey = new Uint8Array(Buffer.from(stored.publicKey, 'base64url'));
+    const verification = await verifyAuthenticationResponse({
+      response: args.response,
+      expectedChallenge: expected,
+      expectedOrigin: args.config.origin,
+      expectedRPID: args.config.rpId,
+      requireUserVerification: true,
+      credential: {
+        id: stored.credentialID,
+        publicKey,
+        counter: stored.counter,
+      },
+    });
+    if (!verification.verified) return { ok: false };
+    const newCounter = verification.authenticationInfo.newCounter;
+    // Authenticators that emit counter 0 advertise "no signCount" — accept
+    // unchanged; otherwise require strict monotonic increase.
+    if (newCounter !== 0 && newCounter <= stored.counter) {
+      return { ok: false };
+    }
+    await tx
+      .update(schema.passkey)
+      .set({ counter: newCounter })
+      .where(eq(schema.passkey.id, stored.id));
+    return { ok: true };
   });
-  if (!verification.verified) return { ok: false };
-  await args.db
-    .update(schema.passkey)
-    .set({ counter: verification.authenticationInfo.newCounter })
-    .where(eq(schema.passkey.id, stored.id));
-  return { ok: true };
 }
