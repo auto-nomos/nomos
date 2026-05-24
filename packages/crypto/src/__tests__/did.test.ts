@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { didFromPublicKey, ED25519_PUB_MULTICODEC, publicKeyFromDid } from '../did.js';
+import {
+  canonicalizeDid,
+  didFromPublicKey,
+  ED25519_PUB_MULTICODEC,
+  publicKeyFromDid,
+} from '../did.js';
 
 describe('didFromPublicKey', () => {
   it('throws on non-32-byte input', () => {
@@ -62,6 +67,19 @@ describe('publicKeyFromDid', () => {
     // To exercise the "too short" branch, decode something < 3 bytes:
     // base58btc of [0x00] = 'z1' (single zero byte), decoded length 1 < 3
     expect(() => publicKeyFromDid('did:key:z1')).toThrow(/too short/);
+  });
+
+  it('canonicalizeDid returns the same canonical form for the input', () => {
+    const pk = new Uint8Array(32).fill(9);
+    const did = didFromPublicKey(pk);
+    expect(canonicalizeDid(did)).toBe(did);
+  });
+
+  it('canonicalizeDid throws on invalid input', () => {
+    expect(() => canonicalizeDid('did:web:example.com')).toThrow(/invalid did:key/);
+    expect(() =>
+      canonicalizeDid('did:key:zQ3shZc2QzApp2oymGvQbzP8eKheVshBHbU4ZYjeXqwSKEn6N'),
+    ).toThrow(/not an ed25519/);
   });
 
   it('throws on truncated ed25519 pubkey', () => {
