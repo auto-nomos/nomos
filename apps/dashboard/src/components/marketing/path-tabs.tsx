@@ -93,7 +93,7 @@ export function PathTabs({
           );
         })}
       </div>
-      <div className="p-6">{activePane}</div>
+      <div className="p-4 sm:p-6">{activePane}</div>
     </div>
   );
 }
@@ -104,7 +104,7 @@ export function PaneShell({ caption, children }: { caption: string; children: Re
       <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-aegis-faint">
         {caption}
       </div>
-      <pre className="overflow-x-auto rounded-sm border border-aegis-line bg-aegis-ink p-5 font-mono text-[12.5px] leading-[1.65] text-aegis-paper">
+      <pre className="overflow-x-auto rounded-sm border border-aegis-line bg-aegis-ink p-4 font-mono text-[11.5px] leading-[1.55] text-aegis-paper sm:p-5 sm:text-[12.5px] sm:leading-[1.65]">
         {children}
       </pre>
     </div>

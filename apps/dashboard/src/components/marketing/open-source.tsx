@@ -38,14 +38,14 @@ const INSTALL_LINES: { lang: string; cmd: string }[] = [
 
 export function OpenSource() {
   return (
-    <section className="mx-auto max-w-[1280px] px-6 py-32 md:px-10">
+    <section className="mx-auto max-w-[1280px] px-4 py-20 sm:px-6 sm:py-28 md:px-10 md:py-32">
       <div className="grid grid-cols-12 gap-10">
         <div className="col-span-12 lg:col-span-5">
           <div className="eyebrow flex items-center gap-3">
             <Github className="h-4 w-4 text-aegis-signal" aria-hidden />
             open source
           </div>
-          <h2 className="display mt-5 text-[56px] leading-[1.02] text-aegis-paper">
+          <h2 className="display mt-5 text-[36px] leading-[1.05] text-aegis-paper sm:text-[44px] md:text-[56px] md:leading-[1.02]">
             Open source.
             <br />
             <em>Coming very soon.</em>
@@ -98,7 +98,7 @@ export function OpenSource() {
         </div>
         <div className="col-span-12 lg:col-span-7">
           <div className="corners relative rounded-sm border border-aegis-line bg-aegis-ink">
-            <div className="grid grid-cols-12 border-b border-aegis-line px-6 py-4 font-mono text-[10px] uppercase tracking-[0.18em] text-aegis-faint">
+            <div className="grid grid-cols-12 border-b border-aegis-line px-4 py-4 font-mono text-[10px] uppercase tracking-[0.18em] text-aegis-faint sm:px-6">
               <div className="col-span-6">package</div>
               <div className="col-span-4">role</div>
               <div className="col-span-2 text-right">status</div>
@@ -107,7 +107,7 @@ export function OpenSource() {
               {PACKAGES.map((p) => (
                 <li
                   key={p.name}
-                  className="grid grid-cols-12 items-center gap-3 px-6 py-3 transition-colors hover:bg-aegis-surface/40"
+                  className="grid grid-cols-12 items-center gap-3 px-4 py-3 transition-colors hover:bg-aegis-surface/40 sm:px-6"
                 >
                   <div className="col-span-6 font-mono text-[12px] text-aegis-paper">{p.name}</div>
                   <div className="col-span-4 text-xs text-aegis-mute">{p.role}</div>
@@ -125,20 +125,20 @@ export function OpenSource() {
                 </li>
               ))}
             </ul>
-            <div className="flex items-center justify-between border-t border-aegis-line px-6 py-4 font-mono text-[10px] uppercase tracking-[0.18em] text-aegis-faint">
+            <div className="flex items-center justify-between border-t border-aegis-line px-4 py-4 font-mono text-[10px] uppercase tracking-[0.18em] text-aegis-faint sm:px-6">
               <span>license · Apache-2.0 on flip</span>
               <span className="text-aegis-paper">{PACKAGES.length} packages</span>
             </div>
           </div>
           <div className="mt-6 rounded-sm border border-aegis-line bg-aegis-ink">
-            <div className="border-b border-aegis-line px-6 py-4 font-mono text-[10px] uppercase tracking-[0.18em] text-aegis-faint">
+            <div className="border-b border-aegis-line px-4 py-4 font-mono text-[10px] uppercase tracking-[0.18em] text-aegis-faint sm:px-6">
               install in 30 seconds
             </div>
             <ul className="divide-y divide-aegis-line">
               {INSTALL_LINES.map((row) => (
                 <li
                   key={row.lang}
-                  className="grid grid-cols-12 items-center gap-3 px-6 py-3 transition-colors hover:bg-aegis-surface/40"
+                  className="grid grid-cols-12 items-center gap-3 px-4 py-3 transition-colors hover:bg-aegis-surface/40 sm:px-6"
                 >
                   <div className="col-span-4 font-mono text-[10px] uppercase tracking-[0.18em] text-aegis-faint">
                     {row.lang}

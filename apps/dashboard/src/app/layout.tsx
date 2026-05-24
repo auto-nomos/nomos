@@ -115,11 +115,6 @@ export const metadata: Metadata = {
       'max-snippet': -1,
     },
   },
-  icons: {
-    icon: [{ url: '/icon.svg', type: 'image/svg+xml' }],
-    apple: [{ url: '/apple-icon', sizes: '180x180', type: 'image/png' }],
-    shortcut: '/icon.svg',
-  },
   manifest: '/manifest.webmanifest',
 };
 
@@ -138,7 +133,7 @@ const JSON_LD = {
       '@id': `${SITE_URL}#org`,
       name: 'Nomos',
       url: SITE_URL,
-      logo: `${SITE_URL}/icon.svg`,
+      logo: `${SITE_URL}/icon`,
       sameAs: [
         'https://github.com/varendra007/nomos',
         'https://www.npmjs.com/org/auto-nomos',

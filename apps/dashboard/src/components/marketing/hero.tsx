@@ -10,18 +10,18 @@ import { DISCORD_INVITE_URL, GITHUB_STAR_URL } from '../../lib/community-links';
 export function Hero() {
   return (
     <section className="relative overflow-hidden">
-      <div className="mx-auto grid max-w-[1280px] grid-cols-12 gap-10 px-6 pt-24 pb-32 md:px-10 md:pt-32">
+      <div className="mx-auto grid max-w-[1280px] grid-cols-12 gap-10 px-4 pt-16 pb-24 sm:px-6 sm:pt-24 sm:pb-32 md:px-10 md:pt-32">
         <div className="col-span-12 lg:col-span-8" data-stagger>
           <div className="eyebrow flex items-center gap-3">
             <span className="pulse" />
             <span>Open source soon · MCP-native · v0.1.x beta</span>
           </div>
-          <h1 className="display mt-7 max-w-[12ch] text-[64px] text-aegis-paper md:text-[96px] lg:text-[112px]">
+          <h1 className="display mt-7 max-w-[12ch] text-[44px] leading-[1.02] text-aegis-paper sm:text-[64px] md:text-[96px] lg:text-[112px]">
             Agents need <em>guardrails</em>.
             <br />
             Not guesswork.
           </h1>
-          <p className="mt-9 max-w-[640px] text-lg leading-relaxed text-aegis-mute md:text-xl">
+          <p className="mt-7 max-w-[640px] text-base leading-relaxed text-aegis-mute sm:mt-9 sm:text-lg md:text-xl">
             Scoped permissions, signed actions, replayable audit. Nomos is the control plane between
             your AI agents and the world — every action authorized, every scope narrowed, every
             decision witnessed. Open source — star us on GitHub.

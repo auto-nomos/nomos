@@ -6,14 +6,14 @@ import { AlertTriangle } from 'lucide-react';
  */
 export function Mistake() {
   return (
-    <section className="mx-auto max-w-[1280px] px-6 py-32 md:px-10">
+    <section className="mx-auto max-w-[1280px] px-4 py-20 sm:px-6 sm:py-28 md:px-10 md:py-32">
       <div className="grid grid-cols-12 gap-10">
         <div className="col-span-12 lg:col-span-4">
           <div className="eyebrow flex items-center gap-3">
             <AlertTriangle className="h-4 w-4 text-aegis-coral" aria-hidden />
             the mistake
           </div>
-          <h2 className="display mt-5 text-[56px] leading-[1.02] text-aegis-paper">
+          <h2 className="display mt-5 text-[36px] leading-[1.05] text-aegis-paper sm:text-[44px] md:text-[56px] md:leading-[1.02]">
             A token in a <em>prompt</em>
             <br />
             is a token in a screenshot.
@@ -25,9 +25,9 @@ export function Mistake() {
           </p>
         </div>
         <div className="col-span-12 lg:col-span-8">
-          <div className="corners relative rounded-sm border border-aegis-line bg-aegis-ink p-8">
+          <div className="corners relative rounded-sm border border-aegis-line bg-aegis-ink p-5 sm:p-8">
             <div className="eyebrow mb-5 text-aegis-coral">don&rsquo;t do this</div>
-            <pre className="overflow-x-auto font-mono text-[13px] leading-[1.8] text-aegis-mute line-through decoration-aegis-coral/60 decoration-1">
+            <pre className="overflow-x-auto font-mono text-[12px] leading-[1.7] text-aegis-mute line-through decoration-aegis-coral/60 decoration-1 sm:text-[13px] sm:leading-[1.8]">
               {`const agent = createAgent({
   systemPrompt: \`
     You are a release bot. Use this GitHub token to ship code:

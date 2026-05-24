@@ -12,14 +12,14 @@ import {
  */
 export function Community() {
   return (
-    <section className="mx-auto max-w-[1280px] px-6 py-32 md:px-10">
+    <section className="mx-auto max-w-[1280px] px-4 py-20 sm:px-6 sm:py-28 md:px-10 md:py-32">
       <div className="grid grid-cols-12 gap-10">
         <div className="col-span-12 lg:col-span-4">
           <div className="eyebrow flex items-center gap-3">
             <Users className="h-4 w-4 text-aegis-signal" aria-hidden />
             community
           </div>
-          <h2 className="display mt-5 text-[56px] leading-[1.02] text-aegis-paper">
+          <h2 className="display mt-5 text-[36px] leading-[1.05] text-aegis-paper sm:text-[44px] md:text-[56px] md:leading-[1.02]">
             Build <em>with</em> us.
           </h2>
           <p className="mt-6 max-w-[420px] text-base leading-relaxed text-aegis-mute">
@@ -85,7 +85,7 @@ function Card({
     <a
       href={href}
       {...linkProps}
-      className="group flex flex-col bg-aegis-ink p-8 transition-colors hover:bg-aegis-surface/60"
+      className="group flex flex-col bg-aegis-ink p-6 transition-colors hover:bg-aegis-surface/60 sm:p-8"
     >
       <Icon className="h-6 w-6 text-aegis-signal" aria-hidden />
       <div className="eyebrow mt-5">{label}</div>

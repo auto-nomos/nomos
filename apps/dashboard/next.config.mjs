@@ -10,6 +10,11 @@ const nextConfig = {
   experimental: {
     typedRoutes: false,
   },
+  async redirects() {
+    return [
+      { source: '/icon.svg', destination: '/icon', permanent: false },
+    ];
+  },
 };
 
 export default nextConfig;

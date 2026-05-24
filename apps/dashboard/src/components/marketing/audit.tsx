@@ -7,14 +7,14 @@ import { Hash } from 'lucide-react';
 export function Audit() {
   return (
     <section className="border-y border-aegis-line bg-aegis-surface/30">
-      <div className="mx-auto max-w-[1280px] px-6 py-32 md:px-10">
+      <div className="mx-auto max-w-[1280px] px-4 py-20 sm:px-6 sm:py-28 md:px-10 md:py-32">
         <div className="grid grid-cols-12 gap-10">
           <div className="col-span-12 lg:col-span-5">
             <div className="eyebrow flex items-center gap-3">
               <Hash className="h-4 w-4 text-aegis-signal" aria-hidden />
               live audit
             </div>
-            <h2 className="display mt-5 text-[56px] leading-[1.02] text-aegis-paper">
+            <h2 className="display mt-5 text-[36px] leading-[1.05] text-aegis-paper sm:text-[44px] md:text-[56px] md:leading-[1.02]">
               Every decision,
               <br />
               <em>signed</em> and chained.
@@ -33,9 +33,9 @@ export function Audit() {
             </pre>
           </div>
           <div className="col-span-12 lg:col-span-7">
-            <div className="corners relative rounded-sm border border-aegis-line bg-aegis-ink p-8">
+            <div className="corners relative rounded-sm border border-aegis-line bg-aegis-ink p-5 sm:p-8">
               <div className="eyebrow mb-6">chain · last 3 events</div>
-              <pre className="overflow-x-auto font-mono text-[12px] leading-[1.9] text-aegis-paper">
+              <pre className="overflow-x-auto font-mono text-[11px] leading-[1.8] text-aegis-paper sm:text-[12px] sm:leading-[1.9]">
                 {`event N-1                      hash 09f4ab21…
 ├─ ts        14:22:06.182 UTC
 ├─ agent     fin-bot

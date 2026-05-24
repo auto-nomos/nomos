@@ -12,9 +12,10 @@
    the brand.
    ====================================================================== */
 
-import { ArrowUpRight, Github, MessageCircle, Package } from 'lucide-react';
+import { ArrowUpRight, Github, Menu, MessageCircle, Package, X } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import {
   DISCORD_INVITE_URL,
   GITHUB_DISCUSSIONS_URL,
@@ -51,11 +52,26 @@ export function PublicShell({ children }: { children: React.ReactNode }) {
 
 function PublicTopbar() {
   const pathname = usePathname();
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [pathname]);
+
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [mobileOpen]);
+
   return (
     <header className="sticky top-0 z-30 border-b border-aegis-line bg-aegis-ink/80 backdrop-blur-md">
       {/* Hairline chartreuse top edge — subtle brand signal across every page. */}
       <div className="h-px bg-gradient-to-r from-transparent via-aegis-signal/40 to-transparent" />
-      <div className="mx-auto flex h-[68px] max-w-[1280px] items-center justify-between gap-6 px-6 md:px-10">
+      <div className="mx-auto flex h-[68px] max-w-[1280px] items-center justify-between gap-3 px-4 sm:gap-6 sm:px-6 md:px-10">
         <Link href="/" className="group flex items-center gap-3" aria-label="Nomos home">
           <NomosLogo size={26} />
           <span className="hidden items-center gap-1.5 rounded-full border border-aegis-signal/30 bg-aegis-signal/5 px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.22em] text-aegis-signal lg:inline-flex">
@@ -124,14 +140,112 @@ function PublicTopbar() {
           </Link>
           <Link
             href="/sign-up"
-            className="group inline-flex items-center gap-2 rounded-sm border border-aegis-signal/40 bg-aegis-signal/10 px-3.5 py-1.5 font-mono text-[11px] uppercase tracking-[0.18em] text-aegis-signal transition-colors hover:border-aegis-signal hover:bg-aegis-signal/20"
+            className="group inline-flex items-center gap-2 rounded-sm border border-aegis-signal/40 bg-aegis-signal/10 px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.18em] text-aegis-signal transition-colors hover:border-aegis-signal hover:bg-aegis-signal/20 sm:px-3.5"
           >
             Get started
             <ArrowUpRight className="h-3.5 w-3.5 transition-transform group-hover:-translate-y-px group-hover:translate-x-px" />
           </Link>
+          <button
+            type="button"
+            aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
+            aria-expanded={mobileOpen}
+            aria-controls="nomos-mobile-nav"
+            onClick={() => setMobileOpen((open) => !open)}
+            className="inline-flex h-9 w-9 items-center justify-center rounded-sm border border-aegis-line text-aegis-paper transition-colors hover:border-aegis-signal/60 hover:text-aegis-signal md:hidden"
+          >
+            {mobileOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+          </button>
         </div>
       </div>
+      <MobileNav open={mobileOpen} onClose={() => setMobileOpen(false)} pathname={pathname} />
     </header>
+  );
+}
+
+function MobileNav({
+  open,
+  onClose,
+  pathname,
+}: {
+  open: boolean;
+  onClose: () => void;
+  pathname: string | null;
+}) {
+  return (
+    <div
+      id="nomos-mobile-nav"
+      className={cn('md:hidden', open ? 'pointer-events-auto' : 'pointer-events-none')}
+    >
+      <button
+        type="button"
+        aria-label="Close menu"
+        tabIndex={open ? 0 : -1}
+        onClick={onClose}
+        className={cn(
+          'fixed inset-x-0 top-[69px] bottom-0 z-20 bg-aegis-ink/70 backdrop-blur-sm transition-opacity duration-200',
+          open ? 'opacity-100' : 'opacity-0',
+        )}
+      />
+      <div
+        className={cn(
+          'absolute inset-x-0 top-full z-30 origin-top border-b border-aegis-line bg-aegis-ink/95 backdrop-blur-md transition-[opacity,transform] duration-200',
+          open ? 'translate-y-0 opacity-100' : '-translate-y-2 opacity-0',
+        )}
+      >
+        <nav
+          aria-label="Mobile primary"
+          className="mx-auto flex max-w-[1280px] flex-col gap-1 px-4 pt-4 pb-3 sm:px-6"
+        >
+          {PRIMARY_NAV.map((item) => {
+            const active = pathname === item.href || pathname?.startsWith(`${item.href}/`);
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={onClose}
+                className={cn(
+                  'rounded-sm px-3 py-3 font-mono text-[12px] uppercase tracking-[0.18em] transition-colors',
+                  active
+                    ? 'bg-aegis-signal/10 text-aegis-signal'
+                    : 'text-aegis-paper hover:bg-aegis-surface/60',
+                )}
+              >
+                {item.label}
+              </Link>
+            );
+          })}
+        </nav>
+        <div className="mx-auto max-w-[1280px] border-t border-aegis-line px-4 py-3 sm:px-6">
+          <Link
+            href="/sign-in"
+            onClick={onClose}
+            className="block rounded-sm px-3 py-3 font-mono text-[12px] uppercase tracking-[0.18em] text-aegis-mute transition-colors hover:bg-aegis-surface/60 hover:text-aegis-paper"
+          >
+            Sign in
+          </Link>
+        </div>
+        <div className="mx-auto flex max-w-[1280px] flex-wrap items-center gap-2 border-t border-aegis-line px-4 py-4 sm:px-6">
+          <a
+            href={GITHUB_STAR_URL}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-2 rounded-sm border border-aegis-line px-3 py-2 font-mono text-[11px] uppercase tracking-[0.18em] text-aegis-mute transition-colors hover:border-aegis-line-strong hover:text-aegis-paper"
+          >
+            <Github className="h-3.5 w-3.5" />
+            Star
+          </a>
+          <a
+            href={DISCORD_INVITE_URL}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-2 rounded-sm border border-aegis-line px-3 py-2 font-mono text-[11px] uppercase tracking-[0.18em] text-aegis-mute transition-colors hover:border-aegis-line-strong hover:text-aegis-paper"
+          >
+            <MessageCircle className="h-3.5 w-3.5" />
+            Discord
+          </a>
+        </div>
+      </div>
+    </div>
   );
 }
 

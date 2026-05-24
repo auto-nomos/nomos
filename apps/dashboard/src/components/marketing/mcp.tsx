@@ -18,14 +18,14 @@ const CLIENTS: { name: string; config: string; status: 'shipped' | 'beta' }[] = 
 export function Mcp() {
   return (
     <section className="border-y border-aegis-line bg-aegis-surface/30">
-      <div className="mx-auto max-w-[1280px] px-6 py-32 md:px-10">
+      <div className="mx-auto max-w-[1280px] px-4 py-20 sm:px-6 sm:py-28 md:px-10 md:py-32">
         <div className="grid grid-cols-12 gap-10">
           <div className="col-span-12 lg:col-span-5">
             <div className="eyebrow flex items-center gap-3">
               <Boxes className="h-4 w-4 text-aegis-signal" aria-hidden />
               mcp-native
             </div>
-            <h2 className="display mt-5 text-[56px] leading-[1.02] text-aegis-paper">
+            <h2 className="display mt-5 text-[36px] leading-[1.05] text-aegis-paper sm:text-[44px] md:text-[56px] md:leading-[1.02]">
               One <em>npx</em>.
               <br />
               In your editor.
@@ -45,22 +45,22 @@ export function Mcp() {
           </div>
           <div className="col-span-12 lg:col-span-7">
             <div className="corners relative rounded-sm border border-aegis-line bg-aegis-ink">
-              <div className="border-b border-aegis-line px-7 py-5">
+              <div className="border-b border-aegis-line px-5 py-5 sm:px-7">
                 <div className="eyebrow">supported clients</div>
               </div>
               <ul className="divide-y divide-aegis-line">
                 {CLIENTS.map((c) => (
                   <li
                     key={c.name}
-                    className="grid grid-cols-12 items-center gap-4 px-7 py-5 transition-colors hover:bg-aegis-surface/40"
+                    className="grid grid-cols-12 items-center gap-3 px-5 py-4 transition-colors hover:bg-aegis-surface/40 sm:gap-4 sm:px-7 sm:py-5"
                   >
-                    <div className="col-span-5 font-display text-[22px] text-aegis-paper">
+                    <div className="col-span-12 font-display text-[18px] text-aegis-paper sm:col-span-5 sm:text-[22px]">
                       {c.name}
                     </div>
-                    <div className="col-span-5 font-mono text-[11px] text-aegis-mute">
+                    <div className="col-span-9 font-mono text-[11px] text-aegis-mute sm:col-span-5">
                       <code className="break-all">{c.config}</code>
                     </div>
-                    <div className="col-span-2 text-right">
+                    <div className="col-span-3 text-right sm:col-span-2">
                       <span
                         className={`inline-flex items-center gap-1.5 rounded-sm border px-2 py-1 font-mono text-[10px] uppercase tracking-[0.18em] ${
                           c.status === 'shipped'

@@ -39,14 +39,16 @@ const PROVIDERS = [
 export function Marquee() {
   return (
     <section className="border-y border-aegis-line bg-aegis-surface/40">
-      <div className="mx-auto max-w-[1280px] px-6 md:px-10">
+      <div className="mx-auto max-w-[1280px] px-4 sm:px-6 md:px-10">
         <div className="grid grid-cols-2 divide-aegis-line md:grid-cols-4 md:divide-x">
           {KPIS.map((it, i) => (
             <div
               key={it.label}
               className={`px-2 py-7 ${i < 2 ? 'border-b border-aegis-line md:border-b-0' : ''}`}
             >
-              <div className="font-display text-[44px] leading-none text-aegis-paper">{it.kpi}</div>
+              <div className="font-display text-[32px] leading-none text-aegis-paper sm:text-[44px]">
+                {it.kpi}
+              </div>
               <div className="eyebrow mt-3">{it.label}</div>
               <div className="mt-1 text-xs text-aegis-mute">{it.sub}</div>
             </div>

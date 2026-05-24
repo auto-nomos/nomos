@@ -42,11 +42,11 @@ const PRIMITIVES: {
 export function Answer() {
   return (
     <section className="border-y border-aegis-line bg-aegis-surface/30">
-      <div className="mx-auto max-w-[1280px] px-6 py-32 md:px-10">
+      <div className="mx-auto max-w-[1280px] px-4 py-20 sm:px-6 sm:py-28 md:px-10 md:py-32">
         <div className="grid grid-cols-12 gap-10">
           <div className="col-span-12">
             <div className="eyebrow">the answer</div>
-            <h2 className="display mt-5 max-w-[22ch] text-[56px] leading-[1.02] text-aegis-paper md:text-[64px]">
+            <h2 className="display mt-5 max-w-[22ch] text-[36px] leading-[1.05] text-aegis-paper sm:text-[44px] md:text-[56px] md:leading-[1.02] lg:text-[64px]">
               Three primitives.
               <br />
               <em>One page</em> of code.
@@ -62,13 +62,15 @@ export function Answer() {
               {PRIMITIVES.map((p) => (
                 <li
                   key={p.step}
-                  className="group bg-aegis-ink p-8 transition-colors hover:bg-aegis-surface/60"
+                  className="group bg-aegis-ink p-6 transition-colors hover:bg-aegis-surface/60 sm:p-8"
                 >
                   <div className="flex items-baseline justify-between">
-                    <div className="font-display text-[28px] text-aegis-signal">{p.step}</div>
+                    <div className="font-display text-[24px] text-aegis-signal sm:text-[28px]">
+                      {p.step}
+                    </div>
                     <p.icon className="h-5 w-5 text-aegis-paper" aria-hidden />
                   </div>
-                  <h3 className="display mt-6 text-[28px] leading-tight text-aegis-paper">
+                  <h3 className="display mt-6 text-[22px] leading-tight text-aegis-paper sm:text-[28px]">
                     {p.name}
                   </h3>
                   <p className="mt-3 text-sm leading-relaxed text-aegis-mute">{p.body}</p>

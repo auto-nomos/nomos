@@ -6,14 +6,14 @@ import { Fingerprint, ShieldCheck } from 'lucide-react';
  */
 export function Stepup() {
   return (
-    <section className="mx-auto max-w-[1280px] px-6 py-32 md:px-10">
+    <section className="mx-auto max-w-[1280px] px-4 py-20 sm:px-6 sm:py-28 md:px-10 md:py-32">
       <div className="grid grid-cols-12 gap-10">
         <div className="col-span-12 lg:col-span-5">
           <div className="eyebrow flex items-center gap-3">
             <ShieldCheck className="h-4 w-4 text-aegis-signal" aria-hidden />
             step-up approval
           </div>
-          <h2 className="display mt-5 text-[56px] leading-[1.02] text-aegis-paper">
+          <h2 className="display mt-5 text-[36px] leading-[1.05] text-aegis-paper sm:text-[44px] md:text-[56px] md:leading-[1.02]">
             For the calls
             <br />
             that <em>matter</em>.
@@ -39,18 +39,18 @@ export function Stepup() {
           </ul>
         </div>
         <div className="col-span-12 lg:col-span-7">
-          <div className="corners relative rounded-sm border border-aegis-line bg-aegis-ink p-8">
+          <div className="corners relative rounded-sm border border-aegis-line bg-aegis-ink p-5 sm:p-8">
             <div className="flex items-baseline justify-between">
               <div className="eyebrow">approval · pending</div>
               <span className="font-mono text-[10px] text-aegis-faint">expires in 02:14</span>
             </div>
-            <div className="mt-6 rounded-sm border border-aegis-line bg-aegis-surface/50 p-6">
+            <div className="mt-6 rounded-sm border border-aegis-line bg-aegis-surface/50 p-4 sm:p-6">
               <div className="flex items-start gap-4">
                 <div className="grid h-10 w-10 shrink-0 place-items-center rounded-sm border border-aegis-amber/40 bg-aegis-amber/10">
                   <ShieldCheck className="h-5 w-5 text-aegis-amber" aria-hidden />
                 </div>
                 <div>
-                  <div className="font-display text-[20px] text-aegis-paper">
+                  <div className="font-display text-[18px] text-aegis-paper sm:text-[20px]">
                     release-bot wants to transfer a repo
                   </div>
                   <p className="mt-2 text-sm text-aegis-mute">

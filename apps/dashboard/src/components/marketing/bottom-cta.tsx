@@ -10,9 +10,9 @@ import { GITHUB_STAR_URL } from '../../lib/community-links';
 export function BottomCta() {
   return (
     <section className="relative overflow-hidden">
-      <div className="mx-auto grid max-w-[1280px] grid-cols-12 gap-10 px-6 py-32 md:px-10">
+      <div className="mx-auto grid max-w-[1280px] grid-cols-12 gap-10 px-4 py-20 sm:px-6 sm:py-28 md:px-10 md:py-32">
         <div className="col-span-12 lg:col-span-5">
-          <h2 className="display text-[64px] leading-[0.95] text-aegis-paper md:text-[88px]">
+          <h2 className="display text-[44px] leading-[1] text-aegis-paper sm:text-[56px] md:text-[72px] md:leading-[0.95] lg:text-[88px]">
             Give your agents
             <br />
             <em>shoulders</em> to
@@ -85,10 +85,12 @@ function PathCard({
   primary?: boolean;
 }) {
   return (
-    <div className="bg-aegis-ink p-8">
+    <div className="bg-aegis-ink p-6 sm:p-8">
       <Icon className="h-6 w-6 text-aegis-signal" aria-hidden />
       <div className="eyebrow mt-5">{label}</div>
-      <h3 className="display mt-2 text-[28px] leading-tight text-aegis-paper">{title}</h3>
+      <h3 className="display mt-2 text-[22px] leading-tight text-aegis-paper sm:text-[28px]">
+        {title}
+      </h3>
       <ol className="mt-6 space-y-2.5 font-mono text-sm text-aegis-paper">
         {steps.map((s) => (
           <li key={s}>{s}</li>

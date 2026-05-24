@@ -31,11 +31,11 @@ export function Comparison() {
   const competitors = COMPARISON_IDS.map((id) => COMPARISONS[id]);
   return (
     <section className="border-y border-aegis-line bg-aegis-surface/30">
-      <div className="mx-auto max-w-[1280px] px-6 py-32 md:px-10">
+      <div className="mx-auto max-w-[1280px] px-4 py-20 sm:px-6 sm:py-28 md:px-10 md:py-32">
         <div className="grid grid-cols-12 gap-10">
           <div className="col-span-12">
             <div className="eyebrow">the comparison</div>
-            <h2 className="display mt-5 max-w-[22ch] text-[56px] leading-[1.02] text-aegis-paper md:text-[64px]">
+            <h2 className="display mt-5 max-w-[22ch] text-[36px] leading-[1.05] text-aegis-paper sm:text-[44px] md:text-[56px] md:leading-[1.02] lg:text-[64px]">
               Why not just <em>X</em>?
             </h2>
             <p className="mt-6 max-w-[680px] text-base leading-relaxed text-aegis-mute">

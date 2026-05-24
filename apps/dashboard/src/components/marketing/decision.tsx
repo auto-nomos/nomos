@@ -4,11 +4,11 @@
  */
 export function Decision() {
   return (
-    <section className="mx-auto max-w-[1280px] px-6 py-32 md:px-10">
+    <section className="mx-auto max-w-[1280px] px-4 py-20 sm:px-6 sm:py-28 md:px-10 md:py-32">
       <div className="grid grid-cols-12 gap-10">
         <div className="col-span-12 lg:col-span-5">
           <div className="eyebrow">per-call decision</div>
-          <h2 className="display mt-5 text-[56px] leading-[1.02] text-aegis-paper">
+          <h2 className="display mt-5 text-[36px] leading-[1.05] text-aegis-paper sm:text-[44px] md:text-[56px] md:leading-[1.02]">
             One <em>guard()</em>.
             <br />
             Every tool call.
@@ -34,9 +34,9 @@ export function Decision() {
           </ul>
         </div>
         <div className="col-span-12 lg:col-span-7">
-          <div className="corners relative rounded-sm border border-aegis-line bg-aegis-ink p-8">
+          <div className="corners relative rounded-sm border border-aegis-line bg-aegis-ink p-5 sm:p-8">
             <div className="eyebrow mb-5">apps/agent/src/release-bot.ts</div>
-            <pre className="overflow-x-auto font-mono text-[13px] leading-[1.85] text-aegis-paper">
+            <pre className="overflow-x-auto font-mono text-[12px] leading-[1.7] text-aegis-paper sm:text-[13px] sm:leading-[1.85]">
               {`import { createAuthGuard } from '@auto-nomos/sdk';
 
 const guard = createAuthGuard({
