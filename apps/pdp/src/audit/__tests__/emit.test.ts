@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { AuditEvent } from '@auto-nomos/shared-types';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { createAuditEmitter, decisionToAudit, ZERO_HASH } from '../emit.js';
+import { auditGenesisHash, createAuditEmitter, decisionToAudit, ZERO_HASH } from '../emit.js';
 import { verifyAuditChain } from '../verify.js';
 
 const cust = '550e8400-e29b-41d4-a716-446655440000';
@@ -142,6 +142,75 @@ describe('createAuditEmitter', () => {
       expect(JSON.parse(lines[0] as string)).toEqual(a);
       expect(JSON.parse(lines[1] as string)).toEqual(b);
     });
+  });
+});
+
+describe('auditGenesisHash (C3)', () => {
+  it('is deterministic for the same customerId + secret', () => {
+    const a = auditGenesisHash('cust-1', 'super-secret-32-chars-or-more');
+    const b = auditGenesisHash('cust-1', 'super-secret-32-chars-or-more');
+    expect(a).toBe(b);
+    expect(a).toMatch(/^[0-9a-f]{64}$/);
+    expect(a).not.toBe(ZERO_HASH);
+  });
+
+  it('differs across customers with the same secret', () => {
+    const a = auditGenesisHash('cust-1', 'sec');
+    const b = auditGenesisHash('cust-2', 'sec');
+    expect(a).not.toBe(b);
+  });
+
+  it('differs across secrets for the same customer', () => {
+    const a = auditGenesisHash('cust-1', 'sec-a');
+    const b = auditGenesisHash('cust-1', 'sec-b');
+    expect(a).not.toBe(b);
+  });
+});
+
+describe('verifyAuditChain genesisFor (C3)', () => {
+  // Build a 2-event chain whose first event uses a pinned genesis.
+  function chainPinnedToGenesis(pinned: string) {
+    const events: AuditEvent[] = [];
+    const emitter = createAuditEmitter({
+      logPath: '/dev/null',
+      writer: async (_p, line) => {
+        events.push(JSON.parse(line.trim()) as AuditEvent);
+      },
+      initialPrevHash: pinned,
+    });
+    return { events, emitter };
+  }
+
+  it('accepts a chain whose first prev_hash matches the pinned genesis', async () => {
+    const pinned = auditGenesisHash(cust, 'sec');
+    const { events, emitter } = chainPinnedToGenesis(pinned);
+    await emitter.emit(makeInput());
+    await emitter.emit(makeInput({ command: '/github/pr/merge' }));
+    const result = verifyAuditChain(events, {
+      genesisFor: (id) => auditGenesisHash(id, 'sec'),
+    });
+    expect(result.ok).toBe(true);
+  });
+
+  it('rejects a chain that starts with ZERO_HASH when genesisFor is configured', async () => {
+    const { events, emitter } = chainPinnedToGenesis(ZERO_HASH);
+    await emitter.emit(makeInput());
+    const result = verifyAuditChain(events, {
+      genesisFor: (id) => auditGenesisHash(id, 'sec'),
+    });
+    expect(result.ok).toBe(false);
+    expect(result.reason).toBe('prev_hash_mismatch');
+    expect(result.brokenAt).toBe(0);
+  });
+
+  it('accepts ZERO_HASH genesis when acceptLegacyZeroHash is true', async () => {
+    const { events, emitter } = chainPinnedToGenesis(ZERO_HASH);
+    await emitter.emit(makeInput());
+    const result = verifyAuditChain(events, {
+      genesisFor: (id) => auditGenesisHash(id, 'sec'),
+      acceptLegacyZeroHash: true,
+    });
+    expect(result.ok).toBe(true);
   });
 });
 

@@ -19,6 +19,16 @@ const Config = z.object({
   AUDIT_BACKEND: z.enum(['postgres', 'jsonl']).default('postgres'),
   AUDIT_FLUSH_INTERVAL_MS: z.coerce.number().int().positive().default(100),
   AUDIT_BATCH_SIZE_MAX: z.coerce.number().int().positive().default(100),
+  /**
+   * Audit C3 (partial fix). When set, the per-customer audit hash chain
+   * uses `sha256("audit-genesis|v1|" + customerId + "|" + secret)` as the
+   * genesis prev_hash instead of the universal all-zeros ZERO_HASH. A
+   * DB-write attacker without the env secret can no longer fabricate a
+   * believable "first event" for an unused customer. Full sig-anchor work
+   * (per-customer signed root in a separate table) is tracked separately;
+   * this lifts the floor in the meantime.
+   */
+  AUDIT_GENESIS_SECRET: z.string().min(16).optional(),
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   OTEL_EXPORTER_OTLP_ENDPOINT: z.string().url().optional(),
   OTEL_EXPORTER_OTLP_HEADERS: z.string().optional(),
