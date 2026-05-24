@@ -35,7 +35,8 @@ export class RefreshError extends Error {
     | 'no_refresh_token'
     | 'provider_rejected'
     | 'transport_error'
-    | 'account_id_mismatch';
+    | 'account_id_mismatch'
+    | 'scope_escalation_blocked';
   readonly providerStatus?: number;
   constructor(code: RefreshError['code'], message: string, providerStatus?: number) {
     super(message);
@@ -142,6 +143,22 @@ export async function refreshConnection(
       'transport_error',
       `transport error refreshing ${connectionId}: ${(err as Error).message}`,
     );
+  }
+
+  // Audit M3 (2026-05-24): scope downgrade-only — a compromised provider or
+  // MITM could return additional scopes on refresh, silently widening the
+  // capability set the agent flies under. Reject any new scope absent from
+  // the original grant. Providers that omit scope info on refresh respond
+  // with an empty list; that path retains the existing scope set.
+  if (tokens.scopesGranted.length > 0 && stored.tokens.scopesGranted.length > 0) {
+    const oldSet = new Set(stored.tokens.scopesGranted);
+    const escalated = tokens.scopesGranted.filter((s) => !oldSet.has(s));
+    if (escalated.length > 0) {
+      throw new RefreshError(
+        'scope_escalation_blocked',
+        `refresh widened scopes for ${connectionId}: added=${escalated.join(',')}`,
+      );
+    }
   }
 
   try {
