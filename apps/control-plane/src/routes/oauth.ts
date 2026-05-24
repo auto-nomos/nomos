@@ -11,7 +11,8 @@
  * unconfigured (empty client_id), POST /connect returns 503 so the caller
  * can render a "not enabled" message in the dashboard.
  */
-import { eq } from 'drizzle-orm';
+import { sha256Hex } from '@auto-nomos/crypto';
+import { eq, lt } from 'drizzle-orm';
 import { Hono } from 'hono';
 import type { Auth } from '../auth/index.js';
 import type { Config } from '../config.js';
@@ -102,14 +103,25 @@ export function createOAuthRoutes(deps: OAuthRoutesDeps): Hono {
     }
     const connector = getConnector(id) as Connector;
     const now = deps.now ? deps.now() : Date.now();
+    const nonce = freshNonce();
+    const expiresAt = new Date(now + STATE_TTL_MS);
+    // Audit C2 — one-shot ledger entry for this nonce. Stored as sha256
+    // so a snapshot of the table never reveals in-flight nonces; the
+    // callback hashes the presented nonce the same way before CAS-delete.
+    await deps.db.drizzle.insert(schema.oauthStateNonces).values({
+      nonceHash: sha256Hex(nonce),
+      customerId: membership.customerId,
+      connector: id,
+      expiresAt,
+    });
     const state = signState(deps.config.OAUTH_STATE_SIGN_SECRET, {
       customerId: membership.customerId,
       connector: id,
-      nonce: freshNonce(),
+      nonce,
       exp: now + STATE_TTL_MS,
     });
     const authUrl = connector.authUrl(ctxFor(deps, id, creds), { state });
-    return c.json({ authUrl, state, expiresAt: new Date(now + STATE_TTL_MS).toISOString() });
+    return c.json({ authUrl, state, expiresAt: expiresAt.toISOString() });
   });
 
   app.get('/v1/oauth/callback/:connector', async (c) => {
@@ -132,6 +144,22 @@ export function createOAuthRoutes(deps: OAuthRoutesDeps): Hono {
     }
     if (verification.payload.connector !== id) {
       return c.json({ error: 'state_connector_mismatch' }, 400);
+    }
+    // Audit C2 — atomic CAS-consume the one-shot nonce. UPDATE-RETURNING
+    // semantics via DELETE-RETURNING: only one observer wins, replays of
+    // the same captured state see zero rows deleted and are denied with
+    // invalid_state regardless of signature validity.
+    const nonceHash = sha256Hex(verification.payload.nonce);
+    const consumed = await deps.db.drizzle
+      .delete(schema.oauthStateNonces)
+      .where(eq(schema.oauthStateNonces.nonceHash, nonceHash))
+      .returning({ nonceHash: schema.oauthStateNonces.nonceHash });
+    if (consumed.length === 0) {
+      deps.logger.warn(
+        { connector: id, customerId: verification.payload.customerId },
+        'oauth callback: nonce already consumed or unknown — replay attempt',
+      );
+      return c.json({ error: 'invalid_state', reason: 'nonce_replay_or_unknown' }, 400);
     }
     const creds = connectorCredentials(deps.config, id);
     if (!creds) {
@@ -171,4 +199,20 @@ export function createOAuthRoutes(deps: OAuthRoutesDeps): Hono {
   });
 
   return app;
+}
+
+/**
+ * Audit C2 — bounded sweep of expired nonce rows. Caller drives the cadence
+ * (typically a setInterval at PDP/CP boot). Idempotent. Returns the number
+ * of rows deleted so callers can log + page on unusual growth.
+ */
+export async function sweepOAuthStateNonces(
+  deps: Pick<OAuthRoutesDeps, 'db' | 'now'>,
+): Promise<number> {
+  const cutoff = new Date(deps.now ? deps.now() : Date.now());
+  const deleted = await deps.db.drizzle
+    .delete(schema.oauthStateNonces)
+    .where(lt(schema.oauthStateNonces.expiresAt, cutoff))
+    .returning({ nonceHash: schema.oauthStateNonces.nonceHash });
+  return deleted.length;
 }

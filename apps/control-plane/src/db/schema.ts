@@ -492,6 +492,26 @@ export const auditRoots = pgTable(
   }),
 );
 
+/**
+ * Audit C2 (migration 0032) — one-shot ledger for OAuth state nonces. The
+ * connect handler INSERTs sha256(nonce); the callback CAS-DELETEs after
+ * signature verify. Second observation finds the row already gone and the
+ * callback denies as invalid_state, closing the within-TTL replay window.
+ */
+export const oauthStateNonces = pgTable(
+  'oauth_state_nonces',
+  {
+    nonceHash: text('nonce_hash').primaryKey(),
+    customerId: uuid('customer_id').notNull(),
+    connector: text('connector').notNull(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    expiresIdx: index('oauth_state_nonces_expires_idx').on(t.expiresAt),
+  }),
+);
+
 export const pushApprovals = pgTable(
   'push_approvals',
   {
