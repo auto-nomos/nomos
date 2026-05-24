@@ -42,7 +42,12 @@ export interface OAuthRoutesDeps {
   now?: () => number;
 }
 
-const STATE_TTL_MS = 10 * 60 * 1000; // 10 minutes — long enough for slow consent screens.
+// Audit L6 (2026-05-24): reduced from 10 → 5 minutes to shrink the
+// window inside which a captured state value could be replayed (the
+// C2 nonce ledger still single-shots it, but a tighter TTL halves the
+// pre-callback window). 5 minutes is comfortable for normal SaaS
+// consent screens; rare slow paths can re-initiate.
+const STATE_TTL_MS = 5 * 60 * 1000;
 
 function isImplementedConnector(id: string): id is ImplementedConnectorId {
   return (ALL_CONNECTOR_IDS as readonly string[]).includes(id);
