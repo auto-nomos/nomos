@@ -20,28 +20,28 @@ export default function AppleIcon() {
       <svg width="140" height="140" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
         <title>Nomos</title>
         <path
-          d="M5 9 L16 13 L27 9"
+          d="M4 8 L16 14 L28 8"
           fill="none"
           stroke="#bfff00"
-          strokeWidth="2"
+          strokeWidth="3"
           strokeLinecap="square"
           strokeLinejoin="miter"
-          opacity="0.45"
+          opacity="0.5"
         />
         <path
-          d="M5 17 L16 21 L27 17"
+          d="M4 17 L16 23 L28 17"
           fill="none"
           stroke="#bfff00"
-          strokeWidth="2.4"
+          strokeWidth="3.4"
           strokeLinecap="square"
           strokeLinejoin="miter"
-          opacity="0.75"
+          opacity="0.78"
         />
         <path
-          d="M4 25 L16 29.5 L28 25"
+          d="M4 26 L16 30 L28 26"
           fill="none"
           stroke="#bfff00"
-          strokeWidth="2.8"
+          strokeWidth="3.8"
           strokeLinecap="square"
           strokeLinejoin="miter"
         />
