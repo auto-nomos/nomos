@@ -823,8 +823,12 @@ export const observabilityRouter = router({
       });
       if (!row) throw new TRPCError({ code: 'NOT_FOUND' });
 
+      // Audit H4 (2026-05-24) defence-in-depth: agentSpans is already tenant-
+      // filtered above so row.agentId is the current tenant's agent, but a
+      // future schema change (shared agents, etc.) could decouple them. Tie
+      // the JOIN to ctx.customerId so the IDOR can't open up by accident.
       const agent = await ctx.db.drizzle.query.agents.findFirst({
-        where: eq(schema.agents.id, row.agentId),
+        where: and(eq(schema.agents.id, row.agentId), eq(schema.agents.customerId, ctx.customerId)),
         columns: { id: true, name: true, did: true, depth: true },
       });
 
