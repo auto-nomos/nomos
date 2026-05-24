@@ -54,6 +54,7 @@ export const DenyReason = z.enum([
   'step_up_required',
   'cosigner_invalid',
   'cosigner_expired',
+  'cosigner_already_used',
   'resource_out_of_scope',
   'resource_mismatch',
   'schema_violation',

@@ -79,6 +79,9 @@ export interface ServerDeps {
       resource: Record<string, unknown>;
     }) => Promise<{ id: string; deepLink: string }>;
     getStepUp: (id: string) => Promise<StepUpStateResponse | undefined>;
+    /** Audit C5 — atomic CAS-mark a cosigner as consumed. Returns false if
+     *  another caller already won the race or the approval state changed. */
+    consumeStepUp: (id: string) => Promise<{ consumed: boolean }>;
   };
 }
 
@@ -103,6 +106,7 @@ export function createServer(deps: ServerDeps): Hono {
             stepup: {
               create: deps.stepup.create,
               fetchApproval: deps.stepup.getStepUp,
+              consumeApproval: deps.stepup.consumeStepUp,
             },
           }
         : {}),

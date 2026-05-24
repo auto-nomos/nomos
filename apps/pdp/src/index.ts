@@ -181,6 +181,7 @@ async function main(): Promise<void> {
         return { id: created.id, deepLink: created.deepLink };
       },
       getStepUp: cpClient.getStepUp,
+      consumeStepUp: cpClient.consumeStepUp,
     },
   });
 
