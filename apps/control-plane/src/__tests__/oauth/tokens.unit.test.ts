@@ -10,6 +10,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { DrizzleClient } from '../../db/index.js';
 import {
   __test,
+  AccountIdMismatchError,
   loadConnection,
   loadConnectionById,
   updateConnectionTokens,
@@ -134,5 +135,29 @@ describe('tokens.loadConnection / loadConnectionById / updateConnectionTokens (m
         accountId: 'x',
       }),
     ).rejects.toThrow(/missing not found/);
+  });
+
+  it('updateConnectionTokens rejects when refresh response carries a different accountId (H3)', async () => {
+    const findFirst = vi.fn().mockResolvedValue({
+      id: 'conn-1',
+      customerId: 'cust',
+      connector: 'github',
+      accountId: 'victim-acct',
+    });
+    const fakeDb = {
+      query: { oauthConnections: { findFirst } },
+      update: vi.fn(),
+    } as unknown as DrizzleClient;
+    await expect(
+      updateConnectionTokens({ db: fakeDb, encryptionKey: key }, 'conn-1', {
+        accessToken: 'new-access',
+        refreshToken: 'new-refresh',
+        accessTokenExpiresAt: null,
+        refreshTokenExpiresAt: null,
+        scopesGranted: [],
+        accountId: 'attacker-acct',
+      }),
+    ).rejects.toBeInstanceOf(AccountIdMismatchError);
+    expect(fakeDb.update).not.toHaveBeenCalled();
   });
 });
