@@ -4,6 +4,10 @@ import { desc, eq } from 'drizzle-orm';
 import type { DrizzleClient } from '../db/index.js';
 import * as schema from '../db/schema.js';
 
+/** Always emit signatures in this format. Verifier dispatches on
+ * `signatureVersion` column so legacy v1 rows still validate. */
+export const CURRENT_SIGNATURE_VERSION = 2;
+
 export interface SignRootDeps {
   db: DrizzleClient;
   /** 32-byte Ed25519 private key. */
@@ -20,6 +24,8 @@ export interface SignRootResult {
   rootEventId?: string;
   rootHash?: string;
   signature?: string;
+  signatureVersion?: number;
+  signedAtMs?: number;
 }
 
 /**
@@ -40,8 +46,11 @@ export async function signRootForCustomer(
   if (!head) return { signed: false };
 
   const rootHash = head.hash;
-  const signature = bytesToHex(signDetached(deps.signKey, encodeRootHash(rootHash)));
   const now = deps.now?.() ?? new Date();
+  const signedAtMs = now.getTime();
+  const signature = bytesToHex(
+    signDetached(deps.signKey, encodeSignedRoot({ customerId, rootHash, signedAtMs })),
+  );
   const [inserted] = await deps.db
     .insert(schema.auditRoots)
     .values({
@@ -50,7 +59,9 @@ export async function signRootForCustomer(
       rootHash,
       signingKeyId: deps.signingKeyId,
       signature,
+      signatureVersion: CURRENT_SIGNATURE_VERSION,
       signedAt: now,
+      signedAtMs,
     })
     .onConflictDoNothing({ target: schema.auditRoots.rootEventId })
     .returning();
@@ -62,6 +73,8 @@ export async function signRootForCustomer(
     rootEventId: head.eventId,
     rootHash,
     signature,
+    signatureVersion: CURRENT_SIGNATURE_VERSION,
+    signedAtMs,
   };
 }
 
@@ -82,11 +95,27 @@ export async function signRootsForAllCustomers(deps: SignRootDeps): Promise<{
 }
 
 /**
- * Canonical message format the verifier expects to recompute.
- * We sign the UTF-8 bytes of the hex hash so the wire form is human-readable
- * in DB inspections, and so the audit-verify CLI never has to negotiate
- * binary encoding.
+ * v1 canonical: UTF-8 bytes of the hex hash. Kept for verifying signatures
+ * minted before migration 0033. New signatures use `encodeSignedRoot` (v2).
  */
 export function encodeRootHash(rootHash: string): Uint8Array {
   return new TextEncoder().encode(rootHash);
+}
+
+/**
+ * v2 canonical (audit H7, 2026-05-24): bind the signature to `customerId`
+ * and `signedAtMs` so a DB-write attacker cannot move a signature row from
+ * one customer to another or rewrite the signed_at column without
+ * invalidating the signature. Format is plain `|`-delimited UTF-8 — no JSON
+ * escaping required since the inputs are a UUID, a hex digest, and a
+ * non-negative integer.
+ */
+export function encodeSignedRoot(input: {
+  customerId: string;
+  rootHash: string;
+  signedAtMs: number;
+}): Uint8Array {
+  return new TextEncoder().encode(
+    `nomos-audit-root|v2|${input.customerId}|${input.rootHash}|${input.signedAtMs}`,
+  );
 }

@@ -129,7 +129,11 @@ export const auditRouter = router({
               root_hash: root.rootHash,
               signing_key_id: root.signingKeyId,
               signature: root.signature,
+              signature_version: root.signatureVersion,
               signed_at: root.signedAt.toISOString(),
+              // Only present for v2 rows. The verifier uses this exact integer
+              // inside the canonical message (audit H7, 2026-05-24).
+              signed_at_ms: root.signedAtMs ?? null,
             }
           : null,
       };
