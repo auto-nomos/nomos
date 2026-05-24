@@ -33,3 +33,21 @@ export function publicKeyFromDid(did: string): Uint8Array {
   }
   return publicKey;
 }
+
+/**
+ * Re-encode a `did:key` string into the single canonical multibase form
+ * (base58btc, `z` prefix) used by this codebase. Throws on any unsupported
+ * encoding or malformed payload.
+ *
+ * Audit H11 (2026-05-24): UCAN issuer/audience DIDs are embedded verbatim in
+ * the signed payload + hashed into the CID, so accepting two surface forms of
+ * the same key would let an attacker construct distinct UCANs that decode to
+ * the same authority but produce different CIDs — breaking the cosigner
+ * CID-binding check. Callers that ingest DIDs from outside (UCAN payloads,
+ * federation rows, env variables) should normalise via this function before
+ * comparing or hashing.
+ */
+export function canonicalizeDid(did: string): string {
+  const publicKey = publicKeyFromDid(did);
+  return didFromPublicKey(publicKey);
+}
