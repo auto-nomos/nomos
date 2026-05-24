@@ -151,4 +151,24 @@ describe('createRevocationCache', () => {
     expect(cache.getRevoked('cust-1').has('cid-1')).toBe(true);
     cache.stop();
   });
+
+  it('audit H8 — concurrent refresh() calls dedupe into a single fetch', async () => {
+    vi.useRealTimers();
+    let fetches = 0;
+    const cache = createRevocationCache({
+      fetchRevocations: async () => {
+        fetches++;
+        await new Promise((r) => setTimeout(r, 30));
+        return ['fresh-1'];
+      },
+      refreshIntervalMs: 60_000,
+      logger,
+    });
+    await Promise.all(Array.from({ length: 50 }, () => cache.refresh('cust-x')));
+    expect(fetches).toBe(1);
+    expect(cache.getRevoked('cust-x').has('fresh-1')).toBe(true);
+    // After the in-flight resolves the slot frees so the next call hits again.
+    await cache.refresh('cust-x');
+    expect(fetches).toBe(2);
+  });
 });

@@ -24,6 +24,13 @@ export interface RevocationCacheOptions {
 export function createRevocationCache(options: RevocationCacheOptions): RevocationCache {
   const store = new Map<string, Set<string>>();
   let timer: NodeJS.Timeout | undefined;
+  /**
+   * Audit H8 (2026-05-24): concurrent push-revocation + sweep refreshes for
+   * the same customer raced; the slower fetch's response could overwrite a
+   * fresher set, briefly making revoked UCANs pass again. Dedup in-flight
+   * refreshes per customer so the same response wins everywhere.
+   */
+  const inflight = new Map<string, Promise<void>>();
 
   async function refreshOne(customerId: string): Promise<void> {
     try {
@@ -36,11 +43,24 @@ export function createRevocationCache(options: RevocationCacheOptions): Revocati
     }
   }
 
+  function refreshOneDeduped(customerId: string): Promise<void> {
+    const existing = inflight.get(customerId);
+    if (existing) return existing;
+    const promise = refreshOne(customerId).finally(() => {
+      // Only clear if no later caller chained onto this exact promise — the
+      // Map.set in refresh() always overwrites, so the get() above always
+      // returns the most recent pending one.
+      if (inflight.get(customerId) === promise) inflight.delete(customerId);
+    });
+    inflight.set(customerId, promise);
+    return promise;
+  }
+
   async function refreshAll(): Promise<void> {
     const customers = options.knownCustomers
       ? Array.from(options.knownCustomers())
       : [...store.keys()];
-    await Promise.all(customers.map(refreshOne));
+    await Promise.all(customers.map(refreshOneDeduped));
   }
 
   return {
@@ -59,7 +79,7 @@ export function createRevocationCache(options: RevocationCacheOptions): Revocati
       }
     },
     async refresh(customerId) {
-      await refreshOne(customerId);
+      await refreshOneDeduped(customerId);
     },
     start() {
       if (timer) return;
