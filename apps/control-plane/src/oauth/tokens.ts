@@ -203,6 +203,27 @@ export async function loadConnectionById(
   return rowToStored(deps, row);
 }
 
+/**
+ * Thrown by `updateConnectionTokens` when a refresh response carries a
+ * different `accountId` than the connection was originally bound to. Pins
+ * SaaS identity across the refresh boundary (audit finding H3, 2026-05-24):
+ * a compromised provider or MITM cannot silently swap the connection to an
+ * attacker-controlled account.
+ */
+export class AccountIdMismatchError extends Error {
+  readonly code = 'account_id_mismatch';
+  constructor(
+    public readonly connectionId: string,
+    public readonly existingAccountId: string,
+    public readonly presentedAccountId: string,
+  ) {
+    super(
+      `oauth connection ${connectionId} accountId pin violation: existing=${existingAccountId} presented=${presentedAccountId}`,
+    );
+    this.name = 'AccountIdMismatchError';
+  }
+}
+
 /** Replace the cached tokens on an existing connection (post-refresh). */
 export async function updateConnectionTokens(
   deps: TokensServiceDeps,
@@ -210,12 +231,14 @@ export async function updateConnectionTokens(
   tokens: OAuthTokens,
 ): Promise<StoredConnection> {
   // SELECT existing first so we can compute AAD from (customerId, connector,
-  // accountId) without trusting the caller to pass them. H3 piggybacks here:
-  // a follow-up commit adds `existing.accountId !== tokens.accountId` rejection.
+  // accountId) and pin accountId across the refresh.
   const existing = await deps.db.query.oauthConnections.findFirst({
     where: eq(schema.oauthConnections.id, connectionId),
   });
   if (!existing) throw new Error(`oauth connection ${connectionId} not found`);
+  if (existing.accountId !== tokens.accountId) {
+    throw new AccountIdMismatchError(connectionId, existing.accountId, tokens.accountId);
+  }
   const row = tokensToRow(deps, tokens, {
     customerId: existing.customerId,
     connector: existing.connector,

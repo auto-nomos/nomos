@@ -21,6 +21,7 @@ import {
 } from '../oauth/connector.js';
 import { getConnector } from '../oauth/connectors/index.js';
 import {
+  AccountIdMismatchError,
   loadConnectionById,
   type StoredConnection,
   updateConnectionTokens,
@@ -33,7 +34,8 @@ export class RefreshError extends Error {
     | 'connector_unconfigured'
     | 'no_refresh_token'
     | 'provider_rejected'
-    | 'transport_error';
+    | 'transport_error'
+    | 'account_id_mismatch';
   readonly providerStatus?: number;
   constructor(code: RefreshError['code'], message: string, providerStatus?: number) {
     super(message);
@@ -142,9 +144,22 @@ export async function refreshConnection(
     );
   }
 
-  return updateConnectionTokens(
-    { db: deps.db, encryptionKey: deps.encryptionKey },
-    stored.id,
-    tokens,
-  );
+  try {
+    return await updateConnectionTokens(
+      { db: deps.db, encryptionKey: deps.encryptionKey },
+      stored.id,
+      tokens,
+    );
+  } catch (err) {
+    if (err instanceof AccountIdMismatchError) {
+      // Audit finding H3 — provider returned a different SaaS account on
+      // refresh than the connection was bound to. Fail closed; operator
+      // surfaces this via the deny receipt + audit log.
+      throw new RefreshError(
+        'account_id_mismatch',
+        `provider returned mismatched accountId for ${connectionId}: existing=${err.existingAccountId} presented=${err.presentedAccountId}`,
+      );
+    }
+    throw err;
+  }
 }
