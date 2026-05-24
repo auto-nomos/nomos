@@ -78,7 +78,11 @@ export function createAuth(deps: AuthDeps): Auth {
         sessionToken: {
           attributes: {
             httpOnly: true,
-            sameSite: 'lax',
+            // Audit M6 (2026-05-24): in prod, lock sameSite to 'strict' so
+            // cross-origin POSTs (CSRF) cannot reach tRPC mutations. Dev /
+            // test stays 'lax' so the Better-Auth OAuth callback flow (which
+            // crosses origins) still works without HTTPS.
+            sameSite: isProd ? 'strict' : 'lax',
             secure: isProd,
           },
         },
