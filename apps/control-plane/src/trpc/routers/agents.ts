@@ -16,7 +16,17 @@ export const agentsRouter = router({
   create: withPermission('agents', 'create')
     .input(
       z.object({
-        name: z.string().min(1).max(100),
+        // Audit L2 (2026-05-24): block bidi/RTL/zero-width chars that lookalike-
+        // spoof another agent's name in the dashboard, and NFC-normalize so
+        // visually identical decomposed forms collapse to one canonical row.
+        name: z
+          .string()
+          .min(1)
+          .max(100)
+          .refine((s) => !/[‪-‮⁦-⁩‎‏]/u.test(s), {
+            message: 'rtl_override_disallowed',
+          })
+          .transform((s) => s.normalize('NFC')),
         requireApproval: z.boolean().optional(),
       }),
     )

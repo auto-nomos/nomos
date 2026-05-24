@@ -37,7 +37,16 @@ export const policiesRouter = router({
     .input(
       z.object({
         id: z.string().uuid().optional(),
-        name: z.string().min(1).max(200),
+        // Audit L2 (2026-05-24): block bidi/RTL/zero-width chars + NFC-
+        // normalize the display name so policy lists can't be lookalike-spoofed.
+        name: z
+          .string()
+          .min(1)
+          .max(200)
+          .refine((s) => !/[‪-‮⁦-⁩‎‏]/u.test(s), {
+            message: 'rtl_override_disallowed',
+          })
+          .transform((s) => s.normalize('NFC')),
         cedarText: z.string().min(1),
         integrationId: z.string().min(1).optional(),
       }),
