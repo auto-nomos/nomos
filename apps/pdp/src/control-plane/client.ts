@@ -83,6 +83,12 @@ export interface StepUpStateResponse {
   expiresAt: string;
   decidedAt: string | null;
   cosignerAttestationJwt: string | null;
+  /** Set once the cosigner has been consumed (audit C5, single-use). */
+  cosignerUsedAt: string | null;
+}
+
+export interface ConsumeStepUpResult {
+  consumed: boolean;
 }
 
 export interface ControlPlaneClient {
@@ -112,6 +118,14 @@ export interface ControlPlaneClient {
     originalUcanCid?: string;
   }): Promise<StepUpCreateResponse>;
   getStepUp(id: string): Promise<StepUpStateResponse | undefined>;
+  /**
+   * Audit C5 — single-use cosigner enforcement. PDP calls this after
+   * validateCosigner returns ok; the control-plane atomically CAS-marks
+   * the approval as used. `{ consumed: false }` means another caller won
+   * the race (or the approval state changed); PDP must deny with
+   * `cosigner_already_used`.
+   */
+  consumeStepUp(id: string): Promise<ConsumeStepUpResult>;
   /**
    * Best-effort span emit. PDP calls this fire-and-forget after every
    * /v1/proxy invocation completes so the control-plane records what the
@@ -279,6 +293,7 @@ export function createControlPlaneClient(opts: ControlPlaneClientOptions): Contr
       expires_at: string;
       decided_at: string | null;
       cosigner_attestation_jwt: string | null;
+      cosigner_used_at?: string | null;
     };
     return {
       id: body.id,
@@ -290,7 +305,24 @@ export function createControlPlaneClient(opts: ControlPlaneClientOptions): Contr
       expiresAt: body.expires_at,
       decidedAt: body.decided_at,
       cosignerAttestationJwt: body.cosigner_attestation_jwt,
+      cosignerUsedAt: body.cosigner_used_at ?? null,
     };
+  }
+
+  async function consumeStepUp(id: string): Promise<ConsumeStepUpResult> {
+    const res = await fetchImpl(
+      `${opts.baseUrl}/v1/internal/stepup/${encodeURIComponent(id)}/consume`,
+      {
+        method: 'POST',
+        headers: { authorization: `Bearer ${opts.serviceToken}` },
+      },
+    );
+    if (res.status === 409) return { consumed: false };
+    if (!res.ok) {
+      throw new Error(`stepup consume HTTP ${res.status}`);
+    }
+    const body = (await res.json()) as { consumed: boolean };
+    return { consumed: body.consumed === true };
   }
 
   async function emitSpan(args: {
@@ -342,6 +374,7 @@ export function createControlPlaneClient(opts: ControlPlaneClientOptions): Contr
     refreshOAuthToken,
     createStepUp,
     getStepUp,
+    consumeStepUp,
     emitSpan,
   };
 }

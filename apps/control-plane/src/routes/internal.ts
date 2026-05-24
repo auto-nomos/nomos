@@ -1,5 +1,5 @@
 import { EmitSpanInputSchema } from '@auto-nomos/shared-types';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { z } from 'zod';
 import type { Config } from '../config.js';
@@ -186,7 +186,32 @@ export function createInternalRoutes(deps: InternalDeps): Hono {
         expires_at: row.expiresAt.toISOString(),
         decided_at: row.decidedAt ? row.decidedAt.toISOString() : null,
         cosigner_attestation_jwt: row.cosignerAttestationJwt,
+        cosigner_used_at: row.cosignerUsedAt ? row.cosignerUsedAt.toISOString() : null,
       });
+    });
+
+    // Single-use cosigner enforcement (audit C5). Atomic CAS — only the
+    // first observer wins. UPDATE ... WHERE cosigner_used_at IS NULL returns
+    // 0 rows on second call, which we surface as 409 so the PDP can deny
+    // with `cosigner_already_used` instead of letting the same approval
+    // unlock multiple proxy requests.
+    app.post('/v1/internal/stepup/:id/consume', async (c) => {
+      const id = c.req.param('id');
+      const updated = await deps.db.drizzle
+        .update(schema.pushApprovals)
+        .set({ cosignerUsedAt: new Date() })
+        .where(
+          and(
+            eq(schema.pushApprovals.id, id),
+            eq(schema.pushApprovals.state, 'approved'),
+            isNull(schema.pushApprovals.cosignerUsedAt),
+          ),
+        )
+        .returning({ id: schema.pushApprovals.id });
+      if (updated.length === 0) {
+        return c.json({ consumed: false, reason: 'already_used_or_not_approved' }, 409);
+      }
+      return c.json({ consumed: true, id: updated[0]?.id });
     });
   }
 
