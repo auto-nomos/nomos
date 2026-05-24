@@ -55,10 +55,20 @@ export const membersRouter = router({
           });
         }
       }
+      // Audit H5 (2026-05-24) defence-in-depth: pre-check guard above
+      // confirms the membership belongs to ctx.customerId, but the UPDATE
+      // WHERE used to filter on membership id only. Bind the UPDATE to
+      // customerId too so a later schema/normalization change can't open up
+      // a cross-tenant role-edit primitive.
       const [updated] = await ctx.db.drizzle
         .update(schema.memberships)
         .set({ role: input.role })
-        .where(eq(schema.memberships.id, input.membershipId))
+        .where(
+          and(
+            eq(schema.memberships.id, input.membershipId),
+            eq(schema.memberships.customerId, ctx.customerId),
+          ),
+        )
         .returning();
       return {
         membershipId: updated!.id,
