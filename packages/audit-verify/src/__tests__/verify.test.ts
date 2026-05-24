@@ -149,4 +149,63 @@ describe('verifyBundle', () => {
     expect(result.ok).toBe(false);
     expect(result.errors.some((e) => e.reason === 'root_signature_invalid')).toBe(true);
   });
+
+  describe('signature_version 2 (audit H7)', () => {
+    function withV2SignedRoot(events: AuditBundleEvent[]): AuditBundle {
+      const last = events.at(-1)!;
+      const signedAtMs = 1_780_000_000_000;
+      const customerId = events[0]!.customer_id;
+      const msg = new TextEncoder().encode(
+        `nomos-audit-root|v2|${customerId}|${last.hash}|${signedAtMs}`,
+      );
+      const signature = bytesToHex(signDetached(kp.privateKey, msg));
+      return {
+        event_id: events[0]!.event_id,
+        events,
+        root: {
+          root_event_id: last.event_id,
+          root_hash: last.hash,
+          signing_key_id: kp.did,
+          signature,
+          signed_at: new Date(signedAtMs).toISOString(),
+          signature_version: 2,
+          signed_at_ms: signedAtMs,
+        },
+      };
+    }
+
+    it('accepts a valid v2-signed bundle', () => {
+      const bundle = withV2SignedRoot(buildChain({ count: 3 }));
+      const result = verifyBundle(bundle, verifyKey);
+      expect(result.ok).toBe(true);
+      expect(result.errors).toEqual([]);
+    });
+
+    it('rejects v2 sig when customerId is rewritten on events[0] (cross-tenant move)', () => {
+      const bundle = withV2SignedRoot(buildChain({ count: 3 }));
+      // Attacker rewrites the chain's customerId; the v2 signature was bound
+      // to the original customerId so verification must fail.
+      const swappedCustomerId = randomUUID();
+      bundle.events = bundle.events.map((e) => ({ ...e, customer_id: swappedCustomerId }));
+      const result = verifyBundle(bundle, verifyKey);
+      expect(result.ok).toBe(false);
+      expect(result.errors.some((e) => e.reason === 'root_signature_invalid')).toBe(true);
+    });
+
+    it('rejects v2 sig when signed_at_ms is rewritten', () => {
+      const bundle = withV2SignedRoot(buildChain({ count: 3 }));
+      bundle.root!.signed_at_ms = (bundle.root!.signed_at_ms ?? 0) + 1;
+      const result = verifyBundle(bundle, verifyKey);
+      expect(result.ok).toBe(false);
+      expect(result.errors.some((e) => e.reason === 'root_signature_invalid')).toBe(true);
+    });
+
+    it('rejects v2 sig when signed_at_ms is missing', () => {
+      const bundle = withV2SignedRoot(buildChain({ count: 2 }));
+      bundle.root!.signed_at_ms = null;
+      const result = verifyBundle(bundle, verifyKey);
+      expect(result.ok).toBe(false);
+      expect(result.errors.some((e) => e.reason === 'root_signature_invalid')).toBe(true);
+    });
+  });
 });

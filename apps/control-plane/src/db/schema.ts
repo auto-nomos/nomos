@@ -12,6 +12,7 @@
 import { randomUUID } from 'node:crypto';
 import { relations, sql } from 'drizzle-orm';
 import {
+  bigint,
   boolean,
   index,
   integer,
@@ -482,9 +483,14 @@ export const auditRoots = pgTable(
     rootHash: text('root_hash').notNull(),
     /** Stable identifier for the signing key (`did:key:...` or env handle). */
     signingKeyId: text('signing_key_id').notNull(),
-    /** Hex-encoded Ed25519 signature over root_hash. */
+    /** Hex-encoded Ed25519 signature. v1 signs UTF-8 bytes of root_hash; v2
+     * signs `nomos-audit-root|v2|<customerId>|<rootHash>|<signedAtMs>`. */
     signature: text('signature').notNull(),
+    /** Which canonical message format `signature` was computed over (audit H7). */
+    signatureVersion: integer('signature_version').notNull().default(1),
     signedAt: timestamp('signed_at', { withTimezone: true }).notNull().defaultNow(),
+    /** Exact ms-since-epoch used inside the v2 canonical message. NULL for v1. */
+    signedAtMs: bigint('signed_at_ms', { mode: 'number' }),
   },
   (t) => ({
     customerSignedAtIdx: index('audit_roots_customer_signed_at_idx').on(t.customerId, t.signedAt),

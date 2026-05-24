@@ -14,7 +14,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createDb, type Db } from '../db/index.js';
 import * as schema from '../db/schema.js';
 import {
-  encodeRootHash,
+  CURRENT_SIGNATURE_VERSION,
+  encodeSignedRoot,
   signRootForCustomer,
   signRootsForAllCustomers,
 } from '../services/audit-roots.js';
@@ -99,13 +100,27 @@ describe.skipIf(!RUN)('audit roots (requires postgres)', () => {
     expect(result.rootHash).toBe(latestHash);
 
     const sigBytes = hexToBytes(result.signature!);
-    expect(verifyDetached(verifyKey, encodeRootHash(latestHash), sigBytes)).toBe(true);
+    // v2 canonical: {customerId, rootHash, signedAtMs}
+    expect(result.signatureVersion).toBe(CURRENT_SIGNATURE_VERSION);
+    expect(
+      verifyDetached(
+        verifyKey,
+        encodeSignedRoot({
+          customerId,
+          rootHash: latestHash,
+          signedAtMs: result.signedAtMs!,
+        }),
+        sigBytes,
+      ),
+    ).toBe(true);
 
     const stored = await db.drizzle.query.auditRoots.findFirst({
       where: eq(schema.auditRoots.rootEventId, latestId),
     });
     expect(stored?.signingKeyId).toBe(signingKeyId);
     expect(stored?.signature).toBe(result.signature);
+    expect(stored?.signatureVersion).toBe(CURRENT_SIGNATURE_VERSION);
+    expect(stored?.signedAtMs).toBe(result.signedAtMs);
   });
 
   it('returns signed=false (no-op) when customer has no audit events', async () => {

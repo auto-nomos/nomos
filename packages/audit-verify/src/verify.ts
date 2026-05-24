@@ -34,9 +34,19 @@ export interface AuditBundleRoot {
   root_event_id: string;
   root_hash: string;
   signing_key_id: string;
-  /** Hex Ed25519 signature over UTF-8 bytes of `root_hash`. */
+  /**
+   * Hex Ed25519 signature. v1 signs UTF-8 bytes of `root_hash` only.
+   * v2 (audit H7, 2026-05-24) signs the canonical envelope
+   * `nomos-audit-root|v2|<customer_id>|<root_hash>|<signed_at_ms>` —
+   * `customer_id` comes from the bundle's events[0] (chain-consistent),
+   * `signed_at_ms` from this struct.
+   */
   signature: string;
   signed_at: string;
+  /** Defaults to 1 when absent for back-compat with pre-0033 bundles. */
+  signature_version?: number;
+  /** Required when `signature_version === 2`. */
+  signed_at_ms?: number | null;
 }
 
 export interface VerifyError {
@@ -115,7 +125,19 @@ export function verifyBundle(bundle: AuditBundle, verifyKeyHex: string): VerifyR
     try {
       const verifyBytes = hexToBytes(verifyKeyHex);
       const sigBytes = hexToBytes(bundle.root.signature);
-      const msg = new TextEncoder().encode(bundle.root.root_hash);
+      const version = bundle.root.signature_version ?? 1;
+      let msg: Uint8Array;
+      if (version === 2) {
+        if (bundle.root.signed_at_ms === undefined || bundle.root.signed_at_ms === null) {
+          throw new Error('v2 root missing signed_at_ms');
+        }
+        const customerId = bundle.events[0]!.customer_id;
+        msg = new TextEncoder().encode(
+          `nomos-audit-root|v2|${customerId}|${bundle.root.root_hash}|${bundle.root.signed_at_ms}`,
+        );
+      } else {
+        msg = new TextEncoder().encode(bundle.root.root_hash);
+      }
       signatureValid = verifyDetached(verifyBytes, msg, sigBytes);
     } catch (err) {
       signatureValid = false;
