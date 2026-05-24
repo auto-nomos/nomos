@@ -11,6 +11,7 @@
  * the callback can verify it matches the request and is fresh.
  */
 
+import { timingSafeEqual } from 'node:crypto';
 import { base64urlToString, bytesToBase64url, stringToBase64url } from '@auto-nomos/ucan';
 import { hmac } from '@noble/hashes/hmac';
 import { sha256 } from '@noble/hashes/sha256';
@@ -62,9 +63,21 @@ export function verifyState(secret: string, state: string, now: number = Date.no
   ) {
     return { ok: false, reason: 'state payload shape invalid' };
   }
-  // Constant-time-ish comparison: recompute the signature, compare bytes.
+  // Constant-time comparison on raw HMAC bytes. The previous string-compare
+  // on base64url-encoded signatures leaked per-character timing → recoverable
+  // forge of any (customer, connector) state.
   const expected = hmac(sha256, encoder.encode(secret), encoder.encode(payloadJson));
-  if (bytesToBase64url(expected) !== parts[1]) {
+  const presentedB64 = parts[1] ?? '';
+  let presented: Uint8Array;
+  try {
+    presented = base64urlToBytesStrict(presentedB64);
+  } catch {
+    return { ok: false, reason: 'state signature mismatch' };
+  }
+  if (presented.length !== expected.length) {
+    return { ok: false, reason: 'state signature mismatch' };
+  }
+  if (!timingSafeEqual(presented, expected)) {
     return { ok: false, reason: 'state signature mismatch' };
   }
   if (payload.exp < now) {
@@ -77,4 +90,11 @@ export function freshNonce(): string {
   return Array.from(globalThis.crypto.getRandomValues(new Uint8Array(16)))
     .map((b) => b.toString(16).padStart(2, '0'))
     .join('');
+}
+
+function base64urlToBytesStrict(s: string): Uint8Array {
+  const pad = s.length % 4 === 2 ? '==' : s.length % 4 === 3 ? '=' : '';
+  const b64 = s.replace(/-/g, '+').replace(/_/g, '/') + pad;
+  const bin = Buffer.from(b64, 'base64');
+  return new Uint8Array(bin);
 }

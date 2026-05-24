@@ -530,6 +530,14 @@ export const pushApprovals = pgTable(
     decidedBy: uuid('decided_by').references(() => user.id),
     cosignerAttestationJwt: text('cosigner_attestation_jwt'),
     /**
+     * Single-use enforcement (audit C5, migration 0031). NULL = cosigner has
+     * not been observed by the PDP yet; non-NULL = PDP atomically claimed it
+     * via /v1/internal/stepup/:id/consume. Any subsequent consume attempt
+     * loses the CAS (UPDATE ... WHERE cosigner_used_at IS NULL) and the PDP
+     * denies with cosigner_already_used.
+     */
+    cosignerUsedAt: timestamp('cosigner_used_at', { withTimezone: true }),
+    /**
      * Sprint 9 — CID of the original UCAN that triggered the step-up. The
      * cosigner UCAN's `meta.cosigner_for` is this value; the PDP refuses
      * any cosigner whose `cosigner_for` doesn't match the request's UCAN.

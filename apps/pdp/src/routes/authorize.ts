@@ -55,6 +55,14 @@ export interface AuthorizeRouteDeps {
       originalUcanCid?: string;
     }) => Promise<{ id: string; deepLink: string }>;
     fetchApproval?: (id: string) => Promise<StepUpStateResponse | undefined>;
+    /**
+     * Audit C5 — single-use enforcement. After validateCosigner returns ok,
+     * the route atomically claims the approval via CAS. If `{consumed:false}`
+     * comes back the cosigner was already used (or state changed) and the
+     * route denies with `cosigner_already_used`. When absent, single-use is
+     * not enforced — dev/test-only.
+     */
+    consumeApproval?: (id: string) => Promise<{ consumed: boolean }>;
   };
 }
 
@@ -305,6 +313,41 @@ export function createAuthorizeRoutes(deps: AuthorizeRouteDeps): Hono {
           'authorize cosigner-deny',
         );
         return c.json(denyDecision, 200);
+      }
+      // Audit C5 — atomic single-use claim. Done after all other validation
+      // succeeds and before context.cosigner=true so a race between two
+      // concurrent retries can never let both through.
+      if (deps.stepup?.consumeApproval) {
+        const claim = await deps.stepup.consumeApproval(validation.approvalId);
+        if (!claim.consumed) {
+          const denyDecision: AuthorizeDecision = {
+            allow: false,
+            reason: 'cosigner_already_used',
+            receiptId: sha256Hex(
+              `cosigner-already-used|${validation.approvalId}|${request.command}`,
+            ),
+          };
+          recordAuthorize(decisionToAudit(denyDecision), denyDecision.reason);
+          if (deps.emitAudit) {
+            await deps.emitAudit({
+              customerId,
+              request,
+              decision: { ...denyDecision },
+              ts: Date.now(),
+              agentDid: extractAgentDid(request.ucan),
+            });
+          }
+          log.info(
+            {
+              customerId,
+              command: request.command,
+              approvalId: validation.approvalId,
+              reason: 'cosigner_already_used',
+            },
+            'authorize cosigner-already-used',
+          );
+          return c.json(denyDecision, 200);
+        }
       }
       effectiveRequest = {
         ...request,

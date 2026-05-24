@@ -2,7 +2,7 @@ import { appendFile } from 'node:fs/promises';
 import { didFromPublicKey } from '@auto-nomos/crypto';
 import { serve } from '@hono/node-server';
 import { hexToBytes } from '@noble/hashes/utils';
-import { createAuditEmitter, decisionToAudit } from './audit/emit.js';
+import { auditGenesisHash, createAuditEmitter, decisionToAudit } from './audit/emit.js';
 import { createPostgresAuditEmitter } from './audit/postgres-emitter.js';
 import { createPgAuditWriter } from './audit/postgres-writer.js';
 import type { ReceiptEmitInput } from './routes/receipts.js';
@@ -122,12 +122,23 @@ async function main(): Promise<void> {
     config.AUDIT_BACKEND === 'postgres'
       ? new pg.Pool({ connectionString: config.DATABASE_URL })
       : undefined;
+  if (config.NODE_ENV === 'production' && !config.AUDIT_GENESIS_SECRET) {
+    logger.warn(
+      'AUDIT_GENESIS_SECRET not set in production — audit chain genesis ' +
+        'falls back to all-zero ZERO_HASH, which lets a DB-write attacker ' +
+        'fabricate first events for unused customers. Set it for C3 fix.',
+    );
+  }
+  const auditGenesisSecret = config.AUDIT_GENESIS_SECRET;
   const pgEmitter = auditPool
     ? createPostgresAuditEmitter({
         writer: createPgAuditWriter(auditPool),
         flushIntervalMs: config.AUDIT_FLUSH_INTERVAL_MS,
         batchSizeMax: config.AUDIT_BATCH_SIZE_MAX,
         logger,
+        ...(auditGenesisSecret
+          ? { genesisFor: (id: string) => auditGenesisHash(id, auditGenesisSecret) }
+          : {}),
       })
     : undefined;
   if (pgEmitter) pgEmitter.start();
@@ -181,6 +192,7 @@ async function main(): Promise<void> {
         return { id: created.id, deepLink: created.deepLink };
       },
       getStepUp: cpClient.getStepUp,
+      consumeStepUp: cpClient.consumeStepUp,
     },
   });
 

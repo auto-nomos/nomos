@@ -44,6 +44,14 @@ export interface PostgresAuditEmitterOptions {
   /** Default 100 — when pending exceeds this, flush is triggered immediately. */
   batchSizeMax?: number;
   logger: Logger;
+  /**
+   * Audit C3 — per-customer genesis seed. When provided, the first event
+   * for a customer uses `genesisFor(customerId)` as `prev_hash` instead of
+   * `ZERO_HASH`. The verifier needs the same function (or the same secret)
+   * to re-derive. Omit for back-compat with existing dev/test deployments;
+   * production should always set it. See `auditGenesisHash()` in emit.ts.
+   */
+  genesisFor?: (customerId: string) => string;
 }
 
 /**
@@ -70,13 +78,20 @@ export function createPostgresAuditEmitter(
   let timer: NodeJS.Timeout | undefined;
   let flushing: Promise<void> | undefined;
 
+  function genesisOf(customerId: string): string {
+    return opts.genesisFor ? opts.genesisFor(customerId) : ZERO_HASH;
+  }
+
   async function ensureLastHash(customerId: string): Promise<string> {
     const cached = lastHashByCustomer.get(customerId);
     if (cached !== undefined) return cached;
     const inflight = hydrating.get(customerId);
     if (inflight) return inflight;
     const p = opts.writer.fetchLastHash(customerId).then((fromDb) => {
-      const v = fromDb ?? ZERO_HASH;
+      // Audit C3 — no DB row yet => use per-customer pinned genesis (if
+      // configured) instead of the universal ZERO_HASH so an attacker
+      // without the env secret can't fabricate a believable first event.
+      const v = fromDb ?? genesisOf(customerId);
       // Concurrent emits would all try to seed; first-writer-wins.
       const existing = lastHashByCustomer.get(customerId);
       if (existing !== undefined) {
@@ -154,7 +169,7 @@ export function createPostgresAuditEmitter(
 
   return {
     emit,
-    getLastHash: (customerId) => lastHashByCustomer.get(customerId) ?? ZERO_HASH,
+    getLastHash: (customerId) => lastHashByCustomer.get(customerId) ?? genesisOf(customerId),
     flush,
     start,
     stop,

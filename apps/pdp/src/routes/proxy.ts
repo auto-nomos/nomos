@@ -132,6 +132,12 @@ export interface ProxyRouteDeps {
       originalUcanCid?: string;
     }) => Promise<{ id: string; deepLink: string }>;
     fetchApproval?: (id: string) => Promise<StepUpStateResponse | undefined>;
+    /**
+     * Audit C5 — single-use enforcement. After validateCosigner returns ok,
+     * the route atomically claims the approval via CAS. `{consumed:false}` =>
+     * deny `cosigner_already_used`. Absent in dev/test => no enforcement.
+     */
+    consumeApproval?: (id: string) => Promise<{ consumed: boolean }>;
   };
   /** Injectable upstream fetch — defaults to global fetch. */
   upstreamFetch?: typeof fetch;
@@ -480,6 +486,51 @@ export function createProxyRoutes(deps: ProxyRouteDeps): Hono {
           requestArgs,
         });
         return c.json({ allow: false, decision: denyDecision, error_code: denyReason }, 200);
+      }
+      // Audit C5 — atomic single-use claim. See authorize.ts for rationale.
+      if (deps.stepup?.consumeApproval) {
+        const claim = await deps.stepup.consumeApproval(validation.approvalId);
+        if (!claim.consumed) {
+          const denyDecision: AuthorizeDecision = {
+            allow: false,
+            reason: 'cosigner_already_used',
+            receiptId: sha256Hex(
+              `proxy-cosigner-already-used|${validation.approvalId}|${request.command}`,
+            ),
+          };
+          recordAuthorize(decisionToAudit(denyDecision), denyDecision.reason);
+          if (deps.emitAudit) {
+            await deps.emitAudit({
+              customerId,
+              request,
+              decision: { ...denyDecision },
+              ts: Date.now(),
+              agentDid: extractAgentDid(request.ucan),
+              apiCall: { method: parsed.data.apiCall.method, path: parsed.data.apiCall.path },
+            });
+          }
+          fireSpan({
+            customerId,
+            agentDid: agentDidForSpan,
+            receiptId: denyDecision.receiptId,
+            toolStatus: 'denied',
+            errorCode: 'cosigner_already_used',
+            requestArgs,
+          });
+          log.info(
+            {
+              customerId,
+              command: request.command,
+              approvalId: validation.approvalId,
+              reason: 'cosigner_already_used',
+            },
+            'proxy cosigner-already-used',
+          );
+          return c.json(
+            { allow: false, decision: denyDecision, error_code: 'cosigner_already_used' },
+            200,
+          );
+        }
       }
       effectiveRequest = {
         ...request,
