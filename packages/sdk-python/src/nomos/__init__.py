@@ -40,4 +40,4 @@ __all__ = [
     "read_parent_chain_from_env",
 ]
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"

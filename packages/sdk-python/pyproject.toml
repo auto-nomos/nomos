@@ -1,6 +1,6 @@
 [project]
 name = "nomos-sdk"
-version = "0.1.0"
+version = "0.1.1"
 description = "Nomos Python SDK — capability layer for AI agents (scoped, time-bound, revocable, delegable permissions for MCP / LangGraph / CrewAI / AutoGen)"
 readme = "README.md"
 requires-python = ">=3.10"
