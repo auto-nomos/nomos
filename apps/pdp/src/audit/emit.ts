@@ -6,6 +6,18 @@ import { canonicalize } from '@auto-nomos/ucan';
 
 export const ZERO_HASH = '0'.repeat(64);
 
+/**
+ * Audit C3 — per-customer genesis hash. When the operator configures
+ * AUDIT_GENESIS_SECRET, the postgres emitter uses this as the prev_hash for
+ * a customer's very first event instead of the universal `ZERO_HASH`. The
+ * version prefix `v1` is forward-compat: rotating to a real per-customer
+ * signed root anchor in a follow-up bumps to `v2`. Pure function — same
+ * inputs always produce the same hash so verifier can re-derive.
+ */
+export function auditGenesisHash(customerId: string, secret: string): string {
+  return sha256Hex(`audit-genesis|v1|${customerId}|${secret}`);
+}
+
 export type AuditEventInput = Omit<AuditEvent, 'event_id' | 'prev_hash' | 'hash'>;
 
 export interface AuditEmitter {
