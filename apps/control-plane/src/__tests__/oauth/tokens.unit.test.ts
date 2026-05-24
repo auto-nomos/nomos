@@ -19,6 +19,7 @@ const key = hexToBytes(generateSecretboxKeyHex());
 const baseDeps = { db: {} as DrizzleClient, encryptionKey: key };
 
 describe('tokens.tokensToRow / rowToTokens (no DB)', () => {
+  const ctx = { customerId: 'cust', connector: 'github' };
   const empty = (over: Partial<Parameters<typeof __test.tokensToRow>[1]>) => ({
     accessToken: '',
     refreshToken: '',
@@ -30,7 +31,7 @@ describe('tokens.tokensToRow / rowToTokens (no DB)', () => {
   });
 
   it('encrypts both tokens when both present', () => {
-    const row = __test.tokensToRow(baseDeps, empty({ accessToken: 'a', refreshToken: 'r' }));
+    const row = __test.tokensToRow(baseDeps, empty({ accessToken: 'a', refreshToken: 'r' }), ctx);
     expect(row.encryptedAccessToken).not.toBe(null);
     expect(row.encryptedAccessToken).not.toBe('a');
     expect(row.encryptedRefreshToken).not.toBe('');
@@ -38,27 +39,27 @@ describe('tokens.tokensToRow / rowToTokens (no DB)', () => {
   });
 
   it('leaves access fields null when access token is empty', () => {
-    const row = __test.tokensToRow(baseDeps, empty({ refreshToken: 'r' }));
+    const row = __test.tokensToRow(baseDeps, empty({ refreshToken: 'r' }), ctx);
     expect(row.encryptedAccessToken).toBeNull();
     expect(row.accessTokenNonce).toBeNull();
     expect(row.encryptedRefreshToken).not.toBe('');
   });
 
   it('leaves refresh fields empty-string when refresh token is empty', () => {
-    const row = __test.tokensToRow(baseDeps, empty({ accessToken: 'a' }));
+    const row = __test.tokensToRow(baseDeps, empty({ accessToken: 'a' }), ctx);
     expect(row.encryptedRefreshToken).toBe('');
     expect(row.refreshTokenNonce).toBe('');
     expect(row.encryptedAccessToken).not.toBe(null);
   });
 
   it('handles both tokens empty (paranoid case — non-revoked connection with no cached creds yet)', () => {
-    const row = __test.tokensToRow(baseDeps, empty({}));
+    const row = __test.tokensToRow(baseDeps, empty({}), ctx);
     expect(row.encryptedRefreshToken).toBe('');
     expect(row.encryptedAccessToken).toBeNull();
   });
 
   it('rowToTokens decrypts only what is present', () => {
-    const row = __test.tokensToRow(baseDeps, empty({ refreshToken: 'r' }));
+    const row = __test.tokensToRow(baseDeps, empty({ refreshToken: 'r' }), ctx);
     const decoded = __test.rowToTokens(baseDeps, {
       id: 'id',
       customerId: 'cust',
@@ -113,12 +114,16 @@ describe('tokens.loadConnection / loadConnectionById / updateConnectionTokens (m
     ).toBeNull();
   });
 
-  it('updateConnectionTokens throws when update returning() yields no row', async () => {
+  it('updateConnectionTokens throws when the connection does not exist', async () => {
+    const findFirst = vi.fn().mockResolvedValue(undefined);
     const returning = vi.fn().mockResolvedValue([]);
     const where = vi.fn().mockReturnValue({ returning });
     const set = vi.fn().mockReturnValue({ where });
     const update = vi.fn().mockReturnValue({ set });
-    const fakeDb = { update } as unknown as DrizzleClient;
+    const fakeDb = {
+      query: { oauthConnections: { findFirst } },
+      update,
+    } as unknown as DrizzleClient;
     await expect(
       updateConnectionTokens({ db: fakeDb, encryptionKey: key }, 'missing', {
         accessToken: 'a',

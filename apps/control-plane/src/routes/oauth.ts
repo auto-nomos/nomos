@@ -79,6 +79,19 @@ function ctxFor(
   };
 }
 
+/** Build dashboard URL the browser lands on after the OAuth callback. */
+function dashboardReturnUrl(
+  deps: Pick<OAuthRoutesDeps, 'config'>,
+  params: Record<string, string | undefined>,
+): string {
+  const base = deps.config.DASHBOARD_PUBLIC_URL.replace(/\/+$/, '');
+  const url = new URL(`${base}/app/connections`);
+  for (const [k, v] of Object.entries(params)) {
+    if (v !== undefined && v !== null && v !== '') url.searchParams.set(k, v);
+  }
+  return url.toString();
+}
+
 export function createOAuthRoutes(deps: OAuthRoutesDeps): Hono {
   const app = new Hono();
 
@@ -125,14 +138,28 @@ export function createOAuthRoutes(deps: OAuthRoutesDeps): Hono {
   });
 
   app.get('/v1/oauth/callback/:connector', async (c) => {
+    // Browser-initiated GET: every branch redirects to the dashboard
+    // connections page with `?oauth=success|error&…` so the user sees a
+    // friendly banner instead of raw JSON. The machine-readable reason
+    // codes ride along as query params for the dashboard to render.
     const id = c.req.param('connector');
+    const fail = (reason: string, extra: Record<string, string | undefined> = {}) =>
+      c.redirect(
+        dashboardReturnUrl(deps, {
+          oauth: 'error',
+          connector: id,
+          reason,
+          ...extra,
+        }),
+        302,
+      );
     if (!isImplementedConnector(id)) {
-      return c.json({ error: 'unknown_connector', connector: id }, 404);
+      return fail('unknown_connector');
     }
     const code = c.req.query('code');
     const state = c.req.query('state');
     if (!code || !state) {
-      return c.json({ error: 'missing_code_or_state' }, 400);
+      return fail('missing_code_or_state');
     }
     const verification = verifyState(
       deps.config.OAUTH_STATE_SIGN_SECRET,
@@ -140,10 +167,10 @@ export function createOAuthRoutes(deps: OAuthRoutesDeps): Hono {
       deps.now ? deps.now() : Date.now(),
     );
     if (!verification.ok || !verification.payload) {
-      return c.json({ error: 'invalid_state', reason: verification.reason }, 400);
+      return fail('invalid_state', { detail: verification.reason });
     }
     if (verification.payload.connector !== id) {
-      return c.json({ error: 'state_connector_mismatch' }, 400);
+      return fail('state_connector_mismatch');
     }
     // Audit C2 — atomic CAS-consume the one-shot nonce. UPDATE-RETURNING
     // semantics via DELETE-RETURNING: only one observer wins, replays of
@@ -159,11 +186,11 @@ export function createOAuthRoutes(deps: OAuthRoutesDeps): Hono {
         { connector: id, customerId: verification.payload.customerId },
         'oauth callback: nonce already consumed or unknown — replay attempt',
       );
-      return c.json({ error: 'invalid_state', reason: 'nonce_replay_or_unknown' }, 400);
+      return fail('invalid_state', { detail: 'nonce_replay_or_unknown' });
     }
     const creds = connectorCredentials(deps.config, id);
     if (!creds) {
-      return c.json({ error: 'connector_not_configured', connector: id }, 503);
+      return fail('connector_not_configured');
     }
     const connector = getConnector(id) as Connector;
     const ctx = ctxFor(deps, id, creds);
@@ -171,16 +198,10 @@ export function createOAuthRoutes(deps: OAuthRoutesDeps): Hono {
     try {
       tokens = await connector.exchangeCode(ctx, code);
     } catch (err) {
-      const status = err instanceof ConnectorAuthError ? 400 : 502;
       deps.logger.warn({ err, connector: id }, 'oauth code exchange failed');
-      return c.json(
-        {
-          error: 'code_exchange_failed',
-          connector: id,
-          providerStatus: err instanceof ConnectorAuthError ? err.status : null,
-        },
-        status,
-      );
+      return fail('code_exchange_failed', {
+        providerStatus: err instanceof ConnectorAuthError ? String(err.status) : undefined,
+      });
     }
     const stored = await saveConnection(
       { db: deps.db.drizzle, encryptionKey: deps.encryptionKey },
@@ -190,12 +211,15 @@ export function createOAuthRoutes(deps: OAuthRoutesDeps): Hono {
         tokens,
       },
     );
-    return c.json({
-      connectionId: stored.id,
-      connector: id,
-      accountId: stored.accountId,
-      scopesGranted: stored.tokens.scopesGranted,
-    });
+    return c.redirect(
+      dashboardReturnUrl(deps, {
+        oauth: 'success',
+        connector: id,
+        connectionId: stored.id,
+        account: stored.accountId,
+      }),
+      302,
+    );
   });
 
   return app;

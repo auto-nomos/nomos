@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { useEffect, useMemo, useState } from 'react';
 import { Badge } from '../../../components/ui/badge';
 import { Button } from '../../../components/ui/button';
 import {
@@ -22,6 +23,15 @@ import { type ConnectorId, OAUTH_FLOW_CONNECTORS, startOAuthConnect } from '../.
 import { trpc } from '../../../lib/trpc';
 import { usePermissions } from '../../../lib/use-permissions';
 import { ManualTokenForm } from './manual-token';
+
+const OAUTH_ERROR_MESSAGES: Record<string, string> = {
+  unknown_connector: 'That connector is not supported.',
+  missing_code_or_state: 'The provider did not return an authorization code.',
+  invalid_state: 'The authorization session expired or was tampered with. Try again.',
+  state_connector_mismatch: 'The callback connector did not match. Try again.',
+  connector_not_configured: 'This connector is not configured on the server.',
+  code_exchange_failed: 'The provider rejected the authorization code. Try again.',
+};
 
 const CONNECTOR_LABELS: Record<string, string> = {
   github: 'GitHub',
@@ -48,6 +58,41 @@ export default function ConnectionsPage() {
   });
   const [pendingConnect, setPendingConnect] = useState<ConnectorId | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const oauthResult = useMemo(() => {
+    const status = searchParams.get('oauth');
+    if (status !== 'success' && status !== 'error') return null;
+    return {
+      status,
+      connector: searchParams.get('connector'),
+      reason: searchParams.get('reason'),
+      account: searchParams.get('account'),
+    };
+  }, [searchParams]);
+  // Strip the oauth=* params from the URL once we've captured them so a
+  // browser refresh doesn't re-fire the banner.
+  useEffect(() => {
+    if (!oauthResult) return;
+    const next = new URLSearchParams(searchParams.toString());
+    for (const k of [
+      'oauth',
+      'connector',
+      'reason',
+      'account',
+      'connectionId',
+      'providerStatus',
+      'detail',
+    ]) {
+      next.delete(k);
+    }
+    const qs = next.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    if (oauthResult.status === 'success') {
+      utils.oauth.list.invalidate();
+    }
+  }, [oauthResult, pathname, router, searchParams, utils.oauth.list]);
 
   async function reconnect(id: ConnectorId) {
     setError(null);
@@ -76,6 +121,21 @@ export default function ConnectionsPage() {
           outstanding UCANs still expire on their own TTL.
         </p>
       </header>
+
+      {oauthResult ? (
+        <div
+          role="status"
+          className={
+            oauthResult.status === 'success'
+              ? 'rounded-md border border-emerald-600/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-700 dark:text-emerald-300'
+              : 'rounded-md border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive'
+          }
+        >
+          {oauthResult.status === 'success'
+            ? `Connected ${CONNECTOR_LABELS[oauthResult.connector ?? ''] ?? oauthResult.connector ?? 'connector'}${oauthResult.account ? ` (${oauthResult.account})` : ''}.`
+            : `Could not connect ${CONNECTOR_LABELS[oauthResult.connector ?? ''] ?? oauthResult.connector ?? 'connector'}: ${OAUTH_ERROR_MESSAGES[oauthResult.reason ?? ''] ?? oauthResult.reason ?? 'unknown error'}`}
+        </div>
+      ) : null}
 
       <Card>
         <CardHeader>

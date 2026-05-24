@@ -166,7 +166,14 @@ describe.skipIf(!RUN)('OAuth routes (requires postgres)', () => {
   });
 
   describe('GET /v1/oauth/callback/:connector', () => {
-    it('exchanges code, persists encrypted tokens, returns connectionId', async () => {
+    function parseRedirect(res: Response): URL {
+      expect(res.status).toBe(302);
+      const loc = res.headers.get('location');
+      expect(loc).toBeTruthy();
+      return new URL(loc!);
+    }
+
+    it('exchanges code, persists encrypted tokens, redirects with connectionId', async () => {
       const fetched = makeFetch([
         {
           match: 'https://github.com/login/oauth/access_token',
@@ -201,12 +208,16 @@ describe.skipIf(!RUN)('OAuth routes (requires postgres)', () => {
       const res = await app.request(
         `/v1/oauth/callback/github?code=AUTH_CODE&state=${encodeURIComponent(state)}`,
       );
-      expect(res.status).toBe(200);
-      const body = (await res.json()) as { connectionId: string; accountId: string };
-      expect(body.accountId).toBe('alice-octo');
+      const url = parseRedirect(res);
+      expect(url.pathname).toBe('/app/connections');
+      expect(url.searchParams.get('oauth')).toBe('success');
+      expect(url.searchParams.get('connector')).toBe('github');
+      expect(url.searchParams.get('account')).toBe('alice-octo');
+      const connectionId = url.searchParams.get('connectionId');
+      expect(connectionId).toBeTruthy();
 
       const stored = await db.drizzle.query.oauthConnections.findFirst({
-        where: eq(schema.oauthConnections.id, body.connectionId),
+        where: eq(schema.oauthConnections.id, connectionId!),
       });
       expect(stored?.encryptedAccessToken).not.toBe('gho_cb');
       expect(
@@ -214,19 +225,24 @@ describe.skipIf(!RUN)('OAuth routes (requires postgres)', () => {
       ).toBe('gho_cb');
     });
 
-    it('rejects missing code or state', async () => {
+    it('redirects with error when code or state missing', async () => {
       const res1 = await app.request('/v1/oauth/callback/github');
-      expect(res1.status).toBe(400);
+      const u1 = parseRedirect(res1);
+      expect(u1.searchParams.get('oauth')).toBe('error');
+      expect(u1.searchParams.get('reason')).toBe('missing_code_or_state');
       const res2 = await app.request('/v1/oauth/callback/github?code=x');
-      expect(res2.status).toBe(400);
+      const u2 = parseRedirect(res2);
+      expect(u2.searchParams.get('reason')).toBe('missing_code_or_state');
     });
 
-    it('rejects invalid state', async () => {
+    it('redirects with error when state is invalid', async () => {
       const res = await app.request('/v1/oauth/callback/github?code=x&state=not.a.valid.state');
-      expect(res.status).toBe(400);
+      const url = parseRedirect(res);
+      expect(url.searchParams.get('oauth')).toBe('error');
+      expect(url.searchParams.get('reason')).toBe('invalid_state');
     });
 
-    it('rejects state where connector field does not match URL', async () => {
+    it('redirects with state_connector_mismatch when state connector does not match URL', async () => {
       const state = signState(stateSecret, {
         customerId: alice.customerId,
         connector: 'slack', // mismatch
@@ -236,12 +252,12 @@ describe.skipIf(!RUN)('OAuth routes (requires postgres)', () => {
       const res = await app.request(
         `/v1/oauth/callback/github?code=x&state=${encodeURIComponent(state)}`,
       );
-      expect(res.status).toBe(400);
-      const body = (await res.json()) as { error: string };
-      expect(body.error).toBe('state_connector_mismatch');
+      const url = parseRedirect(res);
+      expect(url.searchParams.get('oauth')).toBe('error');
+      expect(url.searchParams.get('reason')).toBe('state_connector_mismatch');
     });
 
-    it('returns 400 when provider rejects the code', async () => {
+    it('redirects with code_exchange_failed when provider rejects the code', async () => {
       mockFetch = (async () =>
         new Response(JSON.stringify({ error: 'bad_verification_code' }), {
           status: 200,
@@ -257,12 +273,12 @@ describe.skipIf(!RUN)('OAuth routes (requires postgres)', () => {
       const res = await app.request(
         `/v1/oauth/callback/github?code=BAD&state=${encodeURIComponent(state)}`,
       );
-      expect(res.status).toBe(400);
-      const body = (await res.json()) as { error: string };
-      expect(body.error).toBe('code_exchange_failed');
+      const url = parseRedirect(res);
+      expect(url.searchParams.get('oauth')).toBe('error');
+      expect(url.searchParams.get('reason')).toBe('code_exchange_failed');
     });
 
-    it('returns 503 when the connector lacks credentials', async () => {
+    it('redirects with connector_not_configured when the connector lacks credentials', async () => {
       const state = signState(stateSecret, {
         customerId: alice.customerId,
         connector: 'notion',
@@ -272,12 +288,16 @@ describe.skipIf(!RUN)('OAuth routes (requires postgres)', () => {
       const res = await app.request(
         `/v1/oauth/callback/notion?code=x&state=${encodeURIComponent(state)}`,
       );
-      expect(res.status).toBe(503);
+      const url = parseRedirect(res);
+      expect(url.searchParams.get('oauth')).toBe('error');
+      expect(url.searchParams.get('reason')).toBe('connector_not_configured');
     });
 
-    it('returns 404 for an unknown connector id', async () => {
+    it('redirects with unknown_connector for an unknown connector id', async () => {
       const res = await app.request('/v1/oauth/callback/salesforce?code=x&state=y');
-      expect(res.status).toBe(404);
+      const url = parseRedirect(res);
+      expect(url.searchParams.get('oauth')).toBe('error');
+      expect(url.searchParams.get('reason')).toBe('unknown_connector');
     });
   });
 });

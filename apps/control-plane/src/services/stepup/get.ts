@@ -14,6 +14,7 @@ export interface StepUpStateRow {
   decidedAt: Date | null;
   decidedBy: string | null;
   cosignerAttestationJwt: string | null;
+  cosignerUsedAt: Date | null;
 }
 
 export async function getStepUpApproval(
@@ -38,6 +39,7 @@ export async function getStepUpApproval(
     decidedAt: row.decidedAt ?? null,
     decidedBy: row.decidedBy ?? null,
     cosignerAttestationJwt: row.cosignerAttestationJwt ?? null,
+    cosignerUsedAt: row.cosignerUsedAt ?? null,
   };
 }
 
@@ -64,6 +66,7 @@ export async function getStepUpForCustomer(
     decidedAt: row.decidedAt ?? null,
     decidedBy: row.decidedBy ?? null,
     cosignerAttestationJwt: row.cosignerAttestationJwt ?? null,
+    cosignerUsedAt: row.cosignerUsedAt ?? null,
   };
 }
 
