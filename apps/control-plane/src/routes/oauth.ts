@@ -12,7 +12,7 @@
  * can render a "not enabled" message in the dashboard.
  */
 import { sha256Hex } from '@auto-nomos/crypto';
-import { eq, lt } from 'drizzle-orm';
+import { and, eq, lt } from 'drizzle-orm';
 import { Hono } from 'hono';
 import type { Auth } from '../auth/index.js';
 import type { Config } from '../config.js';
@@ -104,9 +104,30 @@ export function createOAuthRoutes(deps: OAuthRoutesDeps): Hono {
     if (!session?.user) {
       return c.json({ error: 'unauthorized' }, 401);
     }
-    const membership = await deps.db.drizzle.query.memberships.findFirst({
-      where: eq(schema.memberships.userId, session.user.id),
+    // Audit H1 (2026-05-24): the membership lookup used to filter on userId
+    // only, returning some arbitrary org for multi-org users — OAuth could
+    // bind to a tenant the user didn't intend. Prefer the user's
+    // activeCustomerId; only fall back to a first owner / first membership
+    // if no active org is set (single-org accounts).
+    const userRow = await deps.db.drizzle.query.user.findFirst({
+      where: eq(schema.user.id, session.user.id),
+      columns: { activeCustomerId: true },
     });
+    let membership: typeof schema.memberships.$inferSelect | undefined;
+    if (userRow?.activeCustomerId) {
+      membership = await deps.db.drizzle.query.memberships.findFirst({
+        where: and(
+          eq(schema.memberships.userId, session.user.id),
+          eq(schema.memberships.customerId, userRow.activeCustomerId),
+        ),
+      });
+    }
+    if (!membership) {
+      const all = await deps.db.drizzle.query.memberships.findMany({
+        where: eq(schema.memberships.userId, session.user.id),
+      });
+      membership = all.find((m) => m.role === 'owner') ?? all[0];
+    }
     if (!membership) {
       return c.json({ error: 'no_customer_membership' }, 403);
     }
