@@ -105,6 +105,18 @@ function PublicTopbar() {
           </a>
           <span className="hidden h-5 w-px bg-aegis-line md:inline-block" />
           <Link
+            href="/privacy"
+            className="hidden px-2 py-1.5 font-mono text-[10px] uppercase tracking-[0.18em] text-aegis-faint transition-colors hover:text-aegis-paper lg:inline-flex"
+          >
+            Privacy
+          </Link>
+          <Link
+            href="/terms"
+            className="hidden px-2 py-1.5 font-mono text-[10px] uppercase tracking-[0.18em] text-aegis-faint transition-colors hover:text-aegis-paper lg:inline-flex"
+          >
+            Terms
+          </Link>
+          <Link
             href="/sign-in"
             className="hidden px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.18em] text-aegis-mute transition-colors hover:text-aegis-paper md:inline-flex"
           >

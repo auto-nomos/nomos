@@ -331,6 +331,20 @@ function Sidebar() {
       </div>
 
       <SidebarStatus />
+      <div className="border-t border-aegis-line px-6 py-3">
+        <nav
+          aria-label="Legal"
+          className="flex items-center gap-3 font-mono text-[10px] uppercase tracking-[0.18em] text-aegis-faint"
+        >
+          <Link href="/privacy" className="transition-colors hover:text-aegis-paper">
+            Privacy
+          </Link>
+          <span aria-hidden>·</span>
+          <Link href="/terms" className="transition-colors hover:text-aegis-paper">
+            Terms
+          </Link>
+        </nav>
+      </div>
     </aside>
   );
 }
