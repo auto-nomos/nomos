@@ -1,0 +1,24 @@
+# Durable gitleaks configuration — audit L14 (2026-05-24).
+#
+# `.gitleaksignore` is fingerprint-by-fingerprint; this file allowlists the
+# whole-path patterns that are guaranteed to be fixtures or marketing demos.
+# Keep both: the per-line ignore file documents specific cases for human
+# review, this config file prevents the same noise from re-appearing if a
+# rule re-fingerprints a finding (line moves, fingerprint changes).
+
+title = "Nomos — gitleaks"
+
+[extend]
+# Inherit gitleaks' default rule set; we only add an allowlist.
+useDefault = true
+
+[allowlist]
+description = "Marketing demos + test fixtures intentionally containing token shapes"
+paths = [
+  '''apps/dashboard/src/components/marketing/mistake\.tsx''',
+  '''apps/dashboard/src/app/security/page\.tsx''',
+  '''packages/shared-types/src/span-redact\.ts''',
+  '''apps/pdp/src/__tests__/sanitize-response\.test\.ts''',
+  '''apps/control-plane/src/__tests__/.*\.test\.ts''',
+  '''packages/.*/src/__tests__/.*\.test\.ts''',
+]

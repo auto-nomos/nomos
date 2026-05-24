@@ -1,0 +1,28 @@
+# gitleaks ignore — audit L14 (2026-05-24).
+#
+# Reasoning: the 2026-05-24 self-pentest ran `gitleaks detect` and surfaced
+# 22 hits, every one a false positive (marketing demo with a *fake* ghp_…
+# token, security/page.tsx illustrative text, test fixtures, redaction-test
+# inputs). Without this file the next real leak would get lost in the noise.
+#
+# Format: one fingerprint per line (path:rule-id:line) OR a path glob.
+# Lines starting with `#` are comments. See:
+#   https://github.com/gitleaks/gitleaks#gitleaksignore
+#
+# Companion durable config is in .gitleaks.toml — that's where allowlist
+# paths live. This file is for case-by-case fingerprints we'd like to keep
+# visible to anyone running gitleaks ad-hoc.
+
+# Marketing "this is the wrong way to do it" component intentionally shows
+# a fake GitHub PAT shape in struck-through code.
+apps/dashboard/src/components/marketing/mistake.tsx:github-pat:0
+
+# Span redaction test inputs need realistic-looking secret shapes so the
+# redactor's tests can prove it scrubs them.
+packages/shared-types/src/span-redact.ts:generic-api-key:0
+apps/pdp/src/__tests__/sanitize-response.test.ts:generic-api-key:0
+apps/pdp/src/__tests__/sanitize-response.test.ts:github-pat:0
+
+# Knock step-up notifier tests use the placeholder `sk_live_x` as a fake
+# Stripe-style key shape; not a real key.
+apps/control-plane/src/__tests__/stepup-notify.test.ts:stripe-api-key:0
