@@ -499,6 +499,22 @@ export const auditRoots = pgTable(
 );
 
 /**
+ * Audit C3 phase 2 (migration 0034) — per-customer signed genesis anchor.
+ * Verifier requires both `genesis_hash` match AND Ed25519 verify against
+ * `nomos-genesis-anchor|v1|<customerId>|<genesisHash>|<signedAtMs>`.
+ */
+export const auditGenesisAnchors = pgTable('audit_genesis_anchors', {
+  customerId: uuid('customer_id')
+    .primaryKey()
+    .references(() => customers.id, { onDelete: 'cascade' }),
+  genesisHash: text('genesis_hash').notNull(),
+  signingKeyId: text('signing_key_id').notNull(),
+  signature: text('signature').notNull(),
+  signedAt: timestamp('signed_at', { withTimezone: true }).notNull().defaultNow(),
+  signedAtMs: bigint('signed_at_ms', { mode: 'number' }).notNull(),
+});
+
+/**
  * Audit C2 (migration 0032) — one-shot ledger for OAuth state nonces. The
  * connect handler INSERTs sha256(nonce); the callback CAS-DELETEs after
  * signature verify. Second observation finds the row already gone and the

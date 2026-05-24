@@ -28,6 +28,14 @@ export interface AuthDeps {
   /** Sends the 6-digit recovery code via Knock. Falls back to console log
    *  when no notifier is wired (dev). */
   recoveryNotifier?: AuthRecoveryNotifier;
+  /**
+   * Audit C3 phase 2 (2026-05-24) — invoked after the default customer is
+   * created, with the new customerId. The bootstrap wires this to
+   * `writeAnchor` from `services/audit-genesis-anchor.ts` so every new tenant
+   * gets a signed genesis anchor row before its first PDP authorize. Omit in
+   * tests that don't exercise the audit chain.
+   */
+  writeGenesisAnchor?: (customerId: string) => Promise<void>;
 }
 
 export type Auth = ReturnType<typeof betterAuth>;
@@ -166,6 +174,20 @@ export function createAuth(deps: AuthDeps): Auth {
               customerId: customer.id,
               role: 'owner',
             });
+            // Audit C3 phase 2 — mint the signed genesis anchor before the
+            // first audit event. Swallow + log on failure so signup itself
+            // never blocks on the anchor write; the backfill script picks up
+            // missed rows on the next cron tick.
+            if (deps.writeGenesisAnchor) {
+              try {
+                await deps.writeGenesisAnchor(customer.id);
+              } catch (err) {
+                logger.warn(
+                  { err, customerId: customer.id },
+                  'genesis anchor write failed during signup; backfill will retry',
+                );
+              }
+            }
             logger.info(
               {
                 event: 'auth.signup.success',

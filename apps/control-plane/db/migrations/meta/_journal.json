@@ -239,6 +239,13 @@
       "when": 1780700000000,
       "tag": "0033_audit_roots_v2",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1780800000000,
+      "tag": "0034_audit_genesis_anchors",
+      "breakpoints": true
     }
   ]
 }

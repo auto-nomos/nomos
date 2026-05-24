@@ -19,6 +19,23 @@ export interface AuditBundle {
   events: AuditBundleEvent[];
   /** When null, no signed root anchors this event yet (only chain integrity is checked). */
   root: AuditBundleRoot | null;
+  /**
+   * Audit C3 phase 2 (2026-05-24) — signed per-customer genesis anchor. When
+   * present, verifier asserts both that the anchor's signature verifies AND
+   * that the chain's first `prev_hash` equals `anchor.genesis_hash`. Optional
+   * so bundles for customers created before phase 2 (no anchor row) still
+   * pass chain-only verification.
+   */
+  genesis_anchor?: AuditBundleGenesisAnchor | null;
+}
+
+export interface AuditBundleGenesisAnchor {
+  customer_id: string;
+  genesis_hash: string;
+  signing_key_id: string;
+  /** Ed25519 over `nomos-genesis-anchor|v1|<customer_id>|<genesis_hash>|<signed_at_ms>`. */
+  signature: string;
+  signed_at_ms: number;
 }
 
 export interface AuditBundleEvent {
@@ -57,7 +74,10 @@ export interface VerifyError {
     | 'hash_mismatch'
     | 'prev_hash_mismatch'
     | 'root_hash_not_found_in_chain'
-    | 'root_signature_invalid';
+    | 'root_signature_invalid'
+    | 'anchor_signature_invalid'
+    | 'anchor_genesis_mismatch'
+    | 'anchor_customer_mismatch';
   detail?: string;
 }
 
@@ -154,6 +174,46 @@ export function verifyBundle(bundle: AuditBundle, verifyKeyHex: string): VerifyR
           detail: 'Ed25519 verify failed against supplied AUDIT_VERIFY_KEY',
         });
       }
+    }
+  }
+
+  // Audit C3 phase 2 — validate signed genesis anchor when supplied. Use the
+  // SAME `verifyKeyHex` as the root signature; anchors are minted by the
+  // audit-root signing key today.
+  if (bundle.genesis_anchor) {
+    const anchor = bundle.genesis_anchor;
+    const firstEvent = bundle.events[0]!;
+    if (anchor.customer_id !== firstEvent.customer_id) {
+      errors.push({
+        reason: 'anchor_customer_mismatch',
+        detail: `anchor.customer_id=${anchor.customer_id} but events[0].customer_id=${firstEvent.customer_id}`,
+      });
+    }
+    if (firstEvent.prev_hash !== anchor.genesis_hash) {
+      errors.push({
+        reason: 'anchor_genesis_mismatch',
+        detail: `events[0].prev_hash=${firstEvent.prev_hash} but anchor.genesis_hash=${anchor.genesis_hash}`,
+      });
+    }
+    let anchorSigValid = false;
+    try {
+      const verifyBytes = hexToBytes(verifyKeyHex);
+      const sigBytes = hexToBytes(anchor.signature);
+      const msg = new TextEncoder().encode(
+        `nomos-genesis-anchor|v1|${anchor.customer_id}|${anchor.genesis_hash}|${anchor.signed_at_ms}`,
+      );
+      anchorSigValid = verifyDetached(verifyBytes, msg, sigBytes);
+    } catch (err) {
+      errors.push({
+        reason: 'anchor_signature_invalid',
+        detail: `failed to decode anchor key/signature: ${(err as Error).message}`,
+      });
+    }
+    if (!anchorSigValid && !errors.some((e) => e.reason === 'anchor_signature_invalid')) {
+      errors.push({
+        reason: 'anchor_signature_invalid',
+        detail: 'Ed25519 verify failed against supplied AUDIT_VERIFY_KEY',
+      });
     }
   }
 

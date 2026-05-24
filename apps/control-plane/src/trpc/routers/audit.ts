@@ -114,6 +114,15 @@ export const auditRouter = router({
         if (rootEvent && row.eventId === rootEvent.eventId) break;
       }
 
+      // Audit C3 phase 2 — pass the signed genesis anchor alongside the
+      // bundle. Verifier asserts both that the anchor's signature verifies
+      // and that events[0].prev_hash equals anchor.genesis_hash. Optional
+      // because chains written before phase 2 don't have an anchor row yet
+      // (backfill script populates them).
+      const anchor = await ctx.db.drizzle.query.auditGenesisAnchors.findFirst({
+        where: eq(schema.auditGenesisAnchors.customerId, ctx.customerId),
+      });
+
       return {
         event_id: ev.eventId,
         events: chain.map((c) => ({
@@ -134,6 +143,15 @@ export const auditRouter = router({
               // Only present for v2 rows. The verifier uses this exact integer
               // inside the canonical message (audit H7, 2026-05-24).
               signed_at_ms: root.signedAtMs ?? null,
+            }
+          : null,
+        genesis_anchor: anchor
+          ? {
+              customer_id: anchor.customerId,
+              genesis_hash: anchor.genesisHash,
+              signing_key_id: anchor.signingKeyId,
+              signature: anchor.signature,
+              signed_at_ms: anchor.signedAtMs,
             }
           : null,
       };

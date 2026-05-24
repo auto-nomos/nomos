@@ -150,6 +150,92 @@ describe('verifyBundle', () => {
     expect(result.errors.some((e) => e.reason === 'root_signature_invalid')).toBe(true);
   });
 
+  describe('signed genesis anchor (audit C3 phase 2)', () => {
+    function buildBundleWithAnchor(opts: {
+      mutateAnchor?: (a: {
+        customer_id: string;
+        genesis_hash: string;
+        signing_key_id: string;
+        signature: string;
+        signed_at_ms: number;
+      }) => void;
+    }): AuditBundle {
+      const customerId = randomUUID();
+      const genesisHash = sha256Hex(`audit-genesis|v1|${customerId}|test-secret-1234567`);
+      const events: AuditBundleEvent[] = [];
+      let prevHash = genesisHash;
+      for (let i = 0; i < 3; i++) {
+        const eventId = randomUUID();
+        const payload = {
+          event_id: eventId,
+          prev_hash: prevHash,
+          customer_id: customerId,
+          ts: 1_780_000_000_000 + i,
+          agent: 'did:key:z6MkTest',
+          decision: 'allow' as const,
+          command: '/x/y',
+          resource: { i },
+          context: {},
+        };
+        const hash = sha256Hex(`${prevHash}|${canonicalize(payload as Record<string, unknown>)}`);
+        events.push({
+          event_id: eventId,
+          customer_id: customerId,
+          prev_hash: prevHash,
+          hash,
+          payload,
+        });
+        prevHash = hash;
+      }
+      const signedAtMs = 1_779_999_000_000;
+      const anchor = {
+        customer_id: customerId,
+        genesis_hash: genesisHash,
+        signing_key_id: kp.did,
+        signature: bytesToHex(
+          signDetached(
+            kp.privateKey,
+            new TextEncoder().encode(
+              `nomos-genesis-anchor|v1|${customerId}|${genesisHash}|${signedAtMs}`,
+            ),
+          ),
+        ),
+        signed_at_ms: signedAtMs,
+      };
+      opts.mutateAnchor?.(anchor);
+      return { event_id: events[0]!.event_id, events, root: null, genesis_anchor: anchor };
+    }
+
+    it('accepts a chain whose first prev_hash matches the signed anchor', () => {
+      const bundle = buildBundleWithAnchor({});
+      const result = verifyBundle(bundle, verifyKey);
+      expect(result.ok).toBe(true);
+    });
+
+    it('rejects when anchor signature was minted by a different key', () => {
+      const bundle = buildBundleWithAnchor({});
+      const otherKp = generateKeypair();
+      const result = verifyBundle(bundle, bytesToHex(otherKp.publicKey));
+      expect(result.ok).toBe(false);
+      expect(result.errors.some((e) => e.reason === 'anchor_signature_invalid')).toBe(true);
+    });
+
+    it('rejects when anchor.customer_id differs from events[0].customer_id', () => {
+      const bundle = buildBundleWithAnchor({
+        mutateAnchor: (a) => {
+          a.customer_id = randomUUID();
+        },
+      });
+      const result = verifyBundle(bundle, verifyKey);
+      expect(result.ok).toBe(false);
+      expect(
+        result.errors.some(
+          (e) => e.reason === 'anchor_customer_mismatch' || e.reason === 'anchor_signature_invalid',
+        ),
+      ).toBe(true);
+    });
+  });
+
   describe('signature_version 2 (audit H7)', () => {
     function withV2SignedRoot(events: AuditBundleEvent[]): AuditBundle {
       const last = events.at(-1)!;

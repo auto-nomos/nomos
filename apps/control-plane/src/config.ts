@@ -96,6 +96,14 @@ const Config = z.object({
   AUDIT_SIGN_KEY: z.string().optional(),
   AUDIT_VERIFY_KEY: z.string().optional(),
   AUDIT_SIGNING_KEY_ID: z.string().optional(),
+  /**
+   * Audit C3 — per-environment secret mixed into each customer's pinned
+   * genesis hash. Phase 1 (PR #15) consumed this on the PDP side; phase 2
+   * (audit 2026-05-24) needs it here too so the control plane can mint the
+   * signed anchor row at customer-create time. >= 16 chars; matches the PDP
+   * env value so both sides recompute the same genesis.
+   */
+  AUDIT_GENESIS_SECRET: z.string().min(16).optional(),
   /** How often the daily-root signer runs. Default 24h. */
   AUDIT_ROOT_SIGN_INTERVAL_MS: z.coerce
     .number()

@@ -12,6 +12,7 @@ import { DbKeyStore, StaticKeyStore, withDevFallback } from './oidc/key-store.js
 import { createTokenBucketRateLimiter } from './oidc/rate-limit.js';
 import { buildSignerFromConfig } from './oidc/signer.js';
 import { createServer } from './server.js';
+import { writeAnchor as writeAnchorService } from './services/audit-genesis-anchor.js';
 import { createRecoveryNotifier } from './services/auth/recovery-notify.js';
 import { createCloudAuditPublisher } from './services/cloud-audit-publisher.js';
 import { createRiskSummarizer } from './services/grants/llm-risk-summary.js';
@@ -142,7 +143,35 @@ async function main(): Promise<void> {
     apiKey: config.KNOCK_API_KEY,
     logger,
   });
-  const auth = createAuth({ db: db.drizzle, config, logger, recoveryNotifier });
+
+  // Audit C3 phase 2 — hoist audit-root signing key load above createAuth so
+  // we can wire `writeGenesisAnchor` into the user.create.after hook. When
+  // either the signing key or the genesis secret is absent (dev), the hook
+  // is undefined and signup proceeds without an anchor row; backfill picks
+  // it up later when the operator sets both env vars.
+  const earlyAuditSigning = loadAuditSigningKey(config, logger);
+  const writeGenesisAnchor =
+    earlyAuditSigning && config.AUDIT_GENESIS_SECRET
+      ? async (customerId: string) => {
+          await writeAnchorService(
+            {
+              db: db.drizzle,
+              signKey: earlyAuditSigning.signKey,
+              signingKeyId: earlyAuditSigning.signingKeyId,
+              genesisSecret: config.AUDIT_GENESIS_SECRET as string,
+            },
+            customerId,
+          );
+        }
+      : undefined;
+
+  const auth = createAuth({
+    db: db.drizzle,
+    config,
+    logger,
+    recoveryNotifier,
+    ...(writeGenesisAnchor ? { writeGenesisAnchor } : {}),
+  });
   const { signKey, signerDid } = loadSigningKey(config, logger);
   const encryptionKey = loadOAuthEncryptionKey(config, logger);
 
@@ -318,7 +347,9 @@ async function main(): Promise<void> {
   sweep.start();
   logger.info('oauth refresh sweep started (interval=1h, lookahead=24h)');
 
-  const auditSigning = loadAuditSigningKey(config, logger);
+  // Reuse the early load — audit-genesis-anchor wiring above already pulled
+  // the signing key out of env. One env read + one log line.
+  const auditSigning = earlyAuditSigning;
   const auditRootSigner = auditSigning
     ? createAuditRootSigner({
         db: db.drizzle,
