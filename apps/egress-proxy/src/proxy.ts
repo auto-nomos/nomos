@@ -22,6 +22,7 @@ import {
   type DetectedConnector,
   detectCloudHost,
 } from './cloud-host.js';
+import { guardAndResolveHost, type HostGuardOptions } from './security/host-guard.js';
 
 export interface EgressObservation {
   kind: 'connect' | 'http_request';
@@ -57,6 +58,13 @@ export interface EgressProxyOptions {
    * or are refused at the wire — defense-in-depth against a PDP bug.
    */
   cloud?: CloudEnforcementOptions;
+  /**
+   * Audit H6 — SSRF defence. When omitted, the proxy still resolves DNS and
+   * blocks reserved/private/loopback/link-local/metadata addresses on every
+   * CONNECT and plain HTTP forward. Operators can pass a suffix allowlist
+   * (e.g. internal hostnames) or override the resolver in tests.
+   */
+  hostGuard?: HostGuardOptions;
 }
 
 const SENSITIVE_HEADERS = new Set([
@@ -118,25 +126,46 @@ export function createEgressProxy(opts: EgressProxyOptions): {
       return;
     }
 
-    const proxied = httpRequest(
-      {
-        host: url.hostname,
-        port: url.port || 80,
-        method: req.method,
-        path: url.pathname + url.search,
-        headers: req.headers,
-      },
-      (upstream) => {
-        res.writeHead(upstream.statusCode ?? 502, upstream.headers);
-        upstream.pipe(res);
-      },
-    );
-    proxied.on('error', (err) => {
-      log.warn('upstream error', err);
-      res.writeHead(502);
-      res.end();
-    });
-    req.pipe(proxied);
+    // Audit H6 — resolve + reject reserved IPs before forwarding. We connect
+    // to the resolved literal so post-resolve DNS rebind cannot smuggle a
+    // private address past us.
+    guardAndResolveHost(url.hostname, opts.hostGuard)
+      .then((verdict) => {
+        if (!verdict.allow) {
+          log.warn('egress denied (http)', {
+            host: url.hostname,
+            reason: verdict.reason,
+            detail: verdict.detail,
+          });
+          res.writeHead(403, { 'content-type': 'application/json' });
+          res.end(JSON.stringify({ error: verdict.reason, detail: verdict.detail }));
+          return;
+        }
+        const proxied = httpRequest(
+          {
+            host: verdict.resolvedHost,
+            port: url.port || 80,
+            method: req.method,
+            path: url.pathname + url.search,
+            headers: { ...req.headers, host: url.host },
+          },
+          (upstream) => {
+            res.writeHead(upstream.statusCode ?? 502, upstream.headers);
+            upstream.pipe(res);
+          },
+        );
+        proxied.on('error', (err) => {
+          log.warn('upstream error', err);
+          res.writeHead(502);
+          res.end();
+        });
+        req.pipe(proxied);
+      })
+      .catch((err) => {
+        log.warn('egress guard threw', err);
+        res.writeHead(500);
+        res.end();
+      });
   });
 
   server.on('connect', (req: IncomingMessage, clientSocket: Socket, head: Buffer) => {
@@ -178,33 +207,48 @@ export function createEgressProxy(opts: EgressProxyOptions): {
       }
     }
 
-    const upstream = netConnect(port, host, () => {
-      clientSocket.write('HTTP/1.1 200 Connection Established\r\n\r\n');
-      if (head.length > 0) upstream.write(head);
-      upstream.pipe(clientSocket);
-      clientSocket.pipe(upstream);
-    });
-
-    const cleanup = (): void => {
-      try {
-        upstream.destroy();
-      } catch {
-        /* ignore */
+    // Audit H6 — resolve + reject reserved IPs before tunnelling. Connect to
+    // the resolved literal so post-resolve DNS rebind cannot relocate the
+    // tunnel onto an internal address mid-flight.
+    void guardAndResolveHost(host, opts.hostGuard).then((verdict) => {
+      if (!verdict.allow) {
+        log.warn('egress denied (connect)', {
+          host,
+          reason: verdict.reason,
+          detail: verdict.detail,
+        });
+        clientSocket.end(`HTTP/1.1 403 Forbidden\r\nX-Egress-Deny: ${verdict.reason}\r\n\r\n`);
+        return;
       }
-      try {
-        clientSocket.destroy();
-      } catch {
-        /* ignore */
-      }
-    };
 
-    upstream.on('error', (err) => {
-      log.warn('connect upstream error', err);
-      cleanup();
-    });
-    clientSocket.on('error', (err) => {
-      log.warn('connect client error', err);
-      cleanup();
+      const upstream = netConnect(port, verdict.resolvedHost, () => {
+        clientSocket.write('HTTP/1.1 200 Connection Established\r\n\r\n');
+        if (head.length > 0) upstream.write(head);
+        upstream.pipe(clientSocket);
+        clientSocket.pipe(upstream);
+      });
+
+      const cleanup = (): void => {
+        try {
+          upstream.destroy();
+        } catch {
+          /* ignore */
+        }
+        try {
+          clientSocket.destroy();
+        } catch {
+          /* ignore */
+        }
+      };
+
+      upstream.on('error', (err) => {
+        log.warn('connect upstream error', err);
+        cleanup();
+      });
+      clientSocket.on('error', (err) => {
+        log.warn('connect client error', err);
+        cleanup();
+      });
     });
   });
 
