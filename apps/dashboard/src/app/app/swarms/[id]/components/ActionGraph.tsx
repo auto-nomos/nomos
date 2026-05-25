@@ -1,6 +1,10 @@
 'use client';
 
-import type { ActionGraph as ActionGraphData, AgentGraphNode } from '@auto-nomos/shared-types';
+import type {
+  ActionGraph as ActionGraphData,
+  AgentGraphNode,
+  HandoffMatch,
+} from '@auto-nomos/shared-types';
 import dagre from '@dagrejs/dagre';
 import {
   Background,
@@ -144,7 +148,16 @@ export function ActionGraph({ swarmId, agentId }: { swarmId?: string; agentId?: 
               Post-execution telemetry — hashes, latency, redacted summary.
             </DialogDescription>
           </DialogHeader>
-          {openSpan ? <SpanDetail spanId={openSpan} /> : null}
+          {openSpan ? (
+            <SpanDetail
+              spanId={openSpan}
+              match={
+                (q.data?.handoffMatches ?? []).find(
+                  (m: HandoffMatch) => m.sourceSpanId === openSpan,
+                ) ?? null
+              }
+            />
+          ) : null}
         </DialogContent>
       </Dialog>
     </Card>
@@ -393,11 +406,31 @@ function buildLayout(data: ActionGraphData): {
     const child = data.nodes.find((n) => n.id === e.to);
     const parent = data.nodes.find((n) => n.id === e.from);
     const color = e.kind === 'spawn' && child ? child.agentColor : undefined;
-    // P1 — label spawn edges whose parent declared a typed handoff. The
-    // label points at the declared target DID; P3 will recolor when the
-    // *actual* child DID diverges from the declared one.
+    // P1 — label spawn edges whose parent declared a typed handoff.
+    // P3 — when a handoffMatch is attached, override label/color by status.
+    const status = e.handoffMatch?.status;
     const handoffLabel =
-      parent?.handoffToDid && e.kind === 'spawn' ? `→ ${shortId(parent.handoffToDid)}` : undefined;
+      e.handoffMatch && e.handoffMatch.actualAgentDid
+        ? status === 'matched'
+          ? `→ ${shortId(e.handoffMatch.declaredToDid)}`
+          : status === 'late'
+            ? `late → ${shortId(e.handoffMatch.actualAgentDid)}`
+            : `≠ got ${shortId(e.handoffMatch.actualAgentDid)}`
+        : parent?.handoffToDid && e.kind === 'spawn'
+          ? `→ ${shortId(parent.handoffToDid)}`
+          : undefined;
+    const labelBgFill =
+      status === 'wrong_agent'
+        ? 'rgb(var(--aegis-coral) / 0.15)'
+        : status === 'late'
+          ? 'rgb(var(--aegis-amber) / 0.15)'
+          : 'rgb(var(--aegis-iris) / 0.1)';
+    const overrideStroke =
+      status === 'wrong_agent'
+        ? 'rgb(var(--aegis-coral))'
+        : status === 'late'
+          ? 'rgb(var(--aegis-amber))'
+          : undefined;
     return {
       id: e.id,
       source: e.from,
@@ -410,12 +443,12 @@ function buildLayout(data: ActionGraphData): {
             labelStyle: { fontSize: 10, fontFamily: 'var(--font-mono, monospace)' },
             labelBgPadding: [4, 2] as [number, number],
             labelBgBorderRadius: 4,
-            labelBgStyle: { fill: 'rgb(var(--aegis-iris) / 0.1)' },
+            labelBgStyle: { fill: labelBgFill },
           }
         : {}),
       style:
         e.kind === 'spawn'
-          ? { stroke: color, strokeWidth: 2 }
+          ? { stroke: overrideStroke ?? color, strokeWidth: 2 }
           : e.kind === 'sequential'
             ? { stroke: 'rgb(148 163 184 / 0.35)', strokeWidth: 1 }
             : { stroke: 'rgb(148 163 184 / 0.7)', strokeWidth: 1.5 },

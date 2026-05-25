@@ -1,10 +1,17 @@
 'use client';
 
+import type { HandoffMatch, HandoffMatchStatus } from '@auto-nomos/shared-types';
 import { Badge } from '../../../../../components/ui/badge';
 import { trpc } from '../../../../../lib/trpc';
 import { formatDate, shortId } from '../../../../../lib/utils';
 
-export function SpanDetail({ spanId }: { spanId: string }) {
+export function SpanDetail({
+  spanId,
+  match = null,
+}: {
+  spanId: string;
+  match?: HandoffMatch | null;
+}) {
   const q = trpc.observability.spanDetail.useQuery({ spanId });
 
   if (q.isLoading) return <p className="text-sm text-muted-foreground">Loading span…</p>;
@@ -68,6 +75,7 @@ export function SpanDetail({ spanId }: { spanId: string }) {
             <code className="ml-1 font-mono text-[11px] text-aegis-iris/80">
               {shortId(s.handoff.toAgentDid)}
             </code>
+            {match ? <MatchBadge match={match} /> : null}
           </div>
           <div className="text-xs">
             <span className="text-[10px] uppercase tracking-wider text-muted-foreground">task</span>
@@ -171,4 +179,30 @@ function SummaryTable({ summary }: { summary: Record<string, unknown> }) {
 
 function Empty() {
   return <p className="text-xs text-muted-foreground">No summary fields recorded.</p>;
+}
+
+function MatchBadge({ match }: { match: HandoffMatch }) {
+  const label = match.status === 'matched' ? 'matched' : match.status.replace('_', ' ');
+  const tone: Record<HandoffMatchStatus, string> = {
+    matched: 'border-aegis-signal/50 bg-aegis-signal/10 text-aegis-signal',
+    wrong_agent: 'border-aegis-coral/50 bg-aegis-coral/10 text-aegis-coral',
+    missing: 'border-aegis-coral/50 bg-aegis-coral/10 text-aegis-coral',
+    late: 'border-aegis-amber/50 bg-aegis-amber/10 text-aegis-amber',
+  };
+  const title =
+    match.status === 'matched'
+      ? `child arrived in window (${match.latencyMs}ms after parent)`
+      : match.status === 'wrong_agent'
+        ? `expected ${shortId(match.declaredToDid)} · got ${shortId(match.actualAgentDid ?? '?')}`
+        : match.status === 'late'
+          ? `arrived ${Math.round((match.latencyMs ?? 0) / 1000)}s after the 5-min window`
+          : 'no child agent ever authorized — fork never happened';
+  return (
+    <span
+      title={title}
+      className={`ml-auto rounded-full border px-1.5 py-0.5 text-[10px] uppercase tracking-wider ${tone[match.status]}`}
+    >
+      {label}
+    </span>
+  );
 }

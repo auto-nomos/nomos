@@ -117,11 +117,42 @@ export type ActionGraphNode = SpanGraphNode;
 
 export type ActionGraphEdgeKind = 'parent' | 'sequential' | 'spawn';
 
+/**
+ * P3 — planned-vs-actual handoff diff outcome.
+ *
+ *  - `matched`      child agent + window match the parent's declared handoff
+ *  - `wrong_agent`  a child arrived in-window at depth+1 but the agent DID
+ *                   differs from the declared `toAgentDid` (the interesting
+ *                   bug — orchestrator routed to the wrong sub-agent)
+ *  - `missing`      no candidate child appeared at all
+ *  - `late`         a candidate appeared past the 5-minute window
+ */
+export type HandoffMatchStatus = 'matched' | 'wrong_agent' | 'missing' | 'late';
+
+export interface HandoffMatch {
+  sourceSpanId: string;
+  declaredToDid: string;
+  declaredTask: string;
+  actualSpanId: string | null;
+  actualAgentDid: string | null;
+  status: HandoffMatchStatus;
+  /** ms between source.endedAt and actual.startedAt; null when no actual. */
+  latencyMs: number | null;
+}
+
 export interface ActionGraphEdge {
   id: string;
   from: string;
   to: string;
   kind: ActionGraphEdgeKind;
+  /**
+   * P3 — attached to every spawn edge whose source span declared a typed
+   * handoff. UI uses `status` to recolor the edge (matched=default,
+   * wrong_agent+missing=coral, late=amber). `missing` matches never
+   * surface here because there is no real edge to attach to; see
+   * `ActionGraph.handoffMatches` for the full list.
+   */
+  handoffMatch?: HandoffMatch | null;
 }
 
 export interface ActionGraph {
@@ -130,4 +161,10 @@ export interface ActionGraph {
   agents: Record<string, AgentGraphNode>;
   windowMinutes: number;
   spanCount: number;
+  /**
+   * P3 — one entry per source span that declared a handoff, including
+   * `missing` cases that have no corresponding edge. Powers the
+   * workspace-wide "Mis-handoffs" panel and the SpanDetail MatchBadge.
+   */
+  handoffMatches: HandoffMatch[];
 }

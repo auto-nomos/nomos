@@ -23,12 +23,14 @@ function span(
     httpStatus: 200,
     latencyMs: 10,
     startedAt: new Date(1_700_000_000_000 + startedAtSec * 1000).toISOString(),
+    handoffToDid: null,
+    handoffTask: null,
     ...overrides,
   };
 }
 
-function agent(id: string, did = `did:key:${id}`, name = id): DeriveAgentRow {
-  return { id, name, did, depth: 0 };
+function agent(id: string, did = `did:key:${id}`, name = id, depth = 0): DeriveAgentRow {
+  return { id, name, did, depth };
 }
 
 describe('deriveSpanTree', () => {
@@ -132,5 +134,87 @@ describe('deriveSpanTree', () => {
     expect(b.effectiveParentId).toBe('a');
     const edge = tree.edges.find((e) => e.to === 'b')!;
     expect(edge.kind).toBe('sequential');
+  });
+
+  describe('P3 handoff matching', () => {
+    // Helper: parent at depth=0 declares handoff → child at depth=1.
+    const parentAgent = agent('parent', 'did:key:zparent', 'parent', 0);
+    const childAgent = agent('child', 'did:key:zchild', 'child', 1);
+    const wrongAgent = agent('rogue', 'did:key:zrogue', 'rogue', 1);
+
+    it('matches when the declared DID arrives at depth+1 within 5 minutes', () => {
+      const spans = [
+        span('s', 'parent', 0, { handoffToDid: 'did:key:zchild', handoffTask: 'do the thing' }),
+        span('c', 'child', 30, { parentSpanId: 's' }),
+      ];
+      const tree = deriveSpanTree(spans, [parentAgent, childAgent]);
+      expect(tree.handoffMatches).toHaveLength(1);
+      const m = tree.handoffMatches[0]!;
+      expect(m.status).toBe('matched');
+      expect(m.sourceSpanId).toBe('s');
+      expect(m.actualSpanId).toBe('c');
+      expect(m.actualAgentDid).toBe('did:key:zchild');
+      expect(m.declaredTask).toBe('do the thing');
+      // Edge from s → c carries the same match outcome.
+      const edge = tree.edges.find((e) => e.id === 's->c')!;
+      expect(edge.handoffMatch?.status).toBe('matched');
+    });
+
+    it('flags wrong_agent when a sub-agent arrives at depth+1 but DID differs', () => {
+      const spans = [
+        span('s', 'parent', 0, { handoffToDid: 'did:key:zchild', handoffTask: 'route to child' }),
+        span('r', 'rogue', 20, { parentSpanId: 's' }),
+      ];
+      const tree = deriveSpanTree(spans, [parentAgent, childAgent, wrongAgent]);
+      const m = tree.handoffMatches[0]!;
+      expect(m.status).toBe('wrong_agent');
+      expect(m.actualAgentDid).toBe('did:key:zrogue');
+      const edge = tree.edges.find((e) => e.id === 's->r')!;
+      expect(edge.handoffMatch?.status).toBe('wrong_agent');
+    });
+
+    it('flags missing when no child appears at all', () => {
+      const spans = [
+        span('s', 'parent', 0, { handoffToDid: 'did:key:zchild', handoffTask: 'lonely' }),
+      ];
+      const tree = deriveSpanTree(spans, [parentAgent, childAgent]);
+      const m = tree.handoffMatches[0]!;
+      expect(m.status).toBe('missing');
+      expect(m.actualSpanId).toBeNull();
+      expect(m.actualAgentDid).toBeNull();
+      expect(m.latencyMs).toBeNull();
+    });
+
+    it('flags late when the right child appears past the 5-minute window', () => {
+      // Span s ends at t=0+10ms; child starts at t=600s — 10x past the window.
+      const spans = [
+        span('s', 'parent', 0, { handoffToDid: 'did:key:zchild', handoffTask: 'slow' }),
+        span('c', 'child', 600, { parentSpanId: 's' }),
+      ];
+      const tree = deriveSpanTree(spans, [parentAgent, childAgent]);
+      const m = tree.handoffMatches[0]!;
+      expect(m.status).toBe('late');
+      expect(m.actualSpanId).toBe('c');
+      // Edge still gets the match so the UI can recolor it amber.
+      expect(tree.edges.find((e) => e.id === 's->c')!.handoffMatch?.status).toBe('late');
+    });
+
+    it('does not match siblings at the same depth (no chain-depth false-positive)', () => {
+      // Both parent and "child" are at depth 0 — sibling, not sub-agent.
+      const sib = agent('sib', 'did:key:zchild', 'sib', 0);
+      const spans = [
+        span('s', 'parent', 0, { handoffToDid: 'did:key:zchild', handoffTask: 'x' }),
+        span('c', 'sib', 30),
+      ];
+      const tree = deriveSpanTree(spans, [parentAgent, sib]);
+      // sib has the right DID but is at depth 0, not 1 → no match.
+      expect(tree.handoffMatches[0]!.status).toBe('missing');
+    });
+
+    it('emits no matches for spans without handoffToDid', () => {
+      const spans = [span('s', 'parent', 0), span('c', 'child', 30, { parentSpanId: 's' })];
+      const tree = deriveSpanTree(spans, [parentAgent, childAgent]);
+      expect(tree.handoffMatches).toHaveLength(0);
+    });
   });
 });

@@ -20,9 +20,24 @@
 import type {
   ActionGraphEdge,
   AgentGraphNode,
+  HandoffMatch,
+  HandoffMatchStatus,
   SpanGraphNode,
   SpanStatus,
 } from '@auto-nomos/shared-types';
+
+/**
+ * P3 — window past which a child span is "late" instead of "matched". Five
+ * minutes is the p99 fork-to-first-call latency observed in 2026-05 dogfood
+ * traces; tune per-customer only if a real complaint surfaces.
+ */
+const HANDOFF_MATCH_WINDOW_MS = 5 * 60 * 1000;
+/**
+ * After this point even a candidate that would otherwise be `late` is
+ * treated as `missing`. Stops a long-running swarm from accidentally
+ * matching a child fork hours later.
+ */
+const HANDOFF_LATE_CUTOFF_MS = 60 * 60 * 1000;
 
 export interface DeriveSpanRow {
   id: string;
@@ -38,6 +53,9 @@ export interface DeriveSpanRow {
   // P1 — propagated onto SpanGraphNode so the UI can label outgoing edges
   // with the declared target DID without a second query.
   handoffToDid: string | null;
+  // P3 — needed by the matching algorithm to populate HandoffMatch.declaredTask
+  // without an extra round-trip to the spans table.
+  handoffTask: string | null;
 }
 
 export interface DeriveAgentRow {
@@ -51,6 +69,8 @@ export interface DeriveSpanTreeResult {
   nodes: SpanGraphNode[];
   edges: ActionGraphEdge[];
   agents: Record<string, AgentGraphNode>;
+  /** P3 — one entry per source span that declared a handoff. */
+  handoffMatches: HandoffMatch[];
 }
 
 /**
@@ -187,5 +207,67 @@ export function deriveSpanTree(
     });
   }
 
-  return { nodes, edges, agents };
+  // ── P3 ── planned-vs-actual handoff diff ──────────────────────────────
+  // For each source span that declared `handoff_to_did = D`, find the
+  // earliest later span whose agent sits at parent.depth + 1 within a
+  // 5-minute window. Depth comes from the agent registration (sidecar
+  // `agents` map), not per-call chain_depth — see plan rationale.
+  const handoffMatches: HandoffMatch[] = [];
+  const matchByEdgeId = new Map<string, HandoffMatch>();
+  for (const s of sorted) {
+    if (!s.handoffToDid) continue;
+    const sAgent = agents[s.agentId];
+    if (!sAgent || sAgent.depth === null) continue;
+    const sEnd = Date.parse(s.startedAt) + s.latencyMs;
+    const targetDepth = sAgent.depth + 1;
+    let inWindow: DeriveSpanRow | null = null;
+    let lateCandidate: DeriveSpanRow | null = null;
+    for (const c of sorted) {
+      if (c.id === s.id) continue;
+      const cAgent = agents[c.agentId];
+      if (!cAgent || cAgent.depth !== targetDepth) continue;
+      const cStart = Date.parse(c.startedAt);
+      if (cStart <= sEnd) continue;
+      const dt = cStart - sEnd;
+      if (dt <= HANDOFF_MATCH_WINDOW_MS) {
+        // earliest-wins inside the window
+        if (!inWindow || cStart < Date.parse(inWindow.startedAt)) inWindow = c;
+      } else if (dt <= HANDOFF_LATE_CUTOFF_MS) {
+        if (!lateCandidate || cStart < Date.parse(lateCandidate.startedAt)) lateCandidate = c;
+      }
+    }
+    let actual: DeriveSpanRow | null = inWindow;
+    let status: HandoffMatchStatus;
+    if (inWindow) {
+      const cAgent = agents[inWindow.agentId]!;
+      status = cAgent.did === s.handoffToDid ? 'matched' : 'wrong_agent';
+    } else if (lateCandidate) {
+      actual = lateCandidate;
+      const cAgent = agents[lateCandidate.agentId]!;
+      // Late + wrong agent is still "wrong_agent" — the routing error
+      // is the salient signal; the lateness is a secondary modifier.
+      status = cAgent.did === s.handoffToDid ? 'late' : 'wrong_agent';
+    } else {
+      status = 'missing';
+    }
+    const actualAgentDid = actual ? (agents[actual.agentId]?.did ?? null) : null;
+    const latencyMs = actual ? Date.parse(actual.startedAt) - sEnd : null;
+    const match: HandoffMatch = {
+      sourceSpanId: s.id,
+      declaredToDid: s.handoffToDid,
+      declaredTask: s.handoffTask ?? '',
+      actualSpanId: actual?.id ?? null,
+      actualAgentDid,
+      status,
+      latencyMs,
+    };
+    handoffMatches.push(match);
+    if (actual) matchByEdgeId.set(`${s.id}->${actual.id}`, match);
+  }
+  for (const e of edges) {
+    const m = matchByEdgeId.get(e.id);
+    if (m) e.handoffMatch = m;
+  }
+
+  return { nodes, edges, agents, handoffMatches };
 }

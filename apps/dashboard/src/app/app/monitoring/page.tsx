@@ -8,6 +8,7 @@ import { ActionTimeline } from '../swarms/[id]/components/ActionTimeline';
 import { AgentInventory } from '../swarms/[id]/components/AgentInventory';
 import { AnomalyBadges } from '../swarms/[id]/components/AnomalyBadges';
 import { LiveFeed } from '../swarms/[id]/components/LiveFeed';
+import { MishandoffPanel } from '../swarms/[id]/components/MishandoffPanel';
 
 export default function MonitoringPage() {
   const summary = trpc.observability.globalSummary.useQuery(
@@ -85,6 +86,8 @@ export default function MonitoringPage() {
       </section>
 
       <ActionGraph />
+
+      <MishandoffPanel />
 
       <AnomalyBadges showAgent />
 

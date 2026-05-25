@@ -726,6 +726,7 @@ export const observabilityRouter = router({
         started_at: Date | string;
         parent_receipt_id: string | null;
         handoff_to_did: string | null;
+        handoff_task: string | null;
       }>(sql`
         SELECT
           s.id,
@@ -738,7 +739,8 @@ export const observabilityRouter = router({
           s.latency_ms,
           s.started_at,
           ae.parent_receipt_id,
-          s.handoff_to_did
+          s.handoff_to_did,
+          s.handoff_task
         FROM agent_spans s
         LEFT JOIN audit_events ae ON ae.event_id::text = s.receipt_id
         WHERE s.customer_id = ${ctx.customerId}
@@ -782,6 +784,7 @@ export const observabilityRouter = router({
         latencyMs: s.latency_ms,
         startedAt: s.started_at instanceof Date ? s.started_at.toISOString() : String(s.started_at),
         handoffToDid: s.handoff_to_did,
+        handoffTask: s.handoff_task,
       }));
       const deriveAgents: DeriveAgentRow[] = agentRows.map((a) => ({
         id: a.id,
@@ -798,6 +801,7 @@ export const observabilityRouter = router({
         agents: tree.agents,
         windowMinutes: input.sinceMinutes,
         spanCount: spans.length,
+        handoffMatches: tree.handoffMatches,
       };
     }),
 
