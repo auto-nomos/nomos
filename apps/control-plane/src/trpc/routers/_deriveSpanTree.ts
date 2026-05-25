@@ -35,6 +35,9 @@ export interface DeriveSpanRow {
   httpStatus: number | null;
   latencyMs: number;
   startedAt: string;
+  // P1 — propagated onto SpanGraphNode so the UI can label outgoing edges
+  // with the declared target DID without a second query.
+  handoffToDid: string | null;
 }
 
 export interface DeriveAgentRow {
@@ -163,6 +166,7 @@ export function deriveSpanTree(
       latencyMs: s.latencyMs,
       httpStatus: s.httpStatus,
       startedAt: s.startedAt,
+      handoffToDid: s.handoffToDid,
     };
   });
 

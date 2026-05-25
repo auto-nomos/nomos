@@ -15,6 +15,20 @@ export type SpanStatus = z.infer<typeof SpanStatusSchema>;
 export const SpanSummarySchema = z.record(z.string(), z.unknown()).optional();
 export type SpanSummary = z.infer<typeof SpanSummarySchema>;
 
+/**
+ * P1 — structured handoff. The parent agent declares this on the outgoing
+ * authorize call that immediately precedes a fork. Persisted on the parent
+ * span only; the child span never carries it. P3 will diff `toAgentDid`
+ * against the actual next span's agent DID to surface mis-handoffs.
+ */
+export const SpanHandoffSchema = z.object({
+  toAgentDid: z.string().min(1).max(256),
+  task: z.string().min(1).max(2048),
+  expectedOutput: z.string().max(1024).optional(),
+  rationale: z.string().max(1024).optional(),
+});
+export type SpanHandoff = z.infer<typeof SpanHandoffSchema>;
+
 export const EmitSpanInputSchema = z.object({
   receiptId: z.string().min(1),
   toolName: z.string().min(1).max(256),
@@ -32,6 +46,7 @@ export const EmitSpanInputSchema = z.object({
   parentSpanId: z.string().uuid().optional().nullable(),
   nextAgentHint: z.string().max(256).optional().nullable(),
   intent: z.string().max(256).optional().nullable(),
+  handoff: SpanHandoffSchema.optional().nullable(),
 });
 export type EmitSpanInput = z.infer<typeof EmitSpanInputSchema>;
 
@@ -53,6 +68,7 @@ export interface Span {
   responseSummary: Record<string, unknown> | null;
   nextAgentHint: string | null;
   intent: string | null;
+  handoff: SpanHandoff | null;
   startedAt: string;
   endedAt: string;
   latencyMs: number;
@@ -92,6 +108,9 @@ export interface SpanGraphNode {
   latencyMs: number;
   httpStatus: number | null;
   startedAt: string;
+  // P1 — non-null only on spans whose parent agent declared a typed
+  // handoff. UI uses this to label outgoing edges with `→ <shortDid>`.
+  handoffToDid: string | null;
 }
 
 export type ActionGraphNode = SpanGraphNode;

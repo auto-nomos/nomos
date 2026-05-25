@@ -22,6 +22,7 @@ from .chain import (
     read_parent_chain_from_env,
 )
 from .guard import AuthGuard, AuthorizeDecision
+from .observability import SpanHandoffEnvelope, record_handoff
 
 ProxyResult = AuthGuard.ProxyResult
 
@@ -35,9 +36,11 @@ __all__ = [
     "ENV_PARENT_RECEIPT",
     "ENV_SWARM_ID",
     "ParentChainContext",
+    "SpanHandoffEnvelope",
     "apply_parent_chain",
     "fork_child",
     "read_parent_chain_from_env",
+    "record_handoff",
 ]
 
 __version__ = "0.1.1"

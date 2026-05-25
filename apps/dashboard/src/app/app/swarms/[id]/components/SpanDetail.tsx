@@ -60,6 +60,38 @@ export function SpanDetail({ spanId }: { spanId: string }) {
         </div>
       ) : null}
 
+      {s.handoff ? (
+        <div className="space-y-2 rounded-md border border-aegis-iris/40 bg-aegis-iris/10 p-3">
+          <div className="flex items-center gap-2 text-xs font-semibold text-aegis-iris">
+            <span aria-hidden>→</span>
+            <span>Handoff</span>
+            <code className="ml-1 font-mono text-[11px] text-aegis-iris/80">
+              {shortId(s.handoff.toAgentDid)}
+            </code>
+          </div>
+          <div className="text-xs">
+            <span className="text-[10px] uppercase tracking-wider text-muted-foreground">task</span>
+            <p className="mt-0.5 whitespace-pre-wrap">{s.handoff.task}</p>
+          </div>
+          {s.handoff.expectedOutput ? (
+            <div className="text-xs">
+              <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                expected output
+              </span>
+              <p className="mt-0.5 whitespace-pre-wrap">{s.handoff.expectedOutput}</p>
+            </div>
+          ) : null}
+          {s.handoff.rationale ? (
+            <div className="text-xs">
+              <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                rationale
+              </span>
+              <p className="mt-0.5 whitespace-pre-wrap">{s.handoff.rationale}</p>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
       {s.errorCode || s.errorMessage ? (
         <div className="rounded-md border border-aegis-coral/40 bg-aegis-coral/5 p-3">
           <div className="text-xs font-semibold text-aegis-coral">Error</div>

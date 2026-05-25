@@ -356,6 +356,81 @@ describe.skipIf(!RUN)('spans ingestion + observability v2 (requires postgres)', 
       expect(body.error_code).toBe('agent_not_found');
     });
 
+    it('persists handoff envelope into flat columns and reshapes back on spanDetail', async () => {
+      const agent = await makeAgent(alice.customerId, `handoff-${Math.random()}`);
+      const receiptId = await emitAudit(alice.customerId, agent.did);
+      const res = await postInternal({
+        customerId: alice.customerId,
+        agentDid: agent.did,
+        ...spanBody(receiptId, {
+          handoff: {
+            toAgentDid: 'did:web:writer.acme.test',
+            task: 'draft release notes from the merged PR list',
+            expectedOutput: '<= 200 words, markdown',
+            rationale: 'parent is planner; writer owns prose',
+          },
+        }),
+      });
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as { spanId: string };
+
+      // P1 partial index covers the flat columns; verify they wrote.
+      const row = await db.drizzle.query.agentSpans.findFirst({
+        where: eq(schema.agentSpans.id, body.spanId),
+        columns: {
+          handoffToDid: true,
+          handoffTask: true,
+          handoffExpectedOutput: true,
+          handoffRationale: true,
+          handoffSchemaVersion: true,
+        },
+      });
+      expect(row?.handoffToDid).toBe('did:web:writer.acme.test');
+      expect(row?.handoffTask).toBe('draft release notes from the merged PR list');
+      expect(row?.handoffExpectedOutput).toBe('<= 200 words, markdown');
+      expect(row?.handoffRationale).toBe('parent is planner; writer owns prose');
+      expect(row?.handoffSchemaVersion).toBe(1);
+
+      // spanDetail re-projects the four columns into the typed envelope.
+      const detail = await trpcClient(alice.cookie).observability.spanDetail.query({
+        spanId: body.spanId,
+      });
+      expect(detail.handoff).toEqual({
+        toAgentDid: 'did:web:writer.acme.test',
+        task: 'draft release notes from the merged PR list',
+        expectedOutput: '<= 200 words, markdown',
+        rationale: 'parent is planner; writer owns prose',
+      });
+    });
+
+    it('handoffSummary counts only spans with handoff_to_did set', async () => {
+      const agent = await makeAgent(alice.customerId, `hs-${Math.random()}`);
+      const r1 = await emitAudit(alice.customerId, agent.did);
+      const r2 = await emitAudit(alice.customerId, agent.did);
+      // One with a handoff, one without.
+      await postInternal({
+        customerId: alice.customerId,
+        agentDid: agent.did,
+        ...spanBody(r1, {
+          handoff: {
+            toAgentDid: 'did:web:hs-target.test',
+            task: 'do the thing',
+          },
+        }),
+      });
+      await postInternal({
+        customerId: alice.customerId,
+        agentDid: agent.did,
+        ...spanBody(r2),
+      });
+
+      const summary = await trpcClient(alice.cookie).observability.handoffSummary.query({
+        windowHours: 24,
+      });
+      expect(summary.total).toBeGreaterThanOrEqual(1);
+      expect(summary.distinctTargets).toBeGreaterThanOrEqual(1);
+    });
+
     it('idempotent across PDP + mcp-server (both emit same receiptId)', async () => {
       const agent = await makeAgent(alice.customerId, `dedupe-${Math.random()}`);
       const key = await newApiKey(alice.customerId, agent.id);

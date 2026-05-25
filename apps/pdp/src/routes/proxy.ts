@@ -20,6 +20,7 @@ import {
   type EmitSpanInput,
   redactRequest,
   redactResponse,
+  type SpanHandoff,
   sha256Of,
   statusFromOutcome,
 } from '@auto-nomos/shared-types';
@@ -89,6 +90,19 @@ const ProxyRequestSchema = z.object({
      * to writer"). Plain hint; PDP does not validate or use it for routing.
      */
     nextAgentHint: z.string().max(256).optional(),
+    /**
+     * P1 — structured handoff. Parent agent declares the typed delegation
+     * about to happen. Persisted on this span; surfaced as an edge label in
+     * the action graph. PDP does not gate on it.
+     */
+    handoff: z
+      .object({
+        toAgentDid: z.string().min(1).max(256),
+        task: z.string().min(1).max(2048),
+        expectedOutput: z.string().max(1024).optional(),
+        rationale: z.string().max(1024).optional(),
+      })
+      .optional(),
   }),
 });
 
@@ -173,6 +187,21 @@ export function createProxyRoutes(deps: ProxyRouteDeps): Hono {
       typeof parsedData.apiCall.nextAgentHint === 'string'
         ? parsedData.apiCall.nextAgentHint.slice(0, 256)
         : null;
+    // P1 — typed handoff envelope (parent-declared). Zod has already
+    // length-capped the fields; we re-assert string types defensively so
+    // the span payload is well-formed regardless of upstream changes.
+    const handoffField: SpanHandoff | null = parsedData.apiCall.handoff
+      ? {
+          toAgentDid: parsedData.apiCall.handoff.toAgentDid,
+          task: parsedData.apiCall.handoff.task,
+          ...(parsedData.apiCall.handoff.expectedOutput !== undefined
+            ? { expectedOutput: parsedData.apiCall.handoff.expectedOutput }
+            : {}),
+          ...(parsedData.apiCall.handoff.rationale !== undefined
+            ? { rationale: parsedData.apiCall.handoff.rationale }
+            : {}),
+        }
+      : null;
 
     /**
      * Build EmitSpanInput from the request + outcome. Receipts come from
@@ -211,6 +240,7 @@ export function createProxyRoutes(deps: ProxyRouteDeps): Hono {
         parentSpanId: null,
         nextAgentHint: nextAgentHintField,
         intent: intentField,
+        handoff: handoffField,
       };
       try {
         void Promise.resolve(

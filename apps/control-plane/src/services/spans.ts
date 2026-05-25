@@ -122,6 +122,12 @@ export async function ingestSpan(
       responseSummary: input.responseSummary ?? null,
       nextAgentHint: input.nextAgentHint ?? null,
       intent: input.intent ?? null,
+      // P1 — flatten the typed handoff envelope into the four hot columns.
+      // Validation lives in zod (SpanHandoffSchema); ingest is a passthrough.
+      handoffToDid: input.handoff?.toAgentDid ?? null,
+      handoffTask: input.handoff?.task ?? null,
+      handoffExpectedOutput: input.handoff?.expectedOutput ?? null,
+      handoffRationale: input.handoff?.rationale ?? null,
       startedAt: new Date(input.startedAt),
       endedAt: new Date(input.endedAt),
       latencyMs: input.latencyMs,

@@ -1,6 +1,6 @@
 'use client';
 
-import { Activity, CheckCircle2, CircleSlash, ShieldAlert } from 'lucide-react';
+import { Activity, ArrowRightLeft, CheckCircle2, CircleSlash, ShieldAlert } from 'lucide-react';
 import { fmtCount, MetricTile } from '../../../components/metric-tile';
 import { trpc } from '../../../lib/trpc';
 import { ActionGraph } from '../swarms/[id]/components/ActionGraph';
@@ -14,7 +14,12 @@ export default function MonitoringPage() {
     { windowDays: 7 },
     { refetchInterval: 15_000 },
   );
+  const handoffs = trpc.observability.handoffSummary.useQuery(
+    { windowHours: 24 },
+    { refetchInterval: 15_000 },
+  );
   const s = summary.data;
+  const h = handoffs.data;
 
   return (
     <div className="mx-auto max-w-[1180px] space-y-8">
@@ -65,6 +70,17 @@ export default function MonitoringPage() {
               : 'no traffic yet'
           }
           accent="coral"
+        />
+        <MetricTile
+          icon={ArrowRightLeft}
+          label="Handoffs (24h)"
+          value={fmtCount(h?.total)}
+          unit={
+            h && h.total > 0
+              ? `${h.distinctTargets} target agent${h.distinctTargets === 1 ? '' : 's'}`
+              : 'no handoffs declared'
+          }
+          accent="iris"
         />
       </section>
 

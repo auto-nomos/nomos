@@ -622,6 +622,38 @@ export const observabilityRouter = router({
     }),
 
   /**
+   * P1 — handoff counters for the workspace-wide monitoring tile. Counts
+   * declared handoffs (parent agent stamped a typed delegation on the
+   * outgoing span) within the rolling window. Cheap: the partial index
+   * `agent_spans_handoff_to_did_idx` covers the WHERE clause.
+   *
+   * `total` = handoffs declared. `distinctTargets` = unique target DIDs.
+   */
+  handoffSummary: withPermission('audit', 'read')
+    .input(z.object({ windowHours: z.number().int().min(1).max(720).default(24) }))
+    .query(async ({ ctx, input }) => {
+      const since = sql`now() - (${input.windowHours} || ' hours')::interval`;
+      const result = await ctx.db.drizzle.execute<{
+        total: number;
+        distinct_targets: number;
+      }>(sql`
+        SELECT
+          COUNT(*)::int AS total,
+          COUNT(DISTINCT handoff_to_did)::int AS distinct_targets
+        FROM agent_spans
+        WHERE customer_id = ${ctx.customerId}
+          AND handoff_to_did IS NOT NULL
+          AND created_at >= ${since}
+      `);
+      const row = result.rows[0] ?? { total: 0, distinct_targets: 0 };
+      return {
+        windowHours: input.windowHours,
+        total: row.total,
+        distinctTargets: row.distinct_targets,
+      };
+    }),
+
+  /**
    * Daily decisions trend — GROUP BY day(ts) over the window. Powers the
    * stacked-area chart on /app. Caller zero-fills missing days.
    */
@@ -693,6 +725,7 @@ export const observabilityRouter = router({
         latency_ms: number;
         started_at: Date | string;
         parent_receipt_id: string | null;
+        handoff_to_did: string | null;
       }>(sql`
         SELECT
           s.id,
@@ -704,7 +737,8 @@ export const observabilityRouter = router({
           s.http_status,
           s.latency_ms,
           s.started_at,
-          ae.parent_receipt_id
+          ae.parent_receipt_id,
+          s.handoff_to_did
         FROM agent_spans s
         LEFT JOIN audit_events ae ON ae.event_id::text = s.receipt_id
         WHERE s.customer_id = ${ctx.customerId}
@@ -747,6 +781,7 @@ export const observabilityRouter = router({
         httpStatus: s.http_status,
         latencyMs: s.latency_ms,
         startedAt: s.started_at instanceof Date ? s.started_at.toISOString() : String(s.started_at),
+        handoffToDid: s.handoff_to_did,
       }));
       const deriveAgents: DeriveAgentRow[] = agentRows.map((a) => ({
         id: a.id,
@@ -832,12 +867,27 @@ export const observabilityRouter = router({
         columns: { id: true, name: true, did: true, depth: true },
       });
 
+      // P1 — reshape the four flat handoff_* columns back into the typed
+      // SpanHandoff envelope the SDK and dashboard expect. Null when the
+      // parent never declared a handoff on this span.
+      const handoff = row.handoffToDid
+        ? {
+            toAgentDid: row.handoffToDid,
+            task: row.handoffTask ?? '',
+            ...(row.handoffExpectedOutput !== null
+              ? { expectedOutput: row.handoffExpectedOutput }
+              : {}),
+            ...(row.handoffRationale !== null ? { rationale: row.handoffRationale } : {}),
+          }
+        : null;
+
       return {
         ...row,
         startedAt: row.startedAt.toISOString(),
         endedAt: row.endedAt.toISOString(),
         createdAt: row.createdAt.toISOString(),
         agent: agent ?? null,
+        handoff,
       };
     }),
 });

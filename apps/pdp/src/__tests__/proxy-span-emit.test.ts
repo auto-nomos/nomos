@@ -187,4 +187,62 @@ describe('PDP /v1/proxy span emission', () => {
     expect(s.input.httpStatus).toBe(404);
     expect(s.input.responseSummary).toEqual({ error_code: 'not_found' });
   });
+
+  it('propagates apiCall.handoff envelope into EmitSpanInput.handoff', async () => {
+    const fix = buildApp({ status: 201, body: { id: 7 } });
+    fix.policyCache.set(CUSTOMER, POLICY);
+
+    const issuer = generateKeypair();
+    const agent = generateKeypair();
+    const ucan = issueUcan({
+      payload: makePayload(issuer.did, agent.did),
+      privateKey: issuer.privateKey,
+    });
+
+    const res = await fix.app.request('/v1/proxy/github/issue/create', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-cb-customer': CUSTOMER },
+      body: JSON.stringify({
+        ucan: ucan.jwt,
+        request: {
+          ucan: ucan.jwt,
+          command: '/github/issue/create',
+          resource: { repo: 'acme/billing' },
+          context: {},
+        },
+        apiCall: {
+          method: 'POST',
+          path: '/repos/acme/billing/issues',
+          body: { owner: 'acme', repo: 'billing', title: 'pay invoice' },
+          handoff: {
+            toAgentDid: 'did:web:researcher.acme.test',
+            task: 'summarize the new issue and post to #ops',
+            expectedOutput: 'one-paragraph slack message',
+            rationale: 'caller is planner; researcher owns summarization',
+          },
+        },
+      }),
+    });
+    expect(res.status).toBe(200);
+    await Promise.resolve();
+
+    expect(fix.spans).toHaveLength(1);
+    const s = fix.spans[0]!;
+    expect(s.input.handoff).toEqual({
+      toAgentDid: 'did:web:researcher.acme.test',
+      task: 'summarize the new issue and post to #ops',
+      expectedOutput: 'one-paragraph slack message',
+      rationale: 'caller is planner; researcher owns summarization',
+    });
+  });
+
+  it('omits handoff on the span when apiCall has no handoff field', async () => {
+    const fix = buildApp({ status: 201, body: { id: 8 } });
+    fix.policyCache.set(CUSTOMER, POLICY);
+    const res = await proxyCall(fix.app, { repo: 'acme/billing' });
+    expect(res.status).toBe(200);
+    await Promise.resolve();
+    expect(fix.spans).toHaveLength(1);
+    expect(fix.spans[0]!.input.handoff).toBeNull();
+  });
 });

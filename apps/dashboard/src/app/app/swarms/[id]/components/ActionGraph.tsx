@@ -50,6 +50,7 @@ type SpanData = {
   agentDid: string;
   agentColor: string;
   spawnsCount: number;
+  handoffToDid: string | null;
 };
 
 const nodeTypes = { span: SpanNode };
@@ -368,6 +369,7 @@ function buildLayout(data: ActionGraphData): {
           agentDid: n.agentDid,
           agentColor: n.agentColor,
           spawnsCount: spawnsByParent.get(n.id) ?? 0,
+          handoffToDid: n.handoffToDid,
         } satisfies SpanData,
       });
     }
@@ -389,13 +391,28 @@ function buildLayout(data: ActionGraphData): {
 
   const flowEdges: Edge[] = data.edges.map((e) => {
     const child = data.nodes.find((n) => n.id === e.to);
+    const parent = data.nodes.find((n) => n.id === e.from);
     const color = e.kind === 'spawn' && child ? child.agentColor : undefined;
+    // P1 — label spawn edges whose parent declared a typed handoff. The
+    // label points at the declared target DID; P3 will recolor when the
+    // *actual* child DID diverges from the declared one.
+    const handoffLabel =
+      parent?.handoffToDid && e.kind === 'spawn' ? `→ ${shortId(parent.handoffToDid)}` : undefined;
     return {
       id: e.id,
       source: e.from,
       target: e.to,
       type: 'smoothstep',
       animated: e.kind === 'spawn',
+      ...(handoffLabel
+        ? {
+            label: handoffLabel,
+            labelStyle: { fontSize: 10, fontFamily: 'var(--font-mono, monospace)' },
+            labelBgPadding: [4, 2] as [number, number],
+            labelBgBorderRadius: 4,
+            labelBgStyle: { fill: 'rgb(var(--aegis-iris) / 0.1)' },
+          }
+        : {}),
       style:
         e.kind === 'spawn'
           ? { stroke: color, strokeWidth: 2 }

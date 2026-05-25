@@ -19,6 +19,7 @@ import {
   jsonb,
   pgEnum,
   pgTable,
+  smallint,
   text,
   timestamp,
   uniqueIndex,
@@ -1163,6 +1164,18 @@ export const agentSpans = pgTable(
     responseSummary: jsonb('response_summary'),
     nextAgentHint: text('next_agent_hint'),
     intent: text('intent'),
+    // P1 — structured handoff. Parent agent declares the typed delegation
+    // {toDid, task, expectedOutput, rationale} on the outgoing call that
+    // forks a child. Separate from free-text `next_agent_hint` (kept for
+    // back-compat) so the action graph can label edges and P3 can diff
+    // declared-vs-actual handoffs. All four fields null when the call is
+    // not a fork. `handoff_schema_version` lets us evolve the shape later
+    // without another migration.
+    handoffToDid: text('handoff_to_did'),
+    handoffTask: text('handoff_task'),
+    handoffExpectedOutput: text('handoff_expected_output'),
+    handoffRationale: text('handoff_rationale'),
+    handoffSchemaVersion: smallint('handoff_schema_version').notNull().default(1),
     startedAt: timestamp('started_at', { withTimezone: true }).notNull(),
     endedAt: timestamp('ended_at', { withTimezone: true }).notNull(),
     latencyMs: integer('latency_ms').notNull(),
@@ -1177,6 +1190,11 @@ export const agentSpans = pgTable(
     receiptIdx: index('agent_spans_receipt_idx').on(t.receiptId),
     parentIdx: index('agent_spans_parent_idx').on(t.parentSpanId),
     customerReceiptUq: uniqueIndex('agent_spans_customer_receipt_uq').on(t.customerId, t.receiptId),
+    // P1 partial index — supports the P3 handoff-diff join cheaply by only
+    // covering spans that actually declared a delegation.
+    handoffToDidIdx: index('agent_spans_handoff_to_did_idx')
+      .on(t.customerId, t.swarmId, t.handoffToDid)
+      .where(sql`${t.handoffToDid} IS NOT NULL`),
   }),
 );
 
