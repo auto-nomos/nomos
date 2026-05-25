@@ -61,4 +61,40 @@ def record_handoff(
     return {**api_call, "handoff": handoff}
 
 
-__all__ = ["SpanHandoffEnvelope", "record_handoff"]
+class SpanPromptEnvelope(TypedDict, total=False):
+    """P2 — prompt + reasoning capture envelope.
+
+    Caller ships plaintext over TLS. Control-plane gates capture on
+    customer config + ToS + sample-rate, then redacts PII and AEAD-
+    encrypts before insert. PDP never inspects, never persists.
+    """
+
+    text: str
+    reasoning: str
+
+
+def attach_prompt(
+    api_call: dict[str, Any],
+    *,
+    text: str,
+    reasoning: Optional[str] = None,
+) -> dict[str, Any]:
+    """Attach a prompt + optional reasoning blob to an outgoing api_call.
+
+    Returns a shallow copy — does not mutate. Caller-supplied ``prompt``
+    on the api_call wins (no clobbering).
+    """
+    if "prompt" in api_call and api_call["prompt"]:
+        return api_call
+    prompt: dict[str, Any] = {"text": text}
+    if reasoning is not None:
+        prompt["reasoning"] = reasoning
+    return {**api_call, "prompt": prompt}
+
+
+__all__ = [
+    "SpanHandoffEnvelope",
+    "SpanPromptEnvelope",
+    "attach_prompt",
+    "record_handoff",
+]

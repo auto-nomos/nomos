@@ -19,7 +19,7 @@ import {
   useReactFlow,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { Sparkles, Wrench } from 'lucide-react';
+import { MessageSquareText, Sparkles, Wrench } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { Badge } from '../../../../../components/ui/badge';
 import {
@@ -55,6 +55,7 @@ type SpanData = {
   agentColor: string;
   spawnsCount: number;
   handoffToDid: string | null;
+  hasPrompt: boolean;
 };
 
 const nodeTypes = { span: SpanNode };
@@ -271,6 +272,13 @@ function SpanNode({ data }: NodeProps) {
               spawns {d.spawnsCount}
             </span>
           ) : null}
+          {d.hasPrompt ? (
+            <MessageSquareText
+              className="h-3 w-3 text-aegis-iris"
+              aria-label="prompt captured"
+              data-aegis-has-prompt="true"
+            />
+          ) : null}
         </div>
         <div className="flex items-center gap-2">
           <Badge
@@ -383,6 +391,7 @@ function buildLayout(data: ActionGraphData): {
           agentColor: n.agentColor,
           spawnsCount: spawnsByParent.get(n.id) ?? 0,
           handoffToDid: n.handoffToDid,
+          hasPrompt: n.hasPrompt,
         } satisfies SpanData,
       });
     }

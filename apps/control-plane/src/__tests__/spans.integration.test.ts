@@ -11,7 +11,7 @@
  *   - actionTimeline ordered desc with same scoping
  *   - spanDetail 404s on other tenant's span
  */
-import { sha256Hex } from '@auto-nomos/crypto';
+import { generateSecretboxKeyHex, loadSecretboxKey, sha256Hex } from '@auto-nomos/crypto';
 import { createTRPCClient, httpBatchLink } from '@trpc/client';
 import { eq } from 'drizzle-orm';
 import { pino } from 'pino';
@@ -161,6 +161,11 @@ describe.skipIf(!RUN)('spans ingestion + observability v2 (requires postgres)', 
     });
   }
 
+  // P2 — supply an AEAD key + service token so the prompt capture path is
+  // exercised. encryptionKey is hex on the wire; loadSecretboxKey decodes.
+  const PROMPT_TEST_KEY_HEX = generateSecretboxKeyHex();
+  const PROMPT_TEST_KEY = loadSecretboxKey(PROMPT_TEST_KEY_HEX);
+
   beforeAll(async () => {
     db = createDb({ DATABASE_URL: TEST_URL });
     await db.pool.query('SELECT 1');
@@ -171,6 +176,7 @@ describe.skipIf(!RUN)('spans ingestion + observability v2 (requires postgres)', 
       db,
       auth,
       internal: { serviceToken: 'test-service-token' },
+      oauth: { config, encryptionKey: PROMPT_TEST_KEY },
     });
     alice = await signUp('alice-spans');
     bob = await signUp('bob-spans');
@@ -401,6 +407,141 @@ describe.skipIf(!RUN)('spans ingestion + observability v2 (requires postgres)', 
         expectedOutput: '<= 200 words, markdown',
         rationale: 'parent is planner; writer owns prose',
       });
+    });
+
+    // ── P2 ── prompt capture round-trip ────────────────────────────────
+    async function setObsConfig(
+      tenant: Tenant,
+      opts: {
+        enabled?: boolean;
+        sampleRate?: number;
+        retentionDays?: number;
+        kmsArn?: string | null;
+        tos?: string | null;
+      } = {},
+    ) {
+      await db.drizzle
+        .insert(schema.customerObservabilityConfig)
+        .values({
+          customerId: tenant.customerId,
+          promptCaptureEnabled: opts.enabled ?? true,
+          promptCaptureSampleRate: opts.sampleRate ?? 100,
+          promptRetentionDays: opts.retentionDays ?? 30,
+          promptKmsKeyArn: opts.kmsArn ?? null,
+          acceptedTosVersion: opts.tos === undefined ? '2026-05-25' : opts.tos,
+        })
+        .onConflictDoUpdate({
+          target: schema.customerObservabilityConfig.customerId,
+          set: {
+            promptCaptureEnabled: opts.enabled ?? true,
+            promptCaptureSampleRate: opts.sampleRate ?? 100,
+            promptRetentionDays: opts.retentionDays ?? 30,
+            promptKmsKeyArn: opts.kmsArn ?? null,
+            acceptedTosVersion: opts.tos === undefined ? '2026-05-25' : opts.tos,
+            updatedAt: new Date(),
+          },
+        });
+    }
+
+    it('drops prompt silently when capture is disabled', async () => {
+      await setObsConfig(alice, { enabled: false });
+      const agent = await makeAgent(alice.customerId, `pc-off-${Math.random()}`);
+      const receiptId = await emitAudit(alice.customerId, agent.did);
+      const res = await postInternal({
+        customerId: alice.customerId,
+        agentDid: agent.did,
+        ...spanBody(receiptId, {
+          prompt: { text: 'do the thing for alice@acme.com' },
+        }),
+      });
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as { spanId: string };
+      const row = await db.drizzle.query.agentSpanPrompts.findFirst({
+        where: eq(schema.agentSpanPrompts.spanId, body.spanId),
+      });
+      expect(row).toBeUndefined();
+    });
+
+    it('drops prompt when capture enabled but ToS not accepted', async () => {
+      await setObsConfig(alice, { enabled: true, tos: null });
+      const agent = await makeAgent(alice.customerId, `pc-notos-${Math.random()}`);
+      const receiptId = await emitAudit(alice.customerId, agent.did);
+      const res = await postInternal({
+        customerId: alice.customerId,
+        agentDid: agent.did,
+        ...spanBody(receiptId, { prompt: { text: 'hi' } }),
+      });
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as { spanId: string };
+      const row = await db.drizzle.query.agentSpanPrompts.findFirst({
+        where: eq(schema.agentSpanPrompts.spanId, body.spanId),
+      });
+      expect(row).toBeUndefined();
+    });
+
+    it('captures + decrypts redacted prompt with findings', async () => {
+      await setObsConfig(alice, { enabled: true });
+      const agent = await makeAgent(alice.customerId, `pc-on-${Math.random()}`);
+      const receiptId = await emitAudit(alice.customerId, agent.did);
+      const promptText = 'ping alice@acme.com about the merge for 415-555-1234';
+      const reasoningText = 'thinking: alice@acme.com is the owner';
+      const res = await postInternal({
+        customerId: alice.customerId,
+        agentDid: agent.did,
+        ...spanBody(receiptId, {
+          prompt: { text: promptText, reasoning: reasoningText },
+        }),
+      });
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as { spanId: string };
+      const row = await db.drizzle.query.agentSpanPrompts.findFirst({
+        where: eq(schema.agentSpanPrompts.spanId, body.spanId),
+      });
+      expect(row).toBeDefined();
+      expect(row?.kmsKeyId).toBe('platform-default');
+      // ciphertext != plaintext
+      expect(row?.promptCiphertextHex).not.toContain('alice');
+      // findings reflect redaction
+      const findings = row?.redactionFindings as Record<string, number>;
+      expect(findings.email).toBeGreaterThanOrEqual(2);
+      expect(findings.phone).toBeGreaterThanOrEqual(1);
+
+      // tRPC promptDetail decrypts the redacted side
+      const detail = await trpcClient(alice.cookie).observability.promptDetail.query({
+        spanId: body.spanId,
+      });
+      expect(detail.promptText).toContain('[REDACTED:email]');
+      expect(detail.promptText).toContain('[REDACTED:phone]');
+      expect(detail.reasoningText).toContain('[REDACTED:email]');
+      expect(detail.raw).toBe(false);
+
+      // hasPrompt flag flows through the action graph
+      const graph = await trpcClient(alice.cookie).observability.actionGraph.query({
+        sinceMinutes: 60,
+      });
+      const node = graph.nodes.find((n) => n.id === body.spanId);
+      expect(node?.hasPrompt).toBe(true);
+
+      // Coverage tile counts the new row
+      const cov = await trpcClient(alice.cookie).observability.promptCoverageSummary.query({
+        windowHours: 24,
+      });
+      expect(cov.capturedSpans).toBeGreaterThanOrEqual(1);
+    });
+
+    it('cross-tenant promptDetail returns NOT_FOUND', async () => {
+      await setObsConfig(alice, { enabled: true });
+      const agent = await makeAgent(alice.customerId, `pc-iso-${Math.random()}`);
+      const receiptId = await emitAudit(alice.customerId, agent.did);
+      const res = await postInternal({
+        customerId: alice.customerId,
+        agentDid: agent.did,
+        ...spanBody(receiptId, { prompt: { text: 'alice-only secret' } }),
+      });
+      const body = (await res.json()) as { spanId: string };
+      await expect(
+        trpcClient(bob.cookie).observability.promptDetail.query({ spanId: body.spanId }),
+      ).rejects.toThrow();
     });
 
     it('handoffSummary counts only spans with handoff_to_did set', async () => {

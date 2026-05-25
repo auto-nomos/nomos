@@ -253,6 +253,13 @@
       "when": 1780900000000,
       "tag": "0035_agent_spans_handoff",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1781000000000,
+      "tag": "0036_prompt_capture",
+      "breakpoints": true
     }
   ]
 }

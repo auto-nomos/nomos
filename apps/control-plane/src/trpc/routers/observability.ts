@@ -9,14 +9,24 @@
  * "CAN do vs DOES do" diff parses each mapped policy's Cedar via
  * `@auto-nomos/policy-builder` on the fly.
  */
+import { openString, sha256Hex } from '@auto-nomos/crypto';
 import { parseToIr } from '@auto-nomos/policy-builder';
-import type { ActionGraph, SpanStatus } from '@auto-nomos/shared-types';
+import type { ActionGraph, SpanPromptDetail, SpanStatus } from '@auto-nomos/shared-types';
 import { TRPCError } from '@trpc/server';
 import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import * as schema from '../../db/schema.js';
 import { router, withPermission } from '../index.js';
 import { type DeriveAgentRow, type DeriveSpanRow, deriveSpanTree } from './_deriveSpanTree.js';
+
+/** Same hex→bytes shim as services/spans.ts; keep local to avoid a util pkg. */
+function hexToBytes(hex: string): Uint8Array {
+  const out = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < out.length; i++) {
+    out[i] = Number.parseInt(hex.slice(i * 2, i * 2 + 2), 16);
+  }
+  return out;
+}
 
 const WindowDays = z.number().int().min(1).max(30).default(7);
 
@@ -622,6 +632,37 @@ export const observabilityRouter = router({
     }),
 
   /**
+   * P2 — prompt capture coverage tile (workspace-wide). Spans with a
+   * captured prompt / total spans in the rolling window. Counts the
+   * `redacted` side so opting out of raw storage doesn't dent coverage.
+   */
+  promptCoverageSummary: withPermission('audit', 'read')
+    .input(z.object({ windowHours: z.number().int().min(1).max(720).default(24) }))
+    .query(async ({ ctx, input }) => {
+      const since = sql`now() - (${input.windowHours} || ' hours')::interval`;
+      const result = await ctx.db.drizzle.execute<{
+        total_spans: number;
+        captured_spans: number;
+      }>(sql`
+        SELECT
+          COUNT(s.id)::int AS total_spans,
+          COUNT(asp.span_id)::int AS captured_spans
+        FROM agent_spans s
+        LEFT JOIN agent_span_prompts asp ON asp.span_id = s.id
+        WHERE s.customer_id = ${ctx.customerId}
+          AND s.created_at >= ${since}
+      `);
+      const row = result.rows[0] ?? { total_spans: 0, captured_spans: 0 };
+      return {
+        windowHours: input.windowHours,
+        totalSpans: row.total_spans,
+        capturedSpans: row.captured_spans,
+        coveragePct:
+          row.total_spans > 0 ? Math.round((row.captured_spans / row.total_spans) * 100) : 0,
+      };
+    }),
+
+  /**
    * P1 — handoff counters for the workspace-wide monitoring tile. Counts
    * declared handoffs (parent agent stamped a typed delegation on the
    * outgoing span) within the rolling window. Cheap: the partial index
@@ -727,6 +768,7 @@ export const observabilityRouter = router({
         parent_receipt_id: string | null;
         handoff_to_did: string | null;
         handoff_task: string | null;
+        has_prompt: boolean;
       }>(sql`
         SELECT
           s.id,
@@ -740,9 +782,11 @@ export const observabilityRouter = router({
           s.started_at,
           ae.parent_receipt_id,
           s.handoff_to_did,
-          s.handoff_task
+          s.handoff_task,
+          (asp.span_id IS NOT NULL) AS has_prompt
         FROM agent_spans s
         LEFT JOIN audit_events ae ON ae.event_id::text = s.receipt_id
+        LEFT JOIN agent_span_prompts asp ON asp.span_id = s.id
         WHERE s.customer_id = ${ctx.customerId}
           AND s.created_at >= ${since}
           ${swarmFilter}
@@ -785,6 +829,7 @@ export const observabilityRouter = router({
         startedAt: s.started_at instanceof Date ? s.started_at.toISOString() : String(s.started_at),
         handoffToDid: s.handoff_to_did,
         handoffTask: s.handoff_task,
+        hasPrompt: Boolean(s.has_prompt),
       }));
       const deriveAgents: DeriveAgentRow[] = agentRows.map((a) => ({
         id: a.id,
@@ -846,6 +891,202 @@ export const observabilityRouter = router({
         startedAt: r.startedAt.toISOString(),
         endedAt: r.endedAt.toISOString(),
       }));
+    }),
+
+  /**
+   * P2 — observability config (read). Powers the settings page; gated
+   * by `audit:read` so any role that can see the swarm can see whether
+   * capture is enabled, but only org admins can mutate (see update).
+   */
+  observabilityConfig: withPermission('audit', 'read')
+    .input(z.object({}))
+    .query(async ({ ctx }) => {
+      const row = await ctx.db.drizzle.query.customerObservabilityConfig.findFirst({
+        where: eq(schema.customerObservabilityConfig.customerId, ctx.customerId),
+      });
+      if (!row) {
+        return {
+          customerId: ctx.customerId,
+          promptCaptureEnabled: false,
+          promptCaptureSampleRate: 100,
+          promptRetentionDays: 30,
+          promptKmsKeyArn: null,
+          acceptedTosVersion: null,
+          updatedAt: new Date().toISOString(),
+        };
+      }
+      return {
+        customerId: row.customerId,
+        promptCaptureEnabled: row.promptCaptureEnabled,
+        promptCaptureSampleRate: row.promptCaptureSampleRate,
+        promptRetentionDays: row.promptRetentionDays,
+        promptKmsKeyArn: row.promptKmsKeyArn,
+        acceptedTosVersion: row.acceptedTosVersion,
+        updatedAt: row.updatedAt.toISOString(),
+      };
+    }),
+
+  /**
+   * P2 — upsert the per-customer observability config. Gated by
+   * `org:update` since this is an organisation-level setting. ToS
+   * acceptance is a hard gate at ingest time — capture stays off when
+   * `acceptedTosVersion` is null/empty, even if enabled.
+   */
+  observabilityConfigUpdate: withPermission('org', 'update')
+    .input(
+      z.object({
+        promptCaptureEnabled: z.boolean(),
+        promptCaptureSampleRate: z.number().int().min(0).max(100),
+        promptRetentionDays: z.number().int().min(1).max(365),
+        promptKmsKeyArn: z.string().min(1).max(2048).optional().nullable(),
+        acceptedTosVersion: z.string().min(1).max(64).optional().nullable(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const values = {
+        customerId: ctx.customerId,
+        promptCaptureEnabled: input.promptCaptureEnabled,
+        promptCaptureSampleRate: input.promptCaptureSampleRate,
+        promptRetentionDays: input.promptRetentionDays,
+        promptKmsKeyArn: input.promptKmsKeyArn ?? null,
+        acceptedTosVersion: input.acceptedTosVersion ?? null,
+        updatedAt: new Date(),
+      };
+      await ctx.db.drizzle
+        .insert(schema.customerObservabilityConfig)
+        .values(values)
+        .onConflictDoUpdate({
+          target: schema.customerObservabilityConfig.customerId,
+          set: {
+            promptCaptureEnabled: values.promptCaptureEnabled,
+            promptCaptureSampleRate: values.promptCaptureSampleRate,
+            promptRetentionDays: values.promptRetentionDays,
+            promptKmsKeyArn: values.promptKmsKeyArn,
+            acceptedTosVersion: values.acceptedTosVersion,
+            updatedAt: values.updatedAt,
+          },
+        });
+      return { ok: true as const };
+    }),
+
+  /**
+   * P2 — decrypted redacted prompt + reasoning for one span. Gated by
+   * `prompts:read` (auditor/admin/owner by default).
+   */
+  promptDetail: withPermission('prompts', 'read')
+    .input(z.object({ spanId: z.string().uuid() }))
+    .query(async ({ ctx, input }): Promise<SpanPromptDetail> => {
+      if (!ctx.oauth?.encryptionKey) {
+        throw new TRPCError({
+          code: 'PRECONDITION_FAILED',
+          message: 'prompt capture not configured (encryption key missing)',
+        });
+      }
+      const row = await ctx.db.drizzle.query.agentSpanPrompts.findFirst({
+        where: and(
+          eq(schema.agentSpanPrompts.spanId, input.spanId),
+          eq(schema.agentSpanPrompts.customerId, ctx.customerId),
+        ),
+      });
+      if (!row) throw new TRPCError({ code: 'NOT_FOUND' });
+      const aad = hexToBytes(sha256Hex(`${ctx.customerId}|${input.spanId}|${row.promptAadKind}`));
+      const promptText = openString(
+        ctx.oauth.encryptionKey,
+        row.promptCiphertextHex,
+        row.promptNonceHex,
+        aad,
+      );
+      const reasoningText =
+        row.reasoningCiphertextHex && row.reasoningNonceHex
+          ? openString(
+              ctx.oauth.encryptionKey,
+              row.reasoningCiphertextHex,
+              row.reasoningNonceHex,
+              aad,
+            )
+          : null;
+      return {
+        spanId: input.spanId,
+        promptText,
+        reasoningText,
+        redactionFindings: (row.redactionFindings as SpanPromptDetail['redactionFindings']) ?? null,
+        kmsKeyId: row.kmsKeyId,
+        createdAt: row.createdAt.toISOString(),
+        raw: false,
+      };
+    }),
+
+  /**
+   * P2 — unredacted prompt + reasoning. Gated by `prompts_raw:read`
+   * (owner only by default). EVERY read emits an `audit_events` row so
+   * "who looked at raw PII" is itself auditable.
+   */
+  promptRawDetail: withPermission('prompts_raw', 'read')
+    .input(z.object({ spanId: z.string().uuid() }))
+    .query(async ({ ctx, input }): Promise<SpanPromptDetail> => {
+      if (!ctx.oauth?.encryptionKey) {
+        throw new TRPCError({
+          code: 'PRECONDITION_FAILED',
+          message: 'prompt capture not configured (encryption key missing)',
+        });
+      }
+      const row = await ctx.db.drizzle.query.agentSpanPrompts.findFirst({
+        where: and(
+          eq(schema.agentSpanPrompts.spanId, input.spanId),
+          eq(schema.agentSpanPrompts.customerId, ctx.customerId),
+        ),
+      });
+      if (!row) throw new TRPCError({ code: 'NOT_FOUND' });
+      if (!row.rawPromptCiphertextHex || !row.rawPromptNonceHex) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'no raw prompt stored for this span' });
+      }
+      const aad = hexToBytes(sha256Hex(`${ctx.customerId}|${input.spanId}|${row.promptAadKind}`));
+      const promptText = openString(
+        ctx.oauth.encryptionKey,
+        row.rawPromptCiphertextHex,
+        row.rawPromptNonceHex,
+        aad,
+      );
+      const reasoningText =
+        row.rawReasoningCiphertextHex && row.rawReasoningNonceHex
+          ? openString(
+              ctx.oauth.encryptionKey,
+              row.rawReasoningCiphertextHex,
+              row.rawReasoningNonceHex,
+              aad,
+            )
+          : null;
+      // Audit the raw read — who, when, which span. Stored as a normal
+      // audit_events row so it falls under the existing audit chain.
+      const readerId = ctx.session?.user?.id ?? 'unknown';
+      const rawReceiptId = sha256Hex(
+        `prompt-raw-read|${ctx.customerId}|${input.spanId}|${readerId}|${Date.now()}`,
+      );
+      await ctx.db.drizzle.insert(schema.auditEvents).values({
+        customerId: ctx.customerId,
+        agent: 'did:nomos:dashboard-user',
+        decision: 'allow',
+        command: '/observability/prompt_raw/read',
+        resource: { spanId: input.spanId },
+        context: { readerUserId: readerId },
+        prevHash: '0'.repeat(64),
+        hash: rawReceiptId,
+        payload: {
+          kind: 'prompt_raw_read',
+          spanId: input.spanId,
+          readerUserId: readerId,
+        },
+        receiptId: rawReceiptId,
+      });
+      return {
+        spanId: input.spanId,
+        promptText,
+        reasoningText,
+        redactionFindings: (row.redactionFindings as SpanPromptDetail['redactionFindings']) ?? null,
+        kmsKeyId: row.kmsKeyId,
+        createdAt: row.createdAt.toISOString(),
+        raw: true,
+      };
     }),
 
   /**

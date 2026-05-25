@@ -51,5 +51,5 @@ export type {
   ResourceConstraint,
 } from './intent.js';
 export { createIntentClient, IntentError } from './intent.js';
-export type { ApiCallLike, SpanHandoffEnvelope } from './observability.js';
-export { recordHandoff } from './observability.js';
+export type { ApiCallLike, SpanHandoffEnvelope, SpanPromptEnvelope } from './observability.js';
+export { attachPrompt, recordHandoff } from './observability.js';

@@ -1,3 +1,5 @@
+import { sealString, sha256Hex } from '@auto-nomos/crypto';
+import { redact, totalFindings } from '@auto-nomos/redaction';
 import type { EmitSpanInput } from '@auto-nomos/shared-types';
 import { and, eq } from 'drizzle-orm';
 import type { Db } from '../db/index.js';
@@ -27,6 +29,43 @@ interface IngestSpanResult {
   spanId: string;
   inserted: boolean;
   swarmId: string | null;
+  promptCaptured: boolean;
+}
+
+export interface IngestSpanOptions {
+  /**
+   * P2 — platform-default AEAD key. When supplied AND the customer has
+   * `prompt_capture_enabled = true` AND `accepted_tos_version` is set AND
+   * the sample-rate hit fires AND the input carries `prompt`, the prompt
+   * and (optional) reasoning are redacted, encrypted with the supplied
+   * key, and inserted into `agent_span_prompts`.
+   *
+   * When undefined, any `input.prompt` is silently dropped — production
+   * MUST supply this, but tests can omit to skip the path entirely.
+   */
+  promptCaptureKey?: Uint8Array;
+}
+
+/**
+ * Stable 0..99 hash by span uuid so prompt + reasoning sample together
+ * for the same row. djb2-xor over the uuid string; deterministic and
+ * cheap. The first byte of sha256 would be equivalent — djb2 is just
+ * faster and we don't need cryptographic uniformity for sampling.
+ */
+function sampleBucket(spanId: string): number {
+  let h = 5381;
+  for (let i = 0; i < spanId.length; i++) {
+    h = ((h << 5) + h) ^ spanId.charCodeAt(i);
+  }
+  return (h >>> 0) % 100;
+}
+
+function hexToBytes(hex: string): Uint8Array {
+  const out = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < out.length; i++) {
+    out[i] = Number.parseInt(hex.slice(i * 2, i * 2 + 2), 16);
+  }
+  return out;
 }
 
 /**
@@ -46,6 +85,7 @@ interface IngestSpanResult {
 export async function ingestSpan(
   { customerId, agentId, input }: IngestSpanArgs,
   db: Db,
+  opts: IngestSpanOptions = {},
 ): Promise<IngestSpanResult> {
   // decision.receiptId is sha256 hex (not the row's event_id uuid). Look up
   // by the dedicated text column added in migration 0026.
@@ -100,7 +140,12 @@ export async function ingestSpan(
     columns: { id: true, swarmId: true },
   });
   if (existing) {
-    return { spanId: existing.id, inserted: false, swarmId: existing.swarmId };
+    return {
+      spanId: existing.id,
+      inserted: false,
+      swarmId: existing.swarmId,
+      promptCaptured: false,
+    };
   }
 
   const [row] = await db.drizzle
@@ -134,5 +179,69 @@ export async function ingestSpan(
     })
     .returning({ id: schema.agentSpans.id, swarmId: schema.agentSpans.swarmId });
 
-  return { spanId: row!.id, inserted: true, swarmId: row!.swarmId };
+  const spanId = row!.id;
+  let promptCaptured = false;
+  // P2 — opt-in prompt + reasoning capture. Each guard fails closed: if
+  // any of {key, config row, ToS, sample-rate, payload} is missing, the
+  // prompt is silently dropped and the span insert still succeeds.
+  if (opts.promptCaptureKey && input.prompt && input.prompt.text) {
+    const cfg = await db.drizzle.query.customerObservabilityConfig.findFirst({
+      where: eq(schema.customerObservabilityConfig.customerId, customerId),
+    });
+    const enabled =
+      cfg?.promptCaptureEnabled === true &&
+      cfg.acceptedTosVersion !== null &&
+      cfg.acceptedTosVersion !== '' &&
+      sampleBucket(spanId) < cfg.promptCaptureSampleRate;
+    if (enabled) {
+      const promptRed = redact(input.prompt.text);
+      const reasoningRed = input.prompt.reasoning ? redact(input.prompt.reasoning) : null;
+      // AAD binds (customer, span, aad-kind) so a DB-write attacker can't
+      // swap ciphertexts between rows without triggering an auth failure
+      // on decrypt. The decrypt path re-derives this same AAD.
+      const aad = hexToBytes(sha256Hex(`${customerId}|${spanId}|span_v1`));
+      const promptCt = sealString(opts.promptCaptureKey, promptRed.redacted, aad);
+      const reasoningCt = reasoningRed
+        ? sealString(opts.promptCaptureKey, reasoningRed.redacted, aad)
+        : null;
+      // Owner-only raw side. Same key + AAD so storage + cascade story
+      // is identical; the only privilege difference is which RBAC
+      // resource gates the read path.
+      const rawPromptCt = sealString(opts.promptCaptureKey, input.prompt.text, aad);
+      const rawReasoningCt = input.prompt.reasoning
+        ? sealString(opts.promptCaptureKey, input.prompt.reasoning, aad)
+        : null;
+      const totalFindingsCount =
+        totalFindings(promptRed.findings) +
+        (reasoningRed ? totalFindings(reasoningRed.findings) : 0);
+      const aggregated = reasoningRed
+        ? {
+            bearer_token: promptRed.findings.bearer_token + reasoningRed.findings.bearer_token,
+            credit_card: promptRed.findings.credit_card + reasoningRed.findings.credit_card,
+            ssn: promptRed.findings.ssn + reasoningRed.findings.ssn,
+            email: promptRed.findings.email + reasoningRed.findings.email,
+            phone: promptRed.findings.phone + reasoningRed.findings.phone,
+          }
+        : promptRed.findings;
+      await db.drizzle.insert(schema.agentSpanPrompts).values({
+        spanId,
+        customerId,
+        promptCiphertextHex: promptCt.ciphertextHex,
+        promptNonceHex: promptCt.nonceHex,
+        promptAadKind: 'span_v1',
+        reasoningCiphertextHex: reasoningCt?.ciphertextHex ?? null,
+        reasoningNonceHex: reasoningCt?.nonceHex ?? null,
+        rawPromptCiphertextHex: rawPromptCt.ciphertextHex,
+        rawPromptNonceHex: rawPromptCt.nonceHex,
+        rawReasoningCiphertextHex: rawReasoningCt?.ciphertextHex ?? null,
+        rawReasoningNonceHex: rawReasoningCt?.nonceHex ?? null,
+        redactionFindings: totalFindingsCount > 0 ? aggregated : null,
+        kmsKeyId: cfg.promptKmsKeyArn ?? 'platform-default',
+        wrappedDekB64: null,
+      });
+      promptCaptured = true;
+    }
+  }
+
+  return { spanId, inserted: true, swarmId: row!.swarmId, promptCaptured };
 }

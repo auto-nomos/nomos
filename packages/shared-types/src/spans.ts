@@ -16,6 +16,20 @@ export const SpanSummarySchema = z.record(z.string(), z.unknown()).optional();
 export type SpanSummary = z.infer<typeof SpanSummarySchema>;
 
 /**
+ * P2 — prompt + reasoning capture payload. Caller (SDK) ships plaintext
+ * over TLS; control-plane redacts + AEAD-encrypts before insert. Reasoning
+ * is optional because not every LLM emits a separate CoT trace.
+ *
+ * Size caps enforced at zod parse — `text` ≤ 1MB, `reasoning` ≤ 2MB. Past
+ * those limits the SDK should sample or truncate before sending.
+ */
+export const SpanPromptInputSchema = z.object({
+  text: z.string().max(1_000_000),
+  reasoning: z.string().max(2_000_000).optional(),
+});
+export type SpanPromptInput = z.infer<typeof SpanPromptInputSchema>;
+
+/**
  * P1 — structured handoff. The parent agent declares this on the outgoing
  * authorize call that immediately precedes a fork. Persisted on the parent
  * span only; the child span never carries it. P3 will diff `toAgentDid`
@@ -47,8 +61,49 @@ export const EmitSpanInputSchema = z.object({
   nextAgentHint: z.string().max(256).optional().nullable(),
   intent: z.string().max(256).optional().nullable(),
   handoff: SpanHandoffSchema.optional().nullable(),
+  prompt: SpanPromptInputSchema.optional().nullable(),
 });
 export type EmitSpanInput = z.infer<typeof EmitSpanInputSchema>;
+
+/**
+ * P2 — redacted prompt + reasoning view returned by
+ * `observability.promptDetail`. Never carries decrypted text on the
+ * generic `Span` interface; this is the only shape that does. The raw
+ * (unredacted) variant uses the same fields but is gated by the
+ * separate `prompts_raw` resource and audit-logs every read.
+ */
+export interface SpanPromptDetail {
+  spanId: string;
+  promptText: string;
+  reasoningText: string | null;
+  redactionFindings: {
+    bearer_token: number;
+    credit_card: number;
+    ssn: number;
+    email: number;
+    phone: number;
+  } | null;
+  kmsKeyId: string;
+  createdAt: string;
+  /** True when the response is the raw (unredacted) text. */
+  raw: boolean;
+}
+
+/**
+ * P2 — per-customer observability configuration. Read by the dashboard
+ * settings page; mutated only by owner/admin. Sample rate is 0-100. ToS
+ * acceptance is a hard gate — capture stays off when null, regardless of
+ * `promptCaptureEnabled`.
+ */
+export interface CustomerObservabilityConfig {
+  customerId: string;
+  promptCaptureEnabled: boolean;
+  promptCaptureSampleRate: number;
+  promptRetentionDays: number;
+  promptKmsKeyArn: string | null;
+  acceptedTosVersion: string | null;
+  updatedAt: string;
+}
 
 export interface Span {
   id: string;
@@ -111,6 +166,9 @@ export interface SpanGraphNode {
   // P1 — non-null only on spans whose parent agent declared a typed
   // handoff. UI uses this to label outgoing edges with `→ <shortDid>`.
   handoffToDid: string | null;
+  // P2 — cheap presence flag (no decrypted text). UI uses it to show a
+  // Sparkles icon on nodes that have captured prompt/reasoning.
+  hasPrompt: boolean;
 }
 
 export type ActionGraphNode = SpanGraphNode;

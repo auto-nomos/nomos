@@ -36,6 +36,12 @@ export const RESOURCES = [
   'billing',
   'oauth',
   'cloud_connections',
+  // P2 — prompt + reasoning capture. Two-resource split so the redacted
+  // and raw views are distinct ACL targets:
+  //   `prompts`      — redacted view (PII scrubbed). owner/admin/auditor.
+  //   `prompts_raw`  — unredacted view. owner only, audit-logged on read.
+  'prompts',
+  'prompts_raw',
 ] as const;
 export type Resource = (typeof RESOURCES)[number];
 
@@ -55,10 +61,12 @@ function everyResource(actions: ReadonlyArray<Action>): Bundle {
 const OWNER_BUNDLE: Bundle = everyResource(ALL);
 
 // admin = owner minus org:delete and minus billing mutations (billing:read OK).
+// Admin cannot read raw prompts — incident-response only, owner-gated.
 const ADMIN_BUNDLE: Bundle = {
   ...everyResource(ALL),
   org: READ_WRITE,
   billing: READ,
+  prompts_raw: [],
 };
 
 const AGENT_MANAGER_BUNDLE: Bundle = {
@@ -76,6 +84,7 @@ const AGENT_MANAGER_BUNDLE: Bundle = {
   org: READ,
   members: READ,
   invites: READ,
+  // No prompt access — operator persona, not investigator.
 };
 
 const POLICY_AUTHOR_BUNDLE: Bundle = {
@@ -107,6 +116,8 @@ const AUDITOR_BUNDLE: Bundle = {
   org: READ,
   members: READ,
   invites: READ,
+  // Auditor sees redacted prompts (investigative tool); raw stays owner-gated.
+  prompts: READ,
 };
 
 // Minimum-viable member: can read their own org metadata + see members list,

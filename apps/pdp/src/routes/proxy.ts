@@ -21,6 +21,7 @@ import {
   redactRequest,
   redactResponse,
   type SpanHandoff,
+  type SpanPromptInput,
   sha256Of,
   statusFromOutcome,
 } from '@auto-nomos/shared-types';
@@ -101,6 +102,18 @@ const ProxyRequestSchema = z.object({
         task: z.string().min(1).max(2048),
         expectedOutput: z.string().max(1024).optional(),
         rationale: z.string().max(1024).optional(),
+      })
+      .optional(),
+    /**
+     * P2 — LLM prompt + reasoning trace. PDP forwards plaintext over the
+     * TLS-protected internal channel; control-plane redacts and AEAD-
+     * encrypts before persisting. Capture is opt-in per customer + ToS-
+     * gated; when off, the field is silently dropped at the control-plane.
+     */
+    prompt: z
+      .object({
+        text: z.string().max(1_000_000),
+        reasoning: z.string().max(2_000_000).optional(),
       })
       .optional(),
   }),
@@ -202,6 +215,17 @@ export function createProxyRoutes(deps: ProxyRouteDeps): Hono {
             : {}),
         }
       : null;
+    // P2 — pass-through. PDP never inspects, hashes, or persists the
+    // prompt; it is forwarded as-is so the control-plane can decide
+    // capture eligibility (config flag + ToS + sample-rate) in one place.
+    const promptField: SpanPromptInput | null = parsedData.apiCall.prompt
+      ? {
+          text: parsedData.apiCall.prompt.text,
+          ...(parsedData.apiCall.prompt.reasoning !== undefined
+            ? { reasoning: parsedData.apiCall.prompt.reasoning }
+            : {}),
+        }
+      : null;
 
     /**
      * Build EmitSpanInput from the request + outcome. Receipts come from
@@ -241,6 +265,7 @@ export function createProxyRoutes(deps: ProxyRouteDeps): Hono {
         nextAgentHint: nextAgentHintField,
         intent: intentField,
         handoff: handoffField,
+        prompt: promptField,
       };
       try {
         void Promise.resolve(

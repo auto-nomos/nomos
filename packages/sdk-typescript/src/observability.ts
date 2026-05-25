@@ -53,3 +53,36 @@ export function recordHandoff<T extends ApiCallLike>(apiCall: T, handoff: SpanHa
     },
   };
 }
+
+/**
+ * Sprint MAOS-B / P2 — prompt + reasoning capture envelope.
+ *
+ * Caller ships the plaintext prompt over TLS. Control-plane gates capture
+ * on customer config + ToS + sample-rate, then redacts PII and AEAD-
+ * encrypts before insert. PDP forwards as-is; never inspects, never
+ * persists. Capture is OFF by default for every customer.
+ */
+export interface SpanPromptEnvelope {
+  text: string;
+  reasoning?: string;
+}
+
+/**
+ * Attach a prompt + (optional) reasoning blob to an outgoing apiCall body.
+ * Returns a new object — does not mutate. Caller-supplied `prompt` on the
+ * apiCall wins (no clobbering an explicit attachment).
+ *
+ * Use when the SDK wraps an LLM call and wants to capture the input that
+ * drove the tool decision. The control-plane decides whether to actually
+ * persist it; the SDK does not need to check config.
+ */
+export function attachPrompt<T extends ApiCallLike>(apiCall: T, prompt: SpanPromptEnvelope): T {
+  if ((apiCall as { prompt?: unknown }).prompt) return apiCall;
+  return {
+    ...apiCall,
+    prompt: {
+      text: prompt.text,
+      ...(prompt.reasoning !== undefined ? { reasoning: prompt.reasoning } : {}),
+    },
+  } as T;
+}

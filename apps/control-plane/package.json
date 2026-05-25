@@ -32,6 +32,7 @@
     "@auto-nomos/crypto": "workspace:*",
     "@auto-nomos/policy-builder": "workspace:*",
     "@auto-nomos/rbac": "workspace:*",
+    "@auto-nomos/redaction": "workspace:*",
     "@auto-nomos/schema-packs": "workspace:*",
     "@auto-nomos/shared-types": "workspace:*",
     "@auto-nomos/ucan": "workspace:*",

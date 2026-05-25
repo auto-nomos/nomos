@@ -1,6 +1,13 @@
 'use client';
 
-import { Activity, ArrowRightLeft, CheckCircle2, CircleSlash, ShieldAlert } from 'lucide-react';
+import {
+  Activity,
+  ArrowRightLeft,
+  CheckCircle2,
+  CircleSlash,
+  MessageSquareText,
+  ShieldAlert,
+} from 'lucide-react';
 import { fmtCount, MetricTile } from '../../../components/metric-tile';
 import { trpc } from '../../../lib/trpc';
 import { ActionGraph } from '../swarms/[id]/components/ActionGraph';
@@ -19,8 +26,13 @@ export default function MonitoringPage() {
     { windowHours: 24 },
     { refetchInterval: 15_000 },
   );
+  const promptCoverage = trpc.observability.promptCoverageSummary.useQuery(
+    { windowHours: 24 },
+    { refetchInterval: 15_000 },
+  );
   const s = summary.data;
   const h = handoffs.data;
+  const p = promptCoverage.data;
 
   return (
     <div className="mx-auto max-w-[1180px] space-y-8">
@@ -80,6 +92,17 @@ export default function MonitoringPage() {
             h && h.total > 0
               ? `${h.distinctTargets} target agent${h.distinctTargets === 1 ? '' : 's'}`
               : 'no handoffs declared'
+          }
+          accent="iris"
+        />
+        <MetricTile
+          icon={MessageSquareText}
+          label="Prompt coverage (24h)"
+          value={p ? `${p.coveragePct}%` : '—'}
+          unit={
+            p && p.totalSpans > 0
+              ? `${fmtCount(p.capturedSpans)} of ${fmtCount(p.totalSpans)} spans`
+              : 'no spans captured yet'
           }
           accent="iris"
         />

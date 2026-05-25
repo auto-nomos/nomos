@@ -19,6 +19,12 @@ import { ingestSpan, SpanIngestError } from '../services/spans.js';
 
 export interface SpansRouteDeps {
   db: Db;
+  /**
+   * P2 — AEAD key used to encrypt opt-in prompt + reasoning blobs. Same
+   * platform-default key as OAuth token-at-rest encryption today. When
+   * undefined, prompts are silently dropped (capture stays off).
+   */
+  encryptionKey?: Uint8Array;
 }
 
 export function createSpansRoutes(deps: SpansRouteDeps): Hono<{ Variables: ApiKeyAuthVariables }> {
@@ -42,7 +48,9 @@ export function createSpansRoutes(deps: SpansRouteDeps): Hono<{ Variables: ApiKe
     }
 
     try {
-      const result = await ingestSpan({ customerId, agentId, input: parsed.data }, deps.db);
+      const result = await ingestSpan({ customerId, agentId, input: parsed.data }, deps.db, {
+        ...(deps.encryptionKey ? { promptCaptureKey: deps.encryptionKey } : {}),
+      });
       log.info(
         {
           customerId,

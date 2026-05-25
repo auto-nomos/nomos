@@ -251,6 +251,7 @@ export function createInternalRoutes(deps: InternalDeps): Hono {
       const result = await ingestSpan(
         { customerId, agentId: agentRow.id, input: spanInput },
         deps.db,
+        { ...(deps.encryptionKey ? { promptCaptureKey: deps.encryptionKey } : {}) },
       );
       return c.json({
         spanId: result.spanId,

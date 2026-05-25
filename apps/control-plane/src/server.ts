@@ -173,7 +173,13 @@ export function createServer(deps: ServerDeps): Hono {
   // Observability v2 — MCP emits one span per tool call after the upstream
   // returns. Records outcome/latency/hashes + tiny redacted summary; never
   // raw bodies. Idempotent on (customer_id, receipt_id).
-  app.route('/', createSpansRoutes({ db: deps.db }));
+  app.route(
+    '/',
+    createSpansRoutes({
+      db: deps.db,
+      ...(deps.oauth?.encryptionKey ? { encryptionKey: deps.oauth.encryptionKey } : {}),
+    }),
+  );
 
   // SDK ↔ control-plane: dynamic per-request scope narrowing via the
   // Approval Envelope model. Mounted only when step-up is configured —

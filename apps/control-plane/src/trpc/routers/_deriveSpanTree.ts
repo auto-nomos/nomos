@@ -56,6 +56,12 @@ export interface DeriveSpanRow {
   // P3 — needed by the matching algorithm to populate HandoffMatch.declaredTask
   // without an extra round-trip to the spans table.
   handoffTask: string | null;
+  /**
+   * P2 — cheap presence flag derived from a LEFT JOIN against
+   * agent_span_prompts in the actionGraph SQL. UI uses it to show a
+   * Sparkles icon and gate the Prompt tab without leaking content.
+   */
+  hasPrompt: boolean;
 }
 
 export interface DeriveAgentRow {
@@ -187,6 +193,7 @@ export function deriveSpanTree(
       httpStatus: s.httpStatus,
       startedAt: s.startedAt,
       handoffToDid: s.handoffToDid,
+      hasPrompt: s.hasPrompt,
     };
   });
 

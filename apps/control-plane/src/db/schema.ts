@@ -1198,6 +1198,86 @@ export const agentSpans = pgTable(
   }),
 );
 
+// ===== P2: prompt + reasoning capture =====
+
+/**
+ * Encrypted-at-rest prompt + reasoning blobs for one agent span.
+ *
+ * Separate from `agent_spans` because blobs can be megabytes; keeping them
+ * out of the hot span table keeps `agent_spans` scans fast. PK = span_id
+ * with FK cascade so customer delete propagates correctly.
+ *
+ * Storage: ciphertext + nonce hex (XChaCha20-Poly1305). AAD on the seal
+ * binds `customer_id || span_id || prompt_aad_kind` so a DB-write attacker
+ * cannot swap ciphertexts between rows without triggering a decrypt failure.
+ *
+ * `kms_key_id` records which wrapping key was used. When `wrapped_dek_b64`
+ * is null, the platform master key sealed the row directly; when set, the
+ * row uses a per-row DEK wrapped by the customer's KMS key (enterprise tier).
+ *
+ * Redaction findings stored as a small jsonb so the UI can show "3 emails
+ * redacted" without leaking the redacted content.
+ */
+export const agentSpanPrompts = pgTable(
+  'agent_span_prompts',
+  {
+    spanId: uuid('span_id')
+      .primaryKey()
+      .references(() => agentSpans.id, { onDelete: 'cascade' }),
+    customerId: uuid('customer_id')
+      .notNull()
+      .references(() => customers.id, { onDelete: 'cascade' }),
+    promptCiphertextHex: text('prompt_ciphertext_hex').notNull(),
+    promptNonceHex: text('prompt_nonce_hex').notNull(),
+    promptAadKind: text('prompt_aad_kind').notNull().default('span_v1'),
+    reasoningCiphertextHex: text('reasoning_ciphertext_hex'),
+    reasoningNonceHex: text('reasoning_nonce_hex'),
+    /**
+     * Owner-only unredacted ciphertext for incident response. Same AEAD
+     * key + AAD as the redacted side; separate column so a SQL-level
+     * leak of the redacted table doesn't immediately reveal raw PII.
+     */
+    rawPromptCiphertextHex: text('raw_prompt_ciphertext_hex'),
+    rawPromptNonceHex: text('raw_prompt_nonce_hex'),
+    rawReasoningCiphertextHex: text('raw_reasoning_ciphertext_hex'),
+    rawReasoningNonceHex: text('raw_reasoning_nonce_hex'),
+    redactionFindings: jsonb('redaction_findings'),
+    kmsKeyId: text('kms_key_id').notNull(),
+    wrappedDekB64: text('wrapped_dek_b64'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    customerCreatedAtIdx: index('agent_span_prompts_customer_created_at_idx').on(
+      t.customerId,
+      t.createdAt,
+    ),
+  }),
+);
+
+/**
+ * Per-customer observability config — gates whether prompt + reasoning
+ * capture runs at all. Defaults are off; the row only exists once an admin
+ * has touched the settings page.
+ *
+ * `accepted_tos_version` is a hard gate: capture stays off when null, even
+ * if `prompt_capture_enabled = true`. ToS acceptance must be recorded by
+ * the same admin who flipped the toggle.
+ *
+ * `prompt_kms_key_arn` is the per-customer KMS reference. Null → platform
+ * default key. Customer-managed-key path is the enterprise tier.
+ */
+export const customerObservabilityConfig = pgTable('customer_observability_config', {
+  customerId: uuid('customer_id')
+    .primaryKey()
+    .references(() => customers.id, { onDelete: 'cascade' }),
+  promptCaptureEnabled: boolean('prompt_capture_enabled').notNull().default(false),
+  promptCaptureSampleRate: smallint('prompt_capture_sample_rate').notNull().default(100),
+  promptRetentionDays: smallint('prompt_retention_days').notNull().default(30),
+  promptKmsKeyArn: text('prompt_kms_key_arn'),
+  acceptedTosVersion: text('accepted_tos_version'),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 // ===== M0: OIDC issuer keys =====
 
 /**
