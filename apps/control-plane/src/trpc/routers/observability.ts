@@ -785,7 +785,7 @@ export const observabilityRouter = router({
           s.handoff_task,
           (asp.span_id IS NOT NULL) AS has_prompt
         FROM agent_spans s
-        LEFT JOIN audit_events ae ON ae.event_id::text = s.receipt_id
+        LEFT JOIN audit_events ae ON ae.receipt_id = s.receipt_id
         LEFT JOIN agent_span_prompts asp ON asp.span_id = s.id
         WHERE s.customer_id = ${ctx.customerId}
           AND s.created_at >= ${since}
