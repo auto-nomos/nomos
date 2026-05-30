@@ -11,7 +11,7 @@ Report privately via either channel:
 
 - **GitHub Private Vulnerability Reporting** — the preferred path: open the repository's
   **Security → Report a vulnerability** form
-  (https://github.com/varendra007/nomos/security/advisories/new).
+  (https://github.com/auto-nomos/nomos/security/advisories/new).
 - **Email** — `security@auto-nomos.com`. Encrypt with our PGP key if the details are sensitive
   (request the key in your first message).
 

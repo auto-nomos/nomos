@@ -40,7 +40,7 @@ calls so the agent never holds raw OAuth tokens.
 ```bash
 helm install pdp ./infrastructure/helm/cb-pdp \
   --namespace cb-pdp --create-namespace \
-  --set image.repository=ghcr.io/varendra007/cb-pdp \
+  --set image.repository=ghcr.io/auto-nomos/cb-pdp \
   --set image.tag=v0.1.0 \
   --set controlPlane.url=https://api.auto-nomos.com \
   --set secret.controlPlaneServiceToken="$CB_TOKEN" \
@@ -82,7 +82,7 @@ Use this when you don't run Docker. Builds the PDP server bundle plus
 its workspace dependencies — never the dashboard (it OOMs small VMs).
 
 ```bash
-git clone https://github.com/varendra007/nomos /opt/nomos/app
+git clone https://github.com/auto-nomos/nomos /opt/nomos/app
 cd /opt/nomos/app
 pnpm install --frozen-lockfile
 pnpm build:server     # builds control-plane + pdp + workspace deps
@@ -163,13 +163,13 @@ Every `pdp-v*` tag pushed to GHCR is signed with cosign keyless (Sigstore
 OIDC). Verify before deploy:
 
 ```bash
-cosign verify ghcr.io/varendra007/cb-pdp:v0.1.0 \
-  --certificate-identity-regexp 'https://github.com/varendra007/nomos/.github/workflows/release-pdp-image\.yml.*' \
+cosign verify ghcr.io/auto-nomos/cb-pdp:v0.1.0 \
+  --certificate-identity-regexp 'https://github.com/auto-nomos/nomos/.github/workflows/release-pdp-image\.yml.*' \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com
 ```
 
 The image build also publishes provenance + SBOM via buildx — inspect
-with `cosign download attestation ghcr.io/varendra007/cb-pdp:v0.1.0`.
+with `cosign download attestation ghcr.io/auto-nomos/cb-pdp:v0.1.0`.
 
 ---
 

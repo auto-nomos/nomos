@@ -5,8 +5,8 @@
  * from here, so a single string change propagates everywhere.
  */
 
-export const GITHUB_ORG_URL = 'https://github.com/varendra007';
-export const GITHUB_REPO_URL = 'https://github.com/varendra007/nomos';
+export const GITHUB_ORG_URL = 'https://github.com/auto-nomos';
+export const GITHUB_REPO_URL = 'https://github.com/auto-nomos/nomos';
 export const GITHUB_STAR_URL = `${GITHUB_REPO_URL}/stargazers`;
 export const GITHUB_DISCUSSIONS_URL = `${GITHUB_REPO_URL}/discussions`;
 export const GITHUB_RELEASES_URL = `${GITHUB_REPO_URL}/releases`;

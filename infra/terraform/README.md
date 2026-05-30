@@ -59,7 +59,7 @@ All three modules are versioned together at the repo level. Pin to a tag in your
 Terraform source URL:
 
 ```hcl
-source = "git::https://github.com/varendra007/agent-credential-broker.git//infra/terraform/azurerm-nomos-bootstrap?ref=v0.1.0"
+source = "git::https://github.com/auto-nomos/nomos.git//infra/terraform/azurerm-nomos-bootstrap?ref=v0.1.0"
 ```
 
 `main` is the working branch; tags are the supported pins.

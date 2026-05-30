@@ -59,9 +59,7 @@ export function Stepup() {
                       github.transfer_repo
                     </code>{' '}
                     on{' '}
-                    <code className="font-mono text-[12px] text-aegis-paper">
-                      varendra007/nomos
-                    </code>
+                    <code className="font-mono text-[12px] text-aegis-paper">auto-nomos/nomos</code>
                     . Once approved, this envelope covers the next 3 actions in the same intent.
                   </p>
                 </div>

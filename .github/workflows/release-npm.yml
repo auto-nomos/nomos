@@ -8,7 +8,7 @@ name: release npm
 # matches the trusted-publisher config on npmjs.com.
 #
 # **One-time setup per package**: npmjs.com → package → Settings →
-# Trusted Publishers → add GitHub Actions; repo=`varendra007/nomos`,
+# Trusted Publishers → add GitHub Actions; repo=`auto-nomos/nomos`,
 # workflow=`release-npm.yml`, environment=`npm-publish`.
 # Until that's set, the publish step returns ENEEDAUTH and the matrix
 # job fails loudly — by design.

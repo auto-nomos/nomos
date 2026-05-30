@@ -84,9 +84,9 @@ export default function EdgeSettingsPage() {
   const data = install.data;
 
   const helmCmd = data
-    ? `helm install pdp oci://ghcr.io/varendra007/charts/cb-pdp \\
+    ? `helm install pdp oci://ghcr.io/auto-nomos/charts/cb-pdp \\
   --namespace cb-pdp --create-namespace \\
-  --set image.repository=ghcr.io/varendra007/cb-pdp \\
+  --set image.repository=ghcr.io/auto-nomos/cb-pdp \\
   --set image.tag=v0.1.0 \\
   --set controlPlane.url=https://api.auto-nomos.com \\
   --set secret.controlPlaneServiceToken="<paste API key>" \\
@@ -165,7 +165,7 @@ AUDIT_LOG_PATH=/var/audit/pdp.log`
               <CardDescription>
                 Drop-in install. Opt in to ingress / HPA / NetworkPolicy / ServiceMonitor / PDB via{' '}
                 <Link
-                  href="https://github.com/varendra007/nomos/blob/main/infrastructure/helm/cb-pdp/values.yaml"
+                  href="https://github.com/auto-nomos/nomos/blob/main/infrastructure/helm/cb-pdp/values.yaml"
                   className="underline"
                   target="_blank"
                   rel="noreferrer"
@@ -204,8 +204,8 @@ AUDIT_LOG_PATH=/var/audit/pdp.log`
             </CardHeader>
             <CardContent>
               <CodeBlock
-                value={`cosign verify ghcr.io/varendra007/cb-pdp:v0.1.0 \\
-  --certificate-identity-regexp 'https://github.com/varendra007/nomos/.github/workflows/release-pdp-image\\.yml.*' \\
+                value={`cosign verify ghcr.io/auto-nomos/cb-pdp:v0.1.0 \\
+  --certificate-identity-regexp 'https://github.com/auto-nomos/nomos/.github/workflows/release-pdp-image\\.yml.*' \\
   --certificate-oidc-issuer https://token.actions.githubusercontent.com`}
               />
             </CardContent>
@@ -214,7 +214,7 @@ AUDIT_LOG_PATH=/var/audit/pdp.log`
           <p className="text-sm text-aegis-mute">
             Full walkthrough (three deploy modes, day-2 ops, troubleshooting):{' '}
             <Link
-              href="https://github.com/varendra007/nomos/blob/main/docs/SELF_HOSTING.md"
+              href="https://github.com/auto-nomos/nomos/blob/main/docs/SELF_HOSTING.md"
               className="underline"
               target="_blank"
               rel="noreferrer"

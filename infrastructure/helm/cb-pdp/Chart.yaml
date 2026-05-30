@@ -10,8 +10,8 @@ keywords:
   - cedar
   - ucan
   - policy-decision-point
-home: https://github.com/varendra007/nomos
+home: https://github.com/auto-nomos/nomos
 sources:
-  - https://github.com/varendra007/nomos
+  - https://github.com/auto-nomos/nomos
 maintainers:
   - name: credential-broker

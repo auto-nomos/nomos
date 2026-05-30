@@ -46,7 +46,7 @@ const guard = createAuthGuard({
 
 const decision = await guard.authorize({
   command: 'github.create_pr',
-  resource: 'varendra007/nomos',
+  resource: 'auto-nomos/nomos',
   payload: { title, body, head, base },
 });
 

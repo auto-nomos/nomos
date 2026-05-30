@@ -10,7 +10,7 @@
 
 set -euo pipefail
 
-REPO_URL="https://github.com/varendra007/nomos.git"
+REPO_URL="https://github.com/auto-nomos/nomos.git"
 APP_DIR="/opt/nomos/app"
 ENV_FILE="$APP_DIR/.env.local"
 SERVICE_USER="nomos"

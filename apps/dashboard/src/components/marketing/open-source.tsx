@@ -33,7 +33,7 @@ const INSTALL_LINES: { lang: string; cmd: string }[] = [
   { lang: 'MCP server', cmd: 'npm i -g @auto-nomos/mcp-server' },
   {
     lang: 'Self-host PDP (Helm)',
-    cmd: 'helm install pdp oci://ghcr.io/varendra007/charts/cb-pdp',
+    cmd: 'helm install pdp oci://ghcr.io/auto-nomos/charts/cb-pdp',
   },
 ];
 

@@ -31,7 +31,7 @@ the dashboard cloud connection.
 Clone the public bootstrap module:
 
 ```bash
-git clone https://github.com/varendra007/nomos-terraforms.git
+git clone https://github.com/auto-nomos/nomos-terraforms.git
 cd nomos-terraforms
 ```
 

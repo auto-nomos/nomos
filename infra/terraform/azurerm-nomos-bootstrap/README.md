@@ -20,7 +20,7 @@ against `management.azure.com`.
 
 ```hcl
 module "nomos" {
-  source = "git::https://github.com/varendra007/nomos-terraforms.git//azurerm-nomos-bootstrap?ref=main"
+  source = "git::https://github.com/auto-nomos/nomos-terraforms.git//azurerm-nomos-bootstrap?ref=main"
 
   customer_id     = "your-nomos-customer-uuid"          # from /app/settings/workspace
   subscription_id = "00000000-0000-0000-0000-000000000000"

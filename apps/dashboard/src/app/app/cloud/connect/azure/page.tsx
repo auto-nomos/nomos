@@ -70,7 +70,7 @@ provider "azurerm" {
 module "nomos_azure" {
   # Fetches the module directly from GitHub — no local clone needed.
   # Pin <SHA> to a specific commit for reproducible production deploys.
-  source = "git::https://github.com/varendra007/nomos-terraforms.git//azurerm-nomos-bootstrap?ref=main"
+  source = "git::https://github.com/auto-nomos/nomos-terraforms.git//azurerm-nomos-bootstrap?ref=main"
 
   customer_id     = "<your-nomos-customer-id>"  # from /app/settings/organization
   subscription_id = "${subscriptionId || '<subscription-id>'}"

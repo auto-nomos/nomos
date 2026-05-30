@@ -66,7 +66,7 @@ provider "aws" { region = "${region}" }
 module "nomos_aws" {
   # Local-path source (no public registry mirror yet). Copy the dir into your own infra repo:
   source = "../credential-broker/infra/terraform/aws-nomos-bootstrap"
-  # Pin for prod: source = "git::https://github.com/varendra007/nomos.git//infra/terraform/aws-nomos-bootstrap?ref=<SHA>"
+  # Pin for prod: source = "git::https://github.com/auto-nomos/nomos.git//infra/terraform/aws-nomos-bootstrap?ref=<SHA>"
 
   customer_id       = "<your-nomos-customer-id>"  # from /app/settings/organization
   region            = "${region}"

@@ -26,7 +26,7 @@ fetched per-request from the control plane.
 ```bash
 helm install pdp ./infrastructure/helm/cb-pdp \
   --namespace cb-pdp --create-namespace \
-  --set image.repository=ghcr.io/varendra007/cb-pdp \
+  --set image.repository=ghcr.io/auto-nomos/cb-pdp \
   --set image.tag=latest \
   --set controlPlane.url=https://api.credentialbroker.dev \
   --set secret.controlPlaneServiceToken=$CB_TOKEN \

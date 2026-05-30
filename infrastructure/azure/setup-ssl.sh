@@ -9,7 +9,7 @@
 #   - Port 80 + 443 open in the Azure NSG.
 #
 # Run on the VM (as root):
-#   curl -fsSL https://raw.githubusercontent.com/varendra007/nomos/main/infrastructure/azure/setup-ssl.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/auto-nomos/nomos/main/infrastructure/azure/setup-ssl.sh | bash
 
 set -euo pipefail
 

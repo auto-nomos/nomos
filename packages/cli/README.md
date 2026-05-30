@@ -118,4 +118,4 @@ Useful as a watch-window during demos.
 ## Docs
 
 Live docs: [docs.auto-nomos.com/connect/raw-mcp](https://app.auto-nomos.com/docs/connect/raw-mcp)
-Source: [github.com/varendra007/nomos](https://github.com/varendra007/nomos)
+Source: [github.com/auto-nomos/nomos](https://github.com/auto-nomos/nomos)

@@ -30,7 +30,7 @@ kind get clusters | grep -qx "$CLUSTER" || kind create cluster --name "$CLUSTER"
 echo "==> install chart (mock control-plane URL; pod will fail bundle fetch but /healthz still answers)"
 helm upgrade --install pdp "$CHART" \
   --namespace "$NS" --create-namespace \
-  --set image.repository=ghcr.io/varendra007/cb-pdp \
+  --set image.repository=ghcr.io/auto-nomos/cb-pdp \
   --set image.tag=latest \
   --set replicaCount=1 \
   --set controlPlane.url=http://invalid.local \

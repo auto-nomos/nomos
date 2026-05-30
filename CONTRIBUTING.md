@@ -4,7 +4,17 @@ Thanks for your interest in Nomos — the authorization layer for AI agents. Thi
 fresh clone to a green `pnpm verify` and a reviewable pull request.
 
 By contributing you agree that your contributions are licensed under the project's
-[Apache License 2.0](./LICENSE).
+[Apache License 2.0](./LICENSE), and to abide by our [Code of Conduct](./CODE_OF_CONDUCT.md).
+
+## Ways to contribute
+
+- **Report a bug or request a feature** — open an issue with the matching template.
+- **Add a provider** — adapters are YAML-first; see `packages/adapters/README.md`.
+- **Improve docs** — the `docs/` tree and per-package READMEs always need love.
+- **Fix code** — grab a [good first issue](https://github.com/auto-nomos/nomos/labels/good%20first%20issue) or open a PR.
+
+New to the codebase? `graphify-out/GRAPH_REPORT.md` is the fastest map of how the
+modules relate.
 
 ## Prerequisites
 
@@ -15,7 +25,7 @@ By contributing you agree that your contributions are licensed under the project
 ## Local setup
 
 ```bash
-git clone https://github.com/varendra007/nomos.git
+git clone https://github.com/auto-nomos/nomos.git
 cd nomos
 pnpm install
 
@@ -74,4 +84,4 @@ issue** — follow [SECURITY.md](./SECURITY.md).
 ## Questions
 
 Join the community on [Discord](https://discord.gg/cKkWQV7B) or start a
-[GitHub Discussion](https://github.com/varendra007/nomos/discussions).
+[GitHub Discussion](https://github.com/auto-nomos/nomos/discussions).

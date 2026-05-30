@@ -135,7 +135,7 @@ const JSON_LD = {
       url: SITE_URL,
       logo: `${SITE_URL}/icon`,
       sameAs: [
-        'https://github.com/varendra007/nomos',
+        'https://github.com/auto-nomos/nomos',
         'https://www.npmjs.com/org/auto-nomos',
         'https://twitter.com/autonomos',
       ],
@@ -158,7 +158,7 @@ const JSON_LD = {
       '@type': 'SoftwareSourceCode',
       '@id': `${SITE_URL}#source`,
       name: 'Nomos',
-      codeRepository: 'https://github.com/varendra007/nomos',
+      codeRepository: 'https://github.com/auto-nomos/nomos',
       programmingLanguage: ['TypeScript', 'Python'],
       runtimePlatform: 'Node.js',
       license: 'https://opensource.org/licenses/Apache-2.0',

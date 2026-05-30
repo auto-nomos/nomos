@@ -28,10 +28,10 @@ gitleaks detect --no-banner -c .gitleaks.toml --log-opts="--all"   # history cle
 
 Open the PR, get CI (`.github/workflows/ci.yml`) green, merge to `main`.
 
-> **Decision still needed:** keep the repo under `varendra007/nomos` (current
-> remote, all workflows + links assume it) or move to an `auto-nomos` org. Moving
-> changes the npm trusted-publisher config and every `github.com/varendra007/...`
-> reference. Recommended: keep `varendra007/nomos` for launch.
+> **Org:** the repo now lives at `auto-nomos/nomos`. The Terraform modules
+> are mirrored to `auto-nomos/nomos-terraforms` and the Python SDK source to
+> `auto-nomos/python-packages`. All workflows, npm trusted-publisher configs,
+> and `github.com/auto-nomos/...` links assume these three repos.
 
 ---
 
@@ -41,7 +41,7 @@ For **each** of the 13 published `@auto-nomos/*` packages on npmjs.com →
 package **Settings → Trusted Publishers → Add GitHub Actions**:
 
 ```
-Repository:  varendra007/nomos          # must match the merged repo name exactly
+Repository:  auto-nomos/nomos          # must match the merged repo name exactly
 Workflow:    release-npm.yml
 Environment: npm-publish
 ```
@@ -56,7 +56,7 @@ adapters, schema-packs, policy-builder, audit-verify, cli`.
 
 ## 2. VM deploy — control plane + PDP (♻️, ⏱ needs §0 merged)
 
-`deploy.sh` clones/pulls `https://github.com/varendra007/nomos.git` (fixed from
+`deploy.sh` clones/pulls `https://github.com/auto-nomos/nomos.git` (fixed from
 the old `agent-credential-broker` URL) into `/opt/nomos/app`.
 
 ```bash
@@ -170,8 +170,8 @@ Optional independent releases:
 Only after §0 merged + CI green + gitleaks history clean.
 
 ```bash
-gh repo edit varendra007/nomos --visibility public --accept-visibility-change-consequences
-gh repo edit varendra007/nomos-terraforms --visibility public --accept-visibility-change-consequences
+gh repo edit auto-nomos/nomos --visibility public --accept-visibility-change-consequences
+gh repo edit auto-nomos/nomos-terraforms --visibility public --accept-visibility-change-consequences
 ```
 
 > ⚠️ **Do not forget `nomos-terraforms`.** The self-host Terraform docs and the

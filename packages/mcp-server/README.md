@@ -175,4 +175,4 @@ immediately — useful for batch agents.
 ## Docs
 
 Live docs: [docs.auto-nomos.com](https://app.auto-nomos.com/docs)
-Source: [github.com/varendra007/nomos](https://github.com/varendra007/nomos)
+Source: [github.com/auto-nomos/nomos](https://github.com/auto-nomos/nomos)
