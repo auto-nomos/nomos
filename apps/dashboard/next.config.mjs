@@ -11,9 +11,7 @@ const nextConfig = {
     typedRoutes: false,
   },
   async redirects() {
-    return [
-      { source: '/icon.svg', destination: '/icon', permanent: false },
-    ];
+    return [{ source: '/icon.svg', destination: '/icon', permanent: false }];
   },
 };
 

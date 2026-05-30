@@ -11,10 +11,9 @@
  *   NOMOS_ORG_ID        customer/org uuid
  */
 
-export const CONTROL_PLANE = (process.env.CONTROL_PLANE_URL ?? 'https://api.auto-nomos.com').replace(
-  /\/+$/,
-  '',
-);
+export const CONTROL_PLANE = (
+  process.env.CONTROL_PLANE_URL ?? 'https://api.auto-nomos.com'
+).replace(/\/+$/, '');
 export const PDP = (process.env.PDP_URL ?? 'https://pdp.auto-nomos.com').replace(/\/+$/, '');
 
 export function req(name: string): string {
@@ -148,11 +147,13 @@ export async function setupAgent(args: {
   const policies = await t<Array<{ id: string; name: string }>>('policies.list', 'GET');
   const existing = policies.find((p) => p.name === policyName);
   const policyId = existing
-    ? (await t<{ id: string }>('policies.upsert', 'POST', {
-        id: existing.id,
-        name: policyName,
-        cedarText,
-      })).id
+    ? (
+        await t<{ id: string }>('policies.upsert', 'POST', {
+          id: existing.id,
+          name: policyName,
+          cedarText,
+        })
+      ).id
     : (await t<{ id: string }>('policies.upsert', 'POST', { name: policyName, cedarText })).id;
   await t('policies.assignAgents', 'POST', { policyId, agentIds: [agentId] });
 
@@ -311,12 +312,14 @@ export async function pollStepupApproval(args: {
     try {
       res = await fetch(url, { headers });
     } catch (err) {
-      if (process.env.NOMOS_STEPUP_TRACE) console.log(`  [poll ${pollCount}] fetch err: ${(err as Error).message}`);
+      if (process.env.NOMOS_STEPUP_TRACE)
+        console.log(`  [poll ${pollCount}] fetch err: ${(err as Error).message}`);
       await new Promise((r) => setTimeout(r, pollIntervalMs));
       continue;
     }
     if (res.status === 404) {
-      if (process.env.NOMOS_STEPUP_TRACE) console.log(`  [poll ${pollCount}] 404 — approval not visible to PDP yet, retrying`);
+      if (process.env.NOMOS_STEPUP_TRACE)
+        console.log(`  [poll ${pollCount}] 404 — approval not visible to PDP yet, retrying`);
       await new Promise((r) => setTimeout(r, pollIntervalMs));
       continue;
     }

@@ -104,11 +104,7 @@ function trpcHeaders(): Record<string, string> {
   };
 }
 
-async function trpc<T = unknown>(
-  path: string,
-  method: 'GET' | 'POST',
-  body?: unknown,
-): Promise<T> {
+async function trpc<T = unknown>(path: string, method: 'GET' | 'POST', body?: unknown): Promise<T> {
   const inputPayload =
     body === undefined
       ? { 0: { json: null, meta: { values: ['undefined'] } } }
@@ -304,7 +300,9 @@ interface ActionResult {
 
 const results: ActionResult[] = [];
 
-async function probeSchemaRecognised(command: string): Promise<{ recognised: boolean; reason?: string }> {
+async function probeSchemaRecognised(
+  command: string,
+): Promise<{ recognised: boolean; reason?: string }> {
   // Unauthenticated PDP authorize with malformed UCAN. If reason is
   // `unknown_command` → schema-packs and PDP disagree.
   const res = await fetch(`${PDP}/v1/authorize`, {
@@ -328,11 +326,10 @@ async function setupAgentAndKey(): Promise<{ agentId: string; apiKey: string; po
   );
   let agent = agents.find((a) => a.name === AGENT_NAME);
   if (!agent) {
-    agent = await trpc<{ id: string; name: string; status: string }>(
-      'agents.create',
-      'POST',
-      { name: AGENT_NAME, requireApproval: false },
-    );
+    agent = await trpc<{ id: string; name: string; status: string }>('agents.create', 'POST', {
+      name: AGENT_NAME,
+      requireApproval: false,
+    });
     console.log(`  created agent ${agent.id}`);
   } else if (agent.status !== 'active') {
     await trpc('agents.update', 'POST', { id: agent.id, status: 'active' });
@@ -361,11 +358,13 @@ permit (
   const policies = await trpc<Array<{ id: string; name: string }>>('policies.list', 'GET');
   const existing = policies.find((p) => p.name === POLICY_NAME);
   const policyId = existing
-    ? (await trpc<{ id: string }>('policies.upsert', 'POST', {
-        id: existing.id,
-        name: POLICY_NAME,
-        cedarText,
-      })).id
+    ? (
+        await trpc<{ id: string }>('policies.upsert', 'POST', {
+          id: existing.id,
+          name: POLICY_NAME,
+          cedarText,
+        })
+      ).id
     : (await trpc<{ id: string }>('policies.upsert', 'POST', { name: POLICY_NAME, cedarText })).id;
   await trpc('policies.assignAgents', 'POST', { policyId, agentIds: [agentId] });
   console.log(`  policy ${policyId} assigned`);
@@ -413,7 +412,10 @@ async function mintBatch(apiKey: string, commands: string[]): Promise<MintedUcan
   return body.ucans;
 }
 
-async function callProxy(command: string, ucan: string): Promise<{ status: number; body: unknown }> {
+async function callProxy(
+  command: string,
+  ucan: string,
+): Promise<{ status: number; body: unknown }> {
   const probe = armProbes[command];
   const cls = classifyCommand(command);
   // For destructive/write actions without a probe, we still need an apiCall
@@ -426,11 +428,7 @@ async function callProxy(command: string, ucan: string): Promise<{ status: numbe
   // of verb token), everything else POST.
   const inDestructive = (DESTRUCTIVE as readonly string[]).includes(command);
   const inData = (DATA as readonly string[]).includes(command);
-  const method = inDestructive
-    ? 'DELETE'
-    : cls === 'read'
-      ? 'GET'
-      : 'POST';
+  const method = inDestructive ? 'DELETE' : cls === 'read' ? 'GET' : 'POST';
   void inData;
   const apiCall = probe
     ? { method: 'GET' as const, path: probe.path, query: probe.query }
@@ -466,7 +464,12 @@ function interpretProxyBody(
   body: unknown,
 ): Pick<
   ActionResult,
-  'decisionAllow' | 'decisionReason' | 'cosignerBlocked' | 'upstreamStatus' | 'upstreamSuccess' | 'notes'
+  | 'decisionAllow'
+  | 'decisionReason'
+  | 'cosignerBlocked'
+  | 'upstreamStatus'
+  | 'upstreamSuccess'
+  | 'notes'
 > {
   const b = body as {
     decision?: { allow?: boolean; reason?: string };
@@ -479,7 +482,9 @@ function interpretProxyBody(
   };
   const decisionAllow = b.decision?.allow ?? b.allow ?? null;
   const decisionReason = b.decision?.reason;
-  const cosignerBlocked = b.error_code === 'cosigner_required' || decisionReason === 'destructive_cloud_action_requires_cosigner';
+  const cosignerBlocked =
+    b.error_code === 'cosigner_required' ||
+    decisionReason === 'destructive_cloud_action_requires_cosigner';
   const upstreamStatus = b.upstream?.status ?? b.providerStatus ?? null;
   const upstreamSuccess = upstreamStatus !== null && upstreamStatus >= 200 && upstreamStatus < 300;
   let notes = '';
@@ -593,9 +598,8 @@ async function main(): Promise<void> {
     schemaRecognised: results.filter((r) => r.schemaRecognised).length,
     mintOk: results.filter((r) => r.mintOk).length,
     armSuccess: results.filter((r) => r.upstreamSuccess).length,
-    brokerForwarded: results.filter(
-      (r) => r.decisionAllow === true && r.upstreamStatus !== null,
-    ).length,
+    brokerForwarded: results.filter((r) => r.decisionAllow === true && r.upstreamStatus !== null)
+      .length,
     cosignerBlocked: results.filter((r) => r.cosignerBlocked).length,
     schemaViolation: results.filter((r) => r.notes.startsWith('schema_violation')).length,
     pdpDeny: results.filter((r) => r.notes.startsWith('PDP deny')).length,
@@ -657,9 +661,13 @@ function renderMarkdown(
   lines.push(`| Total actions registered | ${stats.total} |`);
   lines.push(`| Recognised by PDP | ${stats.schemaRecognised} |`);
   lines.push(`| UCAN minted successfully | ${stats.mintOk} |`);
-  lines.push(`| Broker forwarded to ARM (Cedar allowed, federation handshake completed) | ${stats.brokerForwarded} |`);
+  lines.push(
+    `| Broker forwarded to ARM (Cedar allowed, federation handshake completed) | ${stats.brokerForwarded} |`,
+  );
   lines.push(`| └─ ARM 2xx | ${stats.armSuccess} |`);
-  lines.push(`| └─ ARM 4xx (Reader role limit or resource absent — broker did its job) | ${stats.brokerForwarded - stats.armSuccess} |`);
+  lines.push(
+    `| └─ ARM 4xx (Reader role limit or resource absent — broker did its job) | ${stats.brokerForwarded - stats.armSuccess} |`,
+  );
   lines.push(`| Cosigner-gated by risk rules | ${stats.cosignerBlocked} |`);
   lines.push(`| Schema violation (rejected pre-Cedar) | ${stats.schemaViolation} |`);
   lines.push(`| PDP deny (Cedar-level) | ${stats.pdpDeny} |`);

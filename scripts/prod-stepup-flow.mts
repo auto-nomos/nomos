@@ -66,11 +66,7 @@ function trpcHeaders(): Record<string, string> {
   };
 }
 
-async function trpc<T = unknown>(
-  path: string,
-  method: 'GET' | 'POST',
-  body?: unknown,
-): Promise<T> {
+async function trpc<T = unknown>(path: string, method: 'GET' | 'POST', body?: unknown): Promise<T> {
   const inputPayload =
     body === undefined
       ? { 0: { json: null, meta: { values: ['undefined'] } } }
@@ -139,11 +135,13 @@ async function setup(): Promise<{ agentId: string; apiKey: string; policyId: str
   const policies = await trpc<Array<{ id: string; name: string }>>('policies.list', 'GET');
   const existing = policies.find((p) => p.name === POLICY_NAME);
   const policyId = existing
-    ? (await trpc<{ id: string }>('policies.upsert', 'POST', {
-        id: existing.id,
-        name: POLICY_NAME,
-        cedarText,
-      })).id
+    ? (
+        await trpc<{ id: string }>('policies.upsert', 'POST', {
+          id: existing.id,
+          name: POLICY_NAME,
+          cedarText,
+        })
+      ).id
     : (await trpc<{ id: string }>('policies.upsert', 'POST', { name: POLICY_NAME, cedarText })).id;
   await trpc('policies.assignAgents', 'POST', { policyId, agentIds: [agentId] });
   console.log(`  policy ${policyId} assigned`);
@@ -235,10 +233,7 @@ async function caseStepupCreated(ctx: {
   }
   pass('intent: stepUpUrl points at /approve/', r.stepUpUrl);
 
-  const pending = await trpc<Array<{ id: string; command: string }>>(
-    'stepup.listPending',
-    'GET',
-  );
+  const pending = await trpc<Array<{ id: string; command: string }>>('stepup.listPending', 'GET');
   const found = pending.find((p) => p.id === r.stepUpId);
   if (found) {
     pass('intent: shows up in stepup.listPending', `command=${found.command}`);
@@ -279,10 +274,7 @@ async function caseStepupDeny(ctx: { stepUpId: string }): Promise<void> {
   }
 }
 
-async function caseRetryAfterDeny(ctx: {
-  agentId: string;
-  apiKey: string;
-}): Promise<void> {
+async function caseRetryAfterDeny(ctx: { agentId: string; apiKey: string }): Promise<void> {
   console.log('--- 3. retry-after-deny still gates ---');
   let r: IntentResponse;
   try {
@@ -292,7 +284,10 @@ async function caseRetryAfterDeny(ctx: {
     return;
   }
   if (r.kind === 'stepup') {
-    pass('retry: still kind=stepup (deny didn\'t auto-allow)', `new stepUpId=${r.stepUpId.slice(0, 12)}...`);
+    pass(
+      "retry: still kind=stepup (deny didn't auto-allow)",
+      `new stepUpId=${r.stepUpId.slice(0, 12)}...`,
+    );
     // Clean up the new pending row so the dashboard doesn't accumulate cruft.
     try {
       await trpc('stepup.deny', 'POST', { approvalId: r.stepUpId, reason: 'e2e-cleanup' });
@@ -349,7 +344,10 @@ async function caseCosignerStaticPath(ctx: { apiKey: string }): Promise<void> {
   if (res.status === 403 && body.error_code === 'cosigner_required') {
     pass('cosigner: 403 cosigner_required', body.decision?.reason ?? '?');
   } else {
-    fail('cosigner: expected 403 cosigner_required', `status=${res.status} body=${JSON.stringify(body).slice(0, 200)}`);
+    fail(
+      'cosigner: expected 403 cosigner_required',
+      `status=${res.status} body=${JSON.stringify(body).slice(0, 200)}`,
+    );
   }
 }
 

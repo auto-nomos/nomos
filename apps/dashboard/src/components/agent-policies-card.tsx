@@ -5,14 +5,7 @@ import { trpc } from '../lib/trpc';
 import { formatDate } from '../lib/utils';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from './ui/card';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from './ui/card';
 import {
   Dialog,
   DialogContent,
@@ -96,9 +89,7 @@ export function AgentPoliciesCard({ agentId }: Props) {
                     <Button
                       size="sm"
                       variant="ghost"
-                      onClick={() =>
-                        unassign.mutate({ agentId, policyId: row.policyId })
-                      }
+                      onClick={() => unassign.mutate({ agentId, policyId: row.policyId })}
                       disabled={unassign.isPending}
                     >
                       Remove
@@ -171,9 +162,7 @@ export function AgentPoliciesCard({ agentId }: Props) {
               Cancel
             </Button>
             <Button
-              onClick={() =>
-                assign.mutate({ agentId, policyIds: Array.from(selected) })
-              }
+              onClick={() => assign.mutate({ agentId, policyIds: Array.from(selected) })}
               disabled={assign.isPending || selected.size === 0}
             >
               {assign.isPending ? 'Mapping…' : `Map ${selected.size || ''}`}

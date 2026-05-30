@@ -27,21 +27,21 @@
  * Run:
  *   DATABASE_URL='postgres://...' pnpm tsx scripts/audit-content-update-smuggle.mts
  */
-import { loadAllAdapters, type Action } from '@auto-nomos/adapters';
+import { type Action, loadAllAdapters } from '@auto-nomos/adapters';
+import { actionToCommand as filesystemMap } from '@auto-nomos/schema-packs/filesystem';
 import { actionToCommand as githubMap } from '@auto-nomos/schema-packs/github';
-import { actionToCommand as slackMap } from '@auto-nomos/schema-packs/slack';
-import { actionToCommand as notionMap } from '@auto-nomos/schema-packs/notion';
-import { actionToCommand as linearMap } from '@auto-nomos/schema-packs/linear';
-import { actionToCommand as stripeMap } from '@auto-nomos/schema-packs/stripe';
 import { actionToCommand as googleMap } from '@auto-nomos/schema-packs/google';
 import { actionToCommand as googleCalendarMap } from '@auto-nomos/schema-packs/google_calendar';
-import { actionToCommand as googleGmailMap } from '@auto-nomos/schema-packs/google_gmail';
+import { actionToCommand as googleContactsMap } from '@auto-nomos/schema-packs/google_contacts';
 import { actionToCommand as googleDocsMap } from '@auto-nomos/schema-packs/google_docs';
+import { actionToCommand as googleGmailMap } from '@auto-nomos/schema-packs/google_gmail';
 import { actionToCommand as googleSheetsMap } from '@auto-nomos/schema-packs/google_sheets';
 import { actionToCommand as googleTasksMap } from '@auto-nomos/schema-packs/google_tasks';
-import { actionToCommand as googleContactsMap } from '@auto-nomos/schema-packs/google_contacts';
-import { actionToCommand as filesystemMap } from '@auto-nomos/schema-packs/filesystem';
+import { actionToCommand as linearMap } from '@auto-nomos/schema-packs/linear';
+import { actionToCommand as notionMap } from '@auto-nomos/schema-packs/notion';
+import { actionToCommand as slackMap } from '@auto-nomos/schema-packs/slack';
 import { actionToCommand as sshMap } from '@auto-nomos/schema-packs/ssh';
+import { actionToCommand as stripeMap } from '@auto-nomos/schema-packs/stripe';
 import pg from 'pg';
 
 const PACK_TO_ADAPTER: Array<[string, Record<string, string>]> = [

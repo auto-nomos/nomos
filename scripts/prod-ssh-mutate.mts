@@ -36,11 +36,11 @@
  */
 import {
   CONTROL_PLANE,
-  PDP,
-  Results,
   mintIntentUcan,
   mintIntentWithApproval,
+  PDP,
   pdpProxy,
+  Results,
   req,
   setAgentMode,
   setupAgent,
@@ -132,9 +132,7 @@ async function mintCovered(
     purpose: `prod-ssh-mutate ${command}`,
   });
   if (res.kind !== 'mint' || !res.ucan) {
-    throw new Error(
-      `intent ${command} not covered (kind=${res.kind}). approve via passkey first.`,
-    );
+    throw new Error(`intent ${command} not covered (kind=${res.kind}). approve via passkey first.`);
   }
   return res.ucan;
 }
@@ -151,12 +149,7 @@ async function bootstrapEnvelope(apiKey: string, agentId: string): Promise<boole
       apiKey,
       agentId,
       command: ACTIONS.createDir,
-      envelopeActions: [
-        ACTIONS.createDir,
-        ACTIONS.write,
-        ACTIONS.read,
-        ACTIONS.list,
-      ],
+      envelopeActions: [ACTIONS.createDir, ACTIONS.write, ACTIONS.read, ACTIONS.list],
       constraint: sshConstraint(SANDBOX_PARENT),
       ttlSeconds: 600,
       purpose: 'prod-ssh-mutate harness bootstrap',
@@ -353,9 +346,7 @@ async function main(): Promise<void> {
 
   console.log('');
   console.log(`leftover on ${TARGET_HOST}: ${SANDBOX}`);
-  console.log(
-    `manual cleanup: ssh ${TARGET_USER}@${TARGET_HOST} 'rm -rf ${SANDBOX}'`,
-  );
+  console.log(`manual cleanup: ssh ${TARGET_USER}@${TARGET_HOST} 'rm -rf ${SANDBOX}'`);
 
   results.exit();
 }

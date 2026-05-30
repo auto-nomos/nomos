@@ -20,7 +20,7 @@
  * is still required so JWKS can publish the matching public key — derive
  * it with `aws kms get-public-key`. Dev path = this script.
  */
-import { generateKeyPairSync, createPublicKey } from 'node:crypto';
+import { createPublicKey, generateKeyPairSync } from 'node:crypto';
 
 function isoToday(): string {
   return new Date().toISOString().slice(0, 10);
@@ -49,7 +49,10 @@ function parseArgs(argv: string[]): { kid: string } {
   return { kid };
 }
 
-function generate(kid: string): { pem: string; jwk: { kid: string; kty: 'RSA'; n: string; e: string; alg: 'RS256'; use: 'sig' } } {
+function generate(kid: string): {
+  pem: string;
+  jwk: { kid: string; kty: 'RSA'; n: string; e: string; alg: 'RS256'; use: 'sig' };
+} {
   const { privateKey, publicKey } = generateKeyPairSync('rsa', {
     modulusLength: 2048,
     publicKeyEncoding: { type: 'spki', format: 'pem' },
@@ -58,9 +61,15 @@ function generate(kid: string): { pem: string; jwk: { kid: string; kty: 'RSA'; n
   void publicKey;
 
   // node's `KeyObject.export({ format: 'jwk' })` gives us n, e in base64url.
-  const jwkRaw = createPublicKey(privateKey).export({ format: 'jwk' }) as { kty: string; n: string; e: string };
+  const jwkRaw = createPublicKey(privateKey).export({ format: 'jwk' }) as {
+    kty: string;
+    n: string;
+    e: string;
+  };
   if (jwkRaw.kty !== 'RSA' || !jwkRaw.n || !jwkRaw.e) {
-    throw new Error('node failed to emit RSA JWK; this should not happen on supported node versions');
+    throw new Error(
+      'node failed to emit RSA JWK; this should not happen on supported node versions',
+    );
   }
 
   return {

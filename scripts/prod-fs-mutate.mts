@@ -34,11 +34,11 @@
 import * as path from 'node:path';
 import {
   CONTROL_PLANE,
-  PDP,
-  Results,
   mintIntentUcan,
   mintIntentWithApproval,
+  PDP,
   pdpProxy,
+  Results,
   req,
   setAgentMode,
   setupAgent,
@@ -112,9 +112,7 @@ async function mintCovered(
     purpose: `prod-fs-mutate ${command}`,
   });
   if (res.kind !== 'mint' || !res.ucan) {
-    throw new Error(
-      `intent ${command} not covered (kind=${res.kind}). approve via passkey first.`,
-    );
+    throw new Error(`intent ${command} not covered (kind=${res.kind}). approve via passkey first.`);
   }
   return res.ucan;
 }
@@ -134,13 +132,7 @@ async function bootstrapEnvelope(apiKey: string, agentId: string): Promise<boole
       // All actions that the envelope must cover for the harness to
       // silent-mint the rest. Step-up classifier doesn't include 'list'
       // in HIGH_RISK_VERBS so we omit it (reads silent-mint anyway).
-      envelopeActions: [
-        ACTIONS.createDir,
-        ACTIONS.write,
-        ACTIONS.read,
-        ACTIONS.copy,
-        ACTIONS.list,
-      ],
+      envelopeActions: [ACTIONS.createDir, ACTIONS.write, ACTIONS.read, ACTIONS.copy, ACTIONS.list],
       constraint: { provider: 'filesystem', path_prefix: SANDBOX_PARENT },
       ttlSeconds: 600,
       purpose: 'prod-fs-mutate harness bootstrap',
@@ -253,10 +245,7 @@ async function caseCopyParity(apiKey: string, agentId: string): Promise<void> {
     if (ls.status === 200 && names.includes('probe.txt') && names.includes('probe-copy.txt')) {
       results.pass('copy-parity: copy + list', `entries=[${names.join(',')}]`);
     } else {
-      results.fail(
-        'copy-parity: copy + list',
-        `status=${ls.status} entries=${names.join(',')}`,
-      );
+      results.fail('copy-parity: copy + list', `status=${ls.status} entries=${names.join(',')}`);
     }
   } catch (err) {
     results.fail('copy-parity', (err as Error).message);

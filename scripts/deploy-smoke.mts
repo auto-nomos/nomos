@@ -29,9 +29,10 @@
  */
 
 const PDP_URL = (process.env.PDP_URL ?? 'https://pdp.auto-nomos.com').replace(/\/+$/, '');
-const CONTROL_PLANE_URL = (
-  process.env.CONTROL_PLANE_URL ?? 'https://api.auto-nomos.com'
-).replace(/\/+$/, '');
+const CONTROL_PLANE_URL = (process.env.CONTROL_PLANE_URL ?? 'https://api.auto-nomos.com').replace(
+  /\/+$/,
+  '',
+);
 const CUSTOMER_ID = process.env.SMOKE_CUSTOMER_ID ?? '00000000-0000-0000-0000-000000000000';
 
 interface CheckResult {
@@ -110,13 +111,21 @@ async function checkAuthorizeShape(): Promise<void> {
     return;
   }
   // Must be 200 (decision shape) — a 4xx leaks as pdp_invalid_response.
-  record('authorize: 200 (not 4xx) on unknown customer', res.status === 200, `status=${res.status}`);
+  record(
+    'authorize: 200 (not 4xx) on unknown customer',
+    res.status === 200,
+    `status=${res.status}`,
+  );
   const body = await getJson(res);
   if (!body) {
     record('authorize: body is JSON', false);
     return;
   }
-  record('authorize: AuthorizeDecision shape (allow + receiptId)', isAuthorizeDecision(body), JSON.stringify(body));
+  record(
+    'authorize: AuthorizeDecision shape (allow + receiptId)',
+    isAuthorizeDecision(body),
+    JSON.stringify(body),
+  );
   if (typeof body.allow === 'boolean') {
     record('authorize: allow === false', body.allow === false);
   }
@@ -148,16 +157,28 @@ async function checkProxyShape(): Promise<void> {
     record('proxy: reachable', false, (err as Error).message);
     return;
   }
-  record('proxy: status 200 or 403 (not 4xx error envelope)', res.status === 200 || res.status === 403, `status=${res.status}`);
+  record(
+    'proxy: status 200 or 403 (not 4xx error envelope)',
+    res.status === 200 || res.status === 403,
+    `status=${res.status}`,
+  );
   const body = await getJson(res);
   if (!body) {
     record('proxy: body is JSON', false);
     return;
   }
   const decision = body.decision;
-  record('proxy: body.decision present', typeof decision === 'object' && decision !== null, JSON.stringify(body));
+  record(
+    'proxy: body.decision present',
+    typeof decision === 'object' && decision !== null,
+    JSON.stringify(body),
+  );
   if (typeof decision === 'object' && decision !== null) {
-    record('proxy: decision is AuthorizeDecision', isAuthorizeDecision(decision), JSON.stringify(decision));
+    record(
+      'proxy: decision is AuthorizeDecision',
+      isAuthorizeDecision(decision),
+      JSON.stringify(decision),
+    );
   }
 }
 

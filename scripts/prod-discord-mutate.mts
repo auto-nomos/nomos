@@ -34,11 +34,11 @@
  */
 import {
   CONTROL_PLANE,
-  PDP,
-  Results,
   mintIntentWithApproval,
   mintStaticUcan,
+  PDP,
   pdpProxy,
+  Results,
   req,
   setAgentMode,
   setupAgent,
@@ -108,10 +108,18 @@ async function listChannels(apiKey: string): Promise<void> {
     resource: { guild_id: GUILD_ID },
     apiCall: { method: 'GET', path: `/guilds/${GUILD_ID}/channels` },
   });
-  if (res.status === 200 && Array.isArray((res.body as { decision?: { upstream?: unknown } })?.decision?.upstream ?? res.body)) {
+  if (
+    res.status === 200 &&
+    Array.isArray(
+      (res.body as { decision?: { upstream?: unknown } })?.decision?.upstream ?? res.body,
+    )
+  ) {
     results.pass('list_channels');
   } else {
-    results.fail('list_channels', `status=${res.status} body=${JSON.stringify(res.body).slice(0, 200)}`);
+    results.fail(
+      'list_channels',
+      `status=${res.status} body=${JSON.stringify(res.body).slice(0, 200)}`,
+    );
   }
 }
 
@@ -151,7 +159,10 @@ async function createChannel(apiKey: string, agentId: string): Promise<void> {
     CREATED_CHANNEL_ID = upstream.id;
     results.pass('create_channel', `id=${upstream.id} name=${channelName}`);
   } else {
-    results.fail('create_channel', `status=${res.status} body=${JSON.stringify(res.body).slice(0, 300)}`);
+    results.fail(
+      'create_channel',
+      `status=${res.status} body=${JSON.stringify(res.body).slice(0, 300)}`,
+    );
   }
 }
 
@@ -193,7 +204,10 @@ async function postMessage(apiKey: string, agentId: string): Promise<void> {
     POSTED_MESSAGE_ID = upstream.id;
     results.pass('post_message', `id=${upstream.id}`);
   } else {
-    results.fail('post_message', `status=${res.status} body=${JSON.stringify(res.body).slice(0, 300)}`);
+    results.fail(
+      'post_message',
+      `status=${res.status} body=${JSON.stringify(res.body).slice(0, 300)}`,
+    );
   }
 }
 
@@ -299,9 +313,13 @@ async function verifyAudit(): Promise<void> {
       results.fail('audit_chain', `trpc audit.list ${res.status}`);
       return;
     }
-    const arr = (await res.json()) as Array<{ result?: { data?: { json?: Array<{ command?: string }> } } }>;
+    const arr = (await res.json()) as Array<{
+      result?: { data?: { json?: Array<{ command?: string }> } };
+    }>;
     const events = arr[0]?.result?.data?.json ?? [];
-    const discordEvents = events.filter((e) => typeof e.command === 'string' && e.command.startsWith('/discord/'));
+    const discordEvents = events.filter(
+      (e) => typeof e.command === 'string' && e.command.startsWith('/discord/'),
+    );
     if (discordEvents.length >= 4) {
       results.pass('audit_chain', `${discordEvents.length} /discord/* events in last 30m`);
     } else {
@@ -328,7 +346,9 @@ async function main(): Promise<void> {
     if (CREATED_CHANNEL_ID) {
       console.log('');
       console.log(`!!! cleanup needed — channel ${CREATED_CHANNEL_ID} was not deleted.`);
-      console.log(`    delete manually at https://discord.com/channels/${GUILD_ID}/${CREATED_CHANNEL_ID}`);
+      console.log(
+        `    delete manually at https://discord.com/channels/${GUILD_ID}/${CREATED_CHANNEL_ID}`,
+      );
     }
   }
   results.exit();
