@@ -1,7 +1,7 @@
 {
   "name": "@auto-nomos/policy-builder",
   "version": "0.0.2",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "private": false,
   "type": "module",
   "main": "./dist/index.js",

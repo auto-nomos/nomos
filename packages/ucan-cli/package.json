@@ -1,8 +1,8 @@
 {
   "name": "@auto-nomos/ucan-cli",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "private": false,
-  "license": "MIT",
+  "license": "Apache-2.0",
   "type": "module",
   "bin": {
     "nomos-ucan": "./dist/cli.js"

@@ -1,9 +1,9 @@
 {
   "name": "@auto-nomos/mcp-server",
-  "version": "0.0.20",
+  "version": "0.0.21",
   "private": false,
   "description": "Distributable MCP server backed by Credential Broker. Wire into Claude Desktop / Cursor; the OAuth tokens stay on the PDP.",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "homepage": "https://github.com/auto-nomos/nomos/tree/main/packages/mcp-server#readme",
   "bugs": {
     "url": "https://github.com/auto-nomos/nomos/issues"

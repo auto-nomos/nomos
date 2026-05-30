@@ -14,6 +14,12 @@ useDefault = true
 
 [allowlist]
 description = "Marketing demos + test fixtures intentionally containing token shapes"
+# did:key values are W3C-method PUBLIC keys (base58 multibase). They are public
+# identifiers by definition, never secrets — but their base58 shape trips the
+# generic-api-key rule. Allowlist the whole class so fixtures using DIDs are clean.
+regexes = [
+  '''did:key:z[1-9A-HJ-NP-Za-km-z]{20,}''',
+]
 paths = [
   '''apps/dashboard/src/components/marketing/mistake\.tsx''',
   '''apps/dashboard/src/app/security/page\.tsx''',
@@ -21,4 +27,6 @@ paths = [
   '''apps/pdp/src/__tests__/sanitize-response\.test\.ts''',
   '''apps/control-plane/src/__tests__/.*\.test\.ts''',
   '''packages/.*/src/__tests__/.*\.test\.ts''',
+  # Broaden to any nested __tests__ under apps/ (e.g. apps/pdp/src/audit/__tests__).
+  '''apps/.*/__tests__/.*\.test\.ts''',
 ]

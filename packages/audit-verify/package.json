@@ -1,8 +1,8 @@
 {
   "name": "@auto-nomos/audit-verify",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "private": false,
-  "license": "MIT",
+  "license": "Apache-2.0",
   "homepage": "https://github.com/auto-nomos/nomos/tree/main/packages/audit-verify#readme",
   "bugs": {
     "url": "https://github.com/auto-nomos/nomos/issues"

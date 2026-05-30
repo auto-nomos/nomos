@@ -68,7 +68,7 @@ provider "google" {
 module "nomos_gcp" {
   # Local-path source (no public registry mirror yet). Copy the dir into your own infra repo:
   source = "../credential-broker/infra/terraform/google-nomos-bootstrap"
-  # Pin for prod: source = "git::https://github.com/varendra007/agent-credential-broker.git//infra/terraform/google-nomos-bootstrap?ref=<SHA>"
+  # Pin for prod: source = "git::https://github.com/varendra007/nomos.git//infra/terraform/google-nomos-bootstrap?ref=<SHA>"
 
   customer_id       = "<your-nomos-customer-id>"  # from /app/settings/organization
   project_id        = "${projectId || '<project-id>'}"

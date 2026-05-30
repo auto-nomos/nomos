@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": false,
   "description": "YAML-driven adapter framework for SaaS integrations. Spec defines actions/scopes/risk/transforms/sanitize; TS executor calls existing Connector.callApi.",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "homepage": "https://github.com/auto-nomos/nomos/tree/main/packages/adapters#readme",
   "bugs": {
     "url": "https://github.com/auto-nomos/nomos/issues"
