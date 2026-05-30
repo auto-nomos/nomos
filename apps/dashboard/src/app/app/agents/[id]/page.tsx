@@ -1,7 +1,7 @@
 'use client';
 
 import { publicKeyFromDid } from '@auto-nomos/crypto/did';
-import { Cloud, Copy, KeyRound, ShieldCheck, Trash2 } from 'lucide-react';
+import { Check, Cloud, Copy, KeyRound, ShieldCheck, Trash2 } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { use, useEffect, useState } from 'react';
 import { AgentAuditPanel } from '../../../../components/agent-audit-panel';
@@ -661,6 +661,48 @@ function AzureFicCard({
       setTimeout(() => setCopiedKey(null), 2000);
     });
   }
+
+  // Probe each connection for this agent's exact-match FIC. Registered rows
+  // collapse to a one-line confirmation; the snippet only shows where the FIC
+  // is missing (or we couldn't confirm). When every connection is registered
+  // the whole card collapses to a single green line.
+  const ficStatuses = trpc.useQueries((t) =>
+    connections.map((conn) =>
+      t.cloudConnections.agentFicStatus(
+        { connectionId: conn.id, agentId },
+        { staleTime: 5 * 60_000, refetchOnWindowFocus: false },
+      ),
+    ),
+  );
+  type FicState = 'registered' | 'missing' | 'error' | 'loading';
+  const statusByConn = new Map<string, FicState>(
+    connections.map((conn, i) => {
+      const q = ficStatuses[i];
+      return [conn.id, q?.isLoading ? 'loading' : ((q?.data?.state as FicState) ?? 'error')];
+    }),
+  );
+  const allRegistered =
+    connections.length > 0 && connections.every((c) => statusByConn.get(c.id) === 'registered');
+
+  if (allRegistered) {
+    return (
+      <Card className="border-emerald-500/30 bg-emerald-500/5">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Check className="h-4 w-4 text-emerald-500" /> Azure federated credential registered
+          </CardTitle>
+          <CardDescription>
+            This app&apos;s exact-match FIC is live on{' '}
+            {connections.length === 1
+              ? 'its App Registration'
+              : `all ${connections.length} App Registrations`}
+            . Azure calls federate without <code className="font-mono text-xs">AADSTS700213</code>.
+          </CardDescription>
+        </CardHeader>
+      </Card>
+    );
+  }
+
   return (
     <Card className="border-amber-500/30 bg-amber-500/5">
       <CardHeader>
@@ -681,6 +723,15 @@ function AzureFicCard({
       </CardHeader>
       <CardContent className="space-y-4">
         {connections.map((conn) => {
+          const status = statusByConn.get(conn.id) ?? 'error';
+          if (status === 'registered') {
+            return (
+              <div key={conn.id} className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Check className="h-3.5 w-3.5 text-emerald-500" /> FIC registered on{' '}
+                <code className="font-mono">{conn.accountId}</code>
+              </div>
+            );
+          }
           const ficName = `nomos-${agentName.replace(/[^a-zA-Z0-9-]/g, '-').slice(0, 60)}-${agentId.slice(0, 8)}`;
           const cli = `az ad app federated-credential create \\
   --id ${conn.externalId} \\
@@ -703,6 +754,11 @@ additional_agent_ids = [
                   <>
                     · tenant <code className="font-mono">{conn.tenantId}</code>
                   </>
+                ) : null}
+                {status === 'loading' ? (
+                  <span className="ml-2 italic">· checking registration…</span>
+                ) : status === 'error' ? (
+                  <span className="ml-2 italic">· couldn&apos;t confirm — skip if already run</span>
                 ) : null}
               </div>
 

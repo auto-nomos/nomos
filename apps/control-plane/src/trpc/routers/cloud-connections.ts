@@ -170,6 +170,24 @@ export const cloudConnectionsRouter = router({
     }),
 
   /**
+   * Per-agent FIC status — does this agent's exact-match federated identity
+   * credential exist on the connection's App Registration? Drives the
+   * dashboard's "register this app's federated credential" card: the snippet
+   * collapses to a confirmation once the FIC is live. Read-only; runs the
+   * real federation handshake under the agent's subject. Returns
+   * `{ state: 'error' }` (never throws) when the worker is unavailable so the
+   * card degrades to showing the snippet rather than blanking.
+   */
+  agentFicStatus: withPermission('cloud_connections', 'read')
+    .input(z.object({ connectionId: z.string().uuid(), agentId: z.string().uuid() }))
+    .query(async ({ ctx, input }) => {
+      if (!ctx.cloudVerifyPoll) {
+        return { state: 'error' as const, detail: 'verify worker unavailable' };
+      }
+      return ctx.cloudVerifyPoll.probeFic(input.connectionId, ctx.customerId, input.agentId);
+    }),
+
+  /**
    * Stamp a verify attempt result. Legacy entry-point used by smoke scripts
    * + ad-hoc operator flows. Prefer `verifyNow` which exercises the real
    * federation handshake.
