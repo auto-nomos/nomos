@@ -44,6 +44,17 @@ export interface VerifyResult {
   error?: string;
 }
 
+/**
+ * Per-agent federated-credential probe result.
+ *   registered — the agent's exact-match FIC exists (handshake succeeded).
+ *   missing    — Azure returned AADSTS700213: no FIC for this agent subject.
+ *   error      — anything else (worker down, transient AAD blip, misconfig).
+ */
+export interface FicProbeResult {
+  state: 'registered' | 'missing' | 'error';
+  detail?: string;
+}
+
 export interface CloudVerifyPoll {
   start(): void;
   stop(): void;
@@ -51,6 +62,12 @@ export interface CloudVerifyPoll {
   runOnce(): Promise<{ checked: number; verified: number; broken: number; transient: number }>;
   /** Probe one connection synchronously. Used by the tRPC `verifyNow` mutation. */
   verifyOne(connectionId: string, customerId: string): Promise<VerifyResult>;
+  /**
+   * Probe whether one agent's exact-match FIC is registered against a
+   * connection. Read-only — never touches `bootstrap_status` (that tracks
+   * connection health via the `verify-poll` subject, not per-agent FICs).
+   */
+  probeFic(connectionId: string, customerId: string, agentId: string): Promise<FicProbeResult>;
 }
 
 // In-memory transient-failure counter keyed by connectionId. Bumped on
@@ -63,14 +80,22 @@ export function createCloudVerifyPoll(opts: CloudVerifyPollOptions): CloudVerify
   const intervalMs = opts.intervalMs ?? 24 * 60 * 60 * 1_000;
   let timer: NodeJS.Timeout | undefined;
 
-  async function probe(
+  /**
+   * Run the bare federation handshake for `agentId` against a connection:
+   * mint an ID token with subject customer/{cid}/agent/{agentId}, then
+   * exchange it for session creds. Throws `CloudFederationError` on
+   * cloud-side rejection. Shared by the connection-health probe
+   * (agentId = 'verify-poll') and the per-agent FIC probe.
+   */
+  async function runHandshake(
     connection: typeof schema.cloudConnections.$inferSelect,
-  ): Promise<VerifyResult> {
+    agentId: string,
+  ): Promise<void> {
     const provider = opts.registry.get(connection.connector);
     if (!provider) {
-      return { status: 'broken', error: `provider_unsupported:${connection.connector}` };
+      throw new CloudFederationError(`provider_unsupported:${connection.connector}`, 400, null);
     }
-    const audience = provider.audienceFor({
+    const ref = {
       id: connection.id,
       customerId: connection.customerId,
       connector: connection.connector,
@@ -78,26 +103,22 @@ export function createCloudVerifyPoll(opts: CloudVerifyPollOptions): CloudVerify
       tenantId: connection.tenantId,
       externalId: connection.externalId,
       config: (connection.config ?? {}) as Record<string, unknown>,
+    };
+    const audience = provider.audienceFor(ref);
+    const idToken = await mintIdToken(opts.signer, opts.issuer, {
+      customerId: connection.customerId,
+      agentId,
+      audience: audience.audience,
+      ttlSeconds: audience.ttlSeconds ?? opts.defaultTtlSeconds,
     });
+    await provider.acquireSessionCreds(ref, idToken.token);
+  }
+
+  async function probe(
+    connection: typeof schema.cloudConnections.$inferSelect,
+  ): Promise<VerifyResult> {
     try {
-      const idToken = await mintIdToken(opts.signer, opts.issuer, {
-        customerId: connection.customerId,
-        agentId: 'verify-poll',
-        audience: audience.audience,
-        ttlSeconds: audience.ttlSeconds ?? opts.defaultTtlSeconds,
-      });
-      await provider.acquireSessionCreds(
-        {
-          id: connection.id,
-          customerId: connection.customerId,
-          connector: connection.connector,
-          accountId: connection.accountId,
-          tenantId: connection.tenantId,
-          externalId: connection.externalId,
-          config: (connection.config ?? {}) as Record<string, unknown>,
-        },
-        idToken.token,
-      );
+      await runHandshake(connection, 'verify-poll');
       transientCounts.delete(connection.id);
       return { status: 'verified' };
     } catch (err) {
@@ -109,6 +130,38 @@ export function createCloudVerifyPoll(opts: CloudVerifyPollOptions): CloudVerify
         return { status: 'broken', error: `${err.message} (after 2 retryable)` };
       }
       return { status: 'broken', error: (err as Error).message };
+    }
+  }
+
+  async function probeFic(
+    connectionId: string,
+    customerId: string,
+    agentId: string,
+  ): Promise<FicProbeResult> {
+    const [row] = await opts.db
+      .select()
+      .from(schema.cloudConnections)
+      .where(
+        and(
+          eq(schema.cloudConnections.id, connectionId),
+          eq(schema.cloudConnections.customerId, customerId),
+        ),
+      )
+      .limit(1);
+    if (!row) return { state: 'error', detail: 'connection_not_found' };
+    try {
+      await runHandshake(row, agentId);
+      return { state: 'registered' };
+    } catch (err) {
+      if (err instanceof CloudFederationError) {
+        // AADSTS700213 = "no matching federated identity record for the
+        // presented assertion subject" — i.e. the per-agent FIC isn't
+        // registered yet. Surfaced in the AAD error body, not the message.
+        const body = JSON.stringify(err.providerBody ?? '');
+        if (body.includes('700213')) return { state: 'missing' };
+        return { state: 'error', detail: err.message };
+      }
+      return { state: 'error', detail: (err as Error).message };
     }
   }
 
@@ -175,6 +228,7 @@ export function createCloudVerifyPoll(opts: CloudVerifyPollOptions): CloudVerify
 
   return {
     verifyOne,
+    probeFic,
     start() {
       if (timer) return;
       timer = setInterval(() => {
