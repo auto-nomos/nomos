@@ -3,10 +3,11 @@ import Link from 'next/link';
 import { GITHUB_RELEASES_URL, GITHUB_STAR_URL, NPM_ORG_URL } from '../../lib/community-links';
 
 /**
- * Band 9 — Open source. One idea: coming very soon, star to be there day one.
- * Includes the small license matrix built from real package data.
+ * Band 9 — Open source. The repo is public under Apache-2.0: npm packages are
+ * live and the full control-plane + dashboard source is readable. Includes the
+ * small license matrix built from real package data.
  */
-const PACKAGES: { name: string; role: string; status: 'public' | 'soon' }[] = [
+const PACKAGES: { name: string; role: string; status: 'public' | 'soon' | 'source' }[] = [
   { name: '@auto-nomos/core', role: 'PDP decide() engine', status: 'public' },
   { name: '@auto-nomos/cedar', role: 'Policy evaluation', status: 'public' },
   { name: '@auto-nomos/ucan', role: 'Capability tokens', status: 'public' },
@@ -21,8 +22,8 @@ const PACKAGES: { name: string; role: string; status: 'public' | 'soon' }[] = [
   { name: '@auto-nomos/ucan-cli', role: 'nomos-ucan CLI', status: 'public' },
   { name: '@auto-nomos/shared-types', role: 'Zod schemas', status: 'public' },
   { name: 'nomos-sdk (PyPI)', role: 'Python SDK for agents', status: 'public' },
-  { name: '@auto-nomos/control-plane', role: 'Hono + tRPC server', status: 'soon' },
-  { name: '@auto-nomos/dashboard', role: 'Next.js operator UI', status: 'soon' },
+  { name: '@auto-nomos/control-plane', role: 'Hono + tRPC server', status: 'source' },
+  { name: '@auto-nomos/dashboard', role: 'Next.js operator UI', status: 'source' },
 ];
 
 const INSTALL_LINES: { lang: string; cmd: string }[] = [
@@ -48,16 +49,15 @@ export function OpenSource() {
           <h2 className="display mt-5 text-[36px] leading-[1.05] text-aegis-paper sm:text-[44px] md:text-[56px] md:leading-[1.02]">
             Open source.
             <br />
-            <em>Coming very soon.</em>
+            <em>Read every line.</em>
           </h2>
           <p className="mt-6 max-w-[460px] text-base leading-relaxed text-aegis-mute">
-            Thirteen packages already live on npm under{' '}
+            Thirteen packages live on npm under{' '}
             <code className="rounded-sm border border-aegis-line bg-aegis-surface px-1.5 py-0.5 font-mono text-[12px] text-aegis-paper">
               @auto-nomos/*
             </code>
-            . The full control-plane and dashboard source flips public alongside our 1.0. Star the
-            repo to be in the first hundred — we&rsquo;re shipping a contributor swag drop on the
-            day.
+            , and the full control-plane and dashboard source is public too — all under Apache-2.0.
+            Read every line, open an issue, send a PR. Star the repo if Nomos is useful to you.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
             <a
@@ -114,19 +114,19 @@ export function OpenSource() {
                   <div className="col-span-2 text-right">
                     <span
                       className={`inline-flex items-center rounded-sm border px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.18em] ${
-                        p.status === 'public'
-                          ? 'border-aegis-signal/40 bg-aegis-signal/10 text-aegis-signal'
-                          : 'border-aegis-amber/40 bg-aegis-amber/10 text-aegis-amber'
+                        p.status === 'soon'
+                          ? 'border-aegis-amber/40 bg-aegis-amber/10 text-aegis-amber'
+                          : 'border-aegis-signal/40 bg-aegis-signal/10 text-aegis-signal'
                       }`}
                     >
-                      {p.status === 'public' ? 'on npm' : 'soon'}
+                      {p.status === 'public' ? 'on npm' : p.status === 'source' ? 'source' : 'soon'}
                     </span>
                   </div>
                 </li>
               ))}
             </ul>
             <div className="flex items-center justify-between border-t border-aegis-line px-4 py-4 font-mono text-[10px] uppercase tracking-[0.18em] text-aegis-faint sm:px-6">
-              <span>license · Apache-2.0 on flip</span>
+              <span>license · Apache-2.0</span>
               <span className="text-aegis-paper">{PACKAGES.length} packages</span>
             </div>
           </div>
