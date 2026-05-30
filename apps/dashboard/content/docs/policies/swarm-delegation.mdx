@@ -132,6 +132,62 @@ forbid ( principal, action == Action::"/github/repo/put_file", resource )
 
 <Shot src="swarms-view.png" alt="Swarm view with agent tree and recent receipts" caption="One swarm view per root. Tree shape lives in DB; runtime chain validation is independent." />
 
+## Observability — track what the swarm actually did
+
+The swarm's **Observability** tab is the governance view: every tool call any agent in
+the chain made, who made it, what it cost, and whether it was allowed — reconstructed
+from signed receipts, not app logs.
+
+### Action graph
+
+Each conversation flows left to right; a **fork marks a sub-agent spawn**. Spans are
+colored per agent (the legend at the top maps each agent's DID to a color), and every
+span shows its command, status, HTTP code, and latency. The graph polls every 5s over
+the last 60 minutes. Failures stand out in red — here a `/google/drive/list` 403 and an
+`/azure/subscriptions/list` 401 surfaced inline, so a denied or errored call in a deep
+chain is visible without grepping logs.
+
+<Shot src="swarm-observability-flow.png" alt="Swarm Observability action graph, four agents reading github left to right with fork connectors" caption="Read it left to right. Each box is one signed receipt; forks are sub-agent spawns." />
+
+<Shot src="swarm-observability-graph.png" alt="Swarm action graph fanning across github/discord/slack/google/azure with two red FAILURE spans" caption="A real run: multi-provider fan-out, with a google 403 and azure 401 caught in red." />
+
+### Span detail
+
+Click any span for the **Span detail** drawer — post-execution telemetry, not the raw
+payload. The **Summary** tab shows the agent + DID, the receipt id, the parent span,
+start/end, the declared **intent**, and — for delegations — the **Handoff** block
+(`MATCHED` when the child's task lines up with the parent's), including the task,
+expected output, and rationale. The request and response are stored as **sha256
+hashes** plus an allowlisted summary.
+
+<Shot src="swarm-span-summary.png" alt="Span detail Summary tab with agent/DID, receipt, intent, a MATCHED handoff block, and request/response sha256 hashes" caption="Handoffs are verified, not assumed: MATCHED means the child's task derives from the parent's. Bodies are hashed, never stored raw." />
+
+<Callout tone="signal" title="Hashes, not bodies.">
+  Only sha256 hashes plus an allowlisted summary are persisted — never raw request or
+  response bodies. The hashes still let you prove, offline, exactly which payload ran.
+</Callout>
+
+### Prompt capture + PII redaction
+
+The **Prompt** tab captures the agent's prompt and reasoning. PII is **redacted by
+default** — emails and phone numbers are detected and replaced with
+`[REDACTED:email]` / `[REDACTED:phone]`, with a count pill for each. The stored,
+shareable view is the redacted one.
+
+<Shot src="swarm-span-prompt-redacted.png" alt="Span detail Prompt tab showing prompt with [REDACTED:email] and [REDACTED:phone] and a show raw button" caption="What's stored: redacted prompt + reasoning. The pills count how much PII was scrubbed." />
+
+**Show raw** reveals the original — and that reveal is itself **audit-logged**
+(`RAW — READ AUDIT-LOGGED`). Looking at unredacted prompt data is a governed action,
+recorded like any other.
+
+<Shot src="swarm-span-prompt-raw.png" alt="Span detail Prompt tab after Show raw, with the RAW — READ AUDIT-LOGGED badge and the original email + phone visible" caption="Revealing raw PII writes its own audit row. Who looked, and when, is on the record." />
+
+### Action timeline
+
+Below the graph, the **Action timeline** lists the last N tool invocations across the
+whole scope — each with its decision (`SUCCESS` / `FAILURE`), command, receipt id,
+timestamp, and latency. It's the flat, chronological companion to the graph.
+
 ## Walking the audit tree
 
 Every receipt carries `parent_receipt_id`. Recursively unwind any chain offline:
