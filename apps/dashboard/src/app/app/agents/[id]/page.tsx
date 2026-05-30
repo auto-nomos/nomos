@@ -1,5 +1,6 @@
 'use client';
 
+import { publicKeyFromDid } from '@auto-nomos/crypto/did';
 import { Cloud, Copy, KeyRound, ShieldCheck, Trash2 } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { use, useEffect, useState } from 'react';
@@ -65,6 +66,14 @@ export default function AgentDetailPage({ params }: { params: Promise<{ id: stri
   >('admin');
   const [issueOpen, setIssueOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [copiedField, setCopiedField] = useState<string | null>(null);
+
+  function copyField(field: string, text: string): void {
+    void navigator.clipboard.writeText(text).then(() => {
+      setCopiedField(field);
+      setTimeout(() => setCopiedField(null), 2000);
+    });
+  }
 
   const createKey = trpc.apiKeys.create.useMutation({
     onSuccess: (k) => {
@@ -266,7 +275,43 @@ export default function AgentDetailPage({ params }: { params: Promise<{ id: stri
               {agent.lastActiveAt ? formatDate(agent.lastActiveAt) : '—'}
             </Row>
             <Row label="DID">
-              <span className="font-mono text-xs">{shortId(agent.did, 16, 6)}</span>
+              <div className="flex items-center gap-2">
+                <span className="font-mono text-xs" title={agent.did}>
+                  {shortId(agent.did, 16, 6)}
+                </span>
+                <Button size="sm" variant="ghost" onClick={() => copyField('agent-did', agent.did)}>
+                  <Copy className="h-3 w-3" /> {copiedField === 'agent-did' ? 'Copied!' : 'Copy'}
+                </Button>
+              </div>
+            </Row>
+            <Row label="Public key">
+              {(() => {
+                let hex: string | null = null;
+                try {
+                  hex = Array.from(publicKeyFromDid(agent.did))
+                    .map((b) => b.toString(16).padStart(2, '0'))
+                    .join('');
+                } catch {
+                  hex = null;
+                }
+                return hex ? (
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-xs" title={hex}>
+                      {shortId(hex, 12, 6)}
+                    </span>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => copyField('agent-pubkey', hex)}
+                    >
+                      <Copy className="h-3 w-3" />{' '}
+                      {copiedField === 'agent-pubkey' ? 'Copied!' : 'Copy'}
+                    </Button>
+                  </div>
+                ) : (
+                  <span className="text-xs text-muted-foreground">—</span>
+                );
+              })()}
             </Row>
             <Row label="Mode">
               <div className="flex items-center gap-2">

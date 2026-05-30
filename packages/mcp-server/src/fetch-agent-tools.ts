@@ -43,7 +43,7 @@ export async function fetchAgentTools(args: {
     });
   } catch (err) {
     throw new FetchAgentToolsError(
-      `could not reach control plane at ${url} — is CB_CONTROL_PLANE_URL correct?`,
+      `could not reach control plane at ${url} — is NOMOS_CONTROL_URL correct?`,
       err,
     );
   }

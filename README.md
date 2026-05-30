@@ -1,20 +1,24 @@
 # Nomos — Agent Authorization Platform
 
-> Domain: [auto-nomos.com](https://auto-nomos.com) · npm scope: `@auto-nomos/*`
->
-> The capability layer for MCP. Scoped, time-bound, revocable, delegable permissions for AI agents.
+> **Website:** [auto-nomos.com](https://auto-nomos.com)  •  **Docs:** [docs.auto-nomos.com](https://app.auto-nomos.com/docs)  •  **npm:** `@auto-nomos/*`
 
-## What this is
+**The authorization layer for AI agents.** Nomos sits between your agents and every SaaS API you connect — GitHub, Slack, Linear, Stripe, Google, Notion, your filesystem, your cloud — and makes sure each agent can only do what your policy says, before the call ever leaves your network. The agent never holds an OAuth token; every action runs against a short-lived signed delegation (UCAN), gated by Cedar policy, and lands in a tamper-evident audit chain.
 
-A SaaS that lets any team shipping AI agents grant fine-grained authorization through a drop-in SDK. Customers connect their existing IdP (Okta/Entra/Google) and SaaS OAuth grants, define policies in a visual builder, and ship MCP servers wrapped with our SDK. Their agents do exactly what policy allows — every other call is rejected at the policy enforcement point (PDP).
+## Start here
 
-**Two architectural principles drive every decision:**
-1. **Control plane is the moat; data plane is distribution.** Customers run the PDP runtime; we run the brain. The PDP is portable and can later deploy at customer edge or on-prem without rebuild.
-2. **Capability through modules, not new products.** Phase 1 ships core PDP + 3 modules. Phase 2/3 layer on more modules. Architecture never gets ripped up.
+- **Use the hosted product:** [app.auto-nomos.com/sign-up](https://app.auto-nomos.com/sign-up) — 2 minutes to first call.
+- **Read the docs:** [docs.auto-nomos.com](https://app.auto-nomos.com/docs) — five journey-based tutorials.
+- **Hack on this repo:** the [Quickstart](#quickstart-development) below boots the full stack locally.
 
-### Delegation chains (beta — Sprint MAOS)
+## What you get
 
-Multi-agent orchestration security: parent agents fork attenuated UCAN chains for child agents (LangGraph / CrewAI / AutoGen / Claude sub-agents). Trust propagation, permission inheritance, and scope containment work end-to-end across agent swarms. See [docs/SWARM_SECURITY.md](docs/SWARM_SECURITY.md).
+1. **Credentials never leak.** OAuth tokens are encrypted in the broker. The agent gets a UCAN good for one method on one resource for the next few minutes.
+2. **Policy enforced before the call.** Cedar runs on every request. Denials return 403 at the PDP — not "we logged it, sorry."
+3. **Every decision is provable.** Allows, denies, and step-ups land in an Ed25519-signed Merkle chain. Verify offline with `@auto-nomos/audit-verify`.
+
+12 providers shipping today across SaaS (GitHub, Slack, Google Workspace, Notion, Linear, Stripe, Discord), filesystem, SSH, and federated cloud IAM (Azure, AWS, GCP).
+
+Multi-agent orchestration (LangGraph / CrewAI / AutoGen / Claude sub-agents) is supported via attenuated UCAN chains — see [docs/SWARM_SECURITY.md](docs/SWARM_SECURITY.md) or the live [Swarm delegation guide](https://app.auto-nomos.com/docs/policies/swarm-delegation).
 
 ## Monorepo layout
 
@@ -72,9 +76,23 @@ mints a proxy-bound UCAN, and exercises both an allowed and a denied call —
 proving the OAuth token never leaves the PDP. To wire it to your real Claude
 Desktop or Cursor, see `packages/mcp-server/README.md`.
 
+## Examples
+
+Copy-paste starters in [`examples/`](./examples) — each is a runnable reference, not pseudocode:
+
+| Example | What it shows |
+|---|---|
+| [`mcp-filesystem`](./examples/mcp-filesystem) | Dynamic-scope (Approval Envelope) flow on the local filesystem — one `read_path` tool proving the full loop |
+| [`mcp-github-dynamic`](./examples/mcp-github-dynamic) | Dynamic-mode GitHub MCP server — every tool call asks the broker for a per-request UCAN |
+| [`mcp-github`](./examples/mcp-github) | Minimal GitHub MCP reference (superseded by [`@auto-nomos/mcp-server`](./packages/mcp-server) for production) |
+| [`swarm-orchestrator`](./examples/swarm-orchestrator) | Multi-agent swarm with attenuated UCAN delegation chains |
+| [`claude-subagents-nomos`](./examples/claude-subagents-nomos) | Claude Code sub-agents authorized through Nomos |
+| [`langgraph-nomos`](./examples/langgraph-nomos) | A 3-agent LangGraph chain authorized through Nomos |
+| [`crewai-nomos`](./examples/crewai-nomos) | CrewAI tasks, each running as a Nomos-authorized agent |
+
 ## Sprint roadmap
 
-This repo is built sprint-by-sprint over 24 weeks. The full plan lives at `~/.claude/plans/wobbly-discovering-pascal.md`. Per-sprint detail in commit history (tags `sprint-N-end`).
+This repo was built sprint-by-sprint. Per-sprint detail lives in commit history (tags `sprint-N-end`).
 
 | Sprint | Weeks | Outcome |
 |---|---|---|

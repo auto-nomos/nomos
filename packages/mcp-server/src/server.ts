@@ -97,7 +97,7 @@ export function createMcpServer(deps: McpServerDeps): McpServer {
             diagnostic: deps.diagnostic ?? {
               phase: 'config',
               message: 'broker has no configuration',
-              hint: 'set CB_API_KEY, CB_PDP_URL, CB_CONTROL_PLANE_URL in MCP client config.',
+              hint: 'set NOMOS_API_KEY, NOMOS_PDP_URL, NOMOS_CONTROL_URL in MCP client config.',
             },
           };
           return { content: [{ type: 'text', text: JSON.stringify(result) }] };
