@@ -10,6 +10,12 @@ badge: GA
 OpenAI's Codex CLI is MCP-native as of v0.5+. Add Nomos as one of its MCP servers and
 your Codex agent gets the same policy gate as every other Nomos-connected agent.
 
+The dashboard's **Connect an agent** page (<Link href="/app/connect">/app/connect</Link>)
+has a **Codex** tab: install the CLI and let it patch the config, or copy the prepared
+**TOML** block (`[mcp_servers.nomos]`) into `config.toml` — API key and URLs filled in.
+
+<Shot src="connect-codex-tab.png" alt="Connect an agent page, Codex tab, showing the [mcp_servers.nomos] TOML block" caption="Codex is TOML, not JSON. The tab hands you the block with the env table already indented." />
+
 <Prereqs items={[
   "Codex CLI 0.5+ (`npm i -g @openai/codex`).",
   "A Nomos App with an API key.",

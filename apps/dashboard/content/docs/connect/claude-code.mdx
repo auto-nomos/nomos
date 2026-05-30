@@ -10,6 +10,13 @@ badge: GA
 Claude Code is Anthropic's CLI agent. It speaks MCP, so wiring Nomos in is one command —
 no JSON file to edit.
 
+The dashboard's **Connect an agent** page (<Link href="/app/connect">/app/connect</Link>)
+has a **Claude Code** tab that walks you through it: install the Nomos setup skill, run
+it inside Claude Code, approve the connection — with your App's API key and URLs already
+filled in. Prefer to type it yourself? The manual command is below.
+
+<Shot src="connect-claude-code-tab.png" alt="Connect an agent page, Claude Code tab, with setup-skill install + run + approve steps" caption="The Connect an agent page pre-fills your API key + control/PDP URLs per tab." />
+
 <Prereqs items={[
   "Claude Code CLI installed (`npm i -g @anthropic-ai/claude-code` or via Homebrew).",
   "A Nomos App with an API key.",

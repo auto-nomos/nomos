@@ -10,6 +10,13 @@ badge: GA
 Claude Desktop reads MCP servers from a single config file. Drop the Nomos block in,
 restart Claude, and every Nomos-connected SaaS becomes a callable tool.
 
+The dashboard's **Connect an agent** page (<Link href="/app/connect">/app/connect</Link>)
+has a **Claude Desktop** tab: install the CLI and let it patch
+`claude_desktop_config.json` for you, or copy the ready-made JSON block, then restart —
+your App's API key and URLs are already baked in.
+
+<Shot src="connect-claude-desktop-tab.png" alt="Connect an agent page, Claude Desktop tab, with CLI-patch and paste-manually options" caption="Let the CLI patch the config, or paste the block yourself. Either way, merge — don't replace." />
+
 <Prereqs items={[
   "Claude Desktop 1.0+ (macOS, Windows, or Linux).",
   "A Nomos App with an API key (Get started → Register your first App).",

@@ -41,6 +41,20 @@ Nomos brokers two kinds of providers:
 | AWS | beta | OIDC federation (STS) | <Link href="/docs/providers/cloud-aws">AWS setup</Link> |
 | GCP | beta | OIDC federation (WIF) | <Link href="/docs/providers/cloud-gcp">GCP setup</Link> |
 
+## The Cloud accounts page
+
+OAuth providers live under <Link href="/app/connections">Connections</Link>; the three
+clouds get their own surface at <Link href="/app/cloud">Cloud accounts</Link>. Because
+they federate over OIDC, **Nomos never holds a static key** — each account binds a
+role / identity that Nomos exchanges for short-lived credentials per call.
+
+- **Active** lists each bound account with its cloud, subscription / account id, and a
+  last-verified time. **Verify now** re-runs the trust check; **Disconnect** removes it.
+- **Connect a new cloud** shows Azure / AWS / GCP cards, each with the exact bind CLI
+  snippet to run. Follow the per-cloud guide above for the full bootstrap.
+
+<Shot src="cloud-accounts-list.png" alt="Cloud accounts page with Active federated accounts (verify-now / disconnect) and Connect-a-new-cloud Azure/AWS/GCP cards" caption="Federated, not key-based. Each row is one role Nomos can assume — no long-lived secret stored." />
+
 <Callout tone="info" title="Provider you need isn't on the list?">
   Open an issue on <Link href="https://github.com/varendra007/nomos/issues">GitHub
   Issues</Link>. New OAuth providers usually ship in 1–2 weeks once we have the spec.

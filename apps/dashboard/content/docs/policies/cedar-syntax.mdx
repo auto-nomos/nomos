@@ -10,6 +10,17 @@ Nomos uses [Cedar](https://www.cedarpolicy.com) for policy. Cedar is small on pu
 three statements (permit, forbid, unless), six operators, three variables
 (`principal`, `action`, `resource`), one context bag.
 
+## The New policy editor
+
+<Link href="/app/policies">Policies</Link> → **New policy** gives you a **Name** field
+and a Cedar editor. The **Integration** dropdown picks which provider this policy
+targets — GitHub, Slack, Google (and its sub-services: Docs, Sheets, Tasks, Gmail),
+Notion, Linear, Stripe, Discord, Filesystem, SSH / SFTP, Azure, AWS, GCP. Choosing one
+scopes the editor's action catalog and autocomplete to that provider's commands, so
+`Action::"…"` completes to real, valid actions instead of free text.
+
+<Shot src="new-policy-integration.png" alt="New policy page with Name field, Cedar editor, and the Integration provider dropdown open" caption="Pick the integration first — it scopes action autocomplete to that provider's real commands." />
+
 ## Three statements
 
 ```cedar

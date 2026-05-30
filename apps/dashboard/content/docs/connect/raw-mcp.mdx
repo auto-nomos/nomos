@@ -10,6 +10,13 @@ Any MCP-speaking agent host can use Nomos. The `@auto-nomos/mcp-server` package 
 a standalone subprocess; your host's job is to spawn it with the right env vars and
 read the tools it advertises.
 
+The dashboard's **Connect an agent** page (<Link href="/app/connect">/app/connect</Link>)
+has an **Other / Custom** tab for exactly this case: install the CLI and generate a
+generic bundle, or just copy the three env values (`NOMOS_CONTROL_URL`,
+`NOMOS_API_KEY`, `NOMOS_PDP_URL`) and hand-wire them into whatever host you run.
+
+<Shot src="connect-custom-tab.png" alt="Connect an agent page, Other/Custom tab, with generate-bundle and hand-wire env-values options" caption="The same three env vars every host needs, with your App's key filled in." />
+
 ## The contract
 
 The MCP server:

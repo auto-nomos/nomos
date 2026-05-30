@@ -29,8 +29,10 @@ five seconds in the common case.
   </Step>
   <Step n="3" title="You tap, your browser signs">
     Notification deep-links to `/approve/<envelopeId>`. The page shows the agent,
-    the action, the resource, the purpose. You tap **Approve**. The browser asks for
-    your passkey assertion (Touch ID / Face ID / hardware key). Sign.
+    the action, the resource, the purpose, and a risk badge. You hit **Allow once** (or
+    **Deny once**). The browser asks for your passkey assertion (Touch ID / Face ID /
+    hardware key); sign. First time on this device there's no passkey yet — hit
+    **Register passkey** to enroll, then the same tap signs.
   </Step>
   <Step n="4" title="Nomos mints a cosigner UCAN">
     The control plane verifies the passkey assertion, mints a cosigner UCAN bound
@@ -68,11 +70,50 @@ the floor for newly-discovered risky actions without forcing a policy rewrite.
 
 ## What the operator sees
 
-The dashboard's <Link href="/app/approvals">Approvals</Link> queue shows pending +
-recent approvals with: agent name, action, resource, purpose, intent risk, requester
-IP, time remaining. Tap a row → passkey sign or deny.
+The dashboard's <Link href="/app/approvals">Approvals</Link> queue tabs across
+**Pending / Awaiting / Approved / Denied / Expired**, with an all-agents filter. Each
+row carries the agent, command, resource, state, scope, who resolved it, when it was
+decided, and when it was requested. **View** opens the detail screen.
 
-<Shot src="dashboard-approvals-pending.png" alt="Approvals page with pending row showing agent + action + resource + countdown" caption="Pending approvals carry a countdown. The agent waits up to 60s by default." />
+<Shot src="dashboard-approvals-pending.png" alt="Approvals queue with Pending/Approved/Denied tabs and agent/command/resource/state columns" caption="Pending approvals carry a countdown. The agent waits up to 60s by default." />
+
+## The approval detail screen
+
+**View** on a row opens the decision page. The header restates the **Command**,
+**Resource**, **State** (`awaiting_review`), **Requested** / **Expires** timestamps,
+a **Risk** badge, and a one-line **Summary** of what the agent wants to do.
+
+Below that is a **Cedar policy preview** — the rule that gets saved if you choose to
+remember the decision. Pick how wide to make it:
+
+- **Narrow** — *this exact resource.* `permit` gated to the one repo / channel /
+  object in the request.
+- **Medium** — *same container.* The whole repo / channel / dataset, not just the one
+  object.
+- **Broad** — *any resource of this action.* `permit` on the action with no resource
+  condition.
+
+Each option renders the exact `permit` block it would write, so there's no drift
+between what you click and what's stored.
+
+Two checkboxes decide persistence:
+
+- **Remember for next time** — saves an **agent_grant** so the next *identical* request
+  auto-allows (or auto-denies) without prompting. This is the same machinery as a
+  <Link href="/docs/policies/standing-grants">standing grant</Link>, created straight
+  from the approval screen at the scope you picked above.
+- Leave it unchecked and the decision is one-shot — the next request prompts again.
+
+The actions are **Allow once** (green), **Register passkey** (when no passkey is
+enrolled yet), and **Deny once** (red).
+
+<Callout tone="warn" title="The original request may have already timed out.">
+  Envelopes expire in 60s. If the agent gave up before you got here, approving no
+  longer resumes that call — but with **Remember for next time** on, it saves the
+  policy so the agent's *next* identical request sails through.
+</Callout>
+
+<Shot src="approval-detail-scope.png" alt="Approval detail with Cedar policy preview showing Narrow/Medium/Broad scope options and Allow once / Register passkey / Deny once buttons" caption="The scope you pick is the Cedar that gets saved. Narrow by default; widen only when you mean it." />
 
 ## What the auditor sees
 

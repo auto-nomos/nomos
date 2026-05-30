@@ -64,13 +64,23 @@ To prove an event existed at a point in time:
 
 ## Drill-in
 
-Click a row → drawer:
+Click a row → **Decision detail** drawer:
 
-- Full canonicalized payload (collapsible JSON).
+- Header: Event ID, Time, Command, Decision (`allow` / `deny` / `step_up`).
+- **Record** and **Payload** — the full canonicalized JSON (collapsible).
 - Hash + prevHash (clickable, jumps to neighbor).
 - For step-ups: linked cosigner UCAN cid + approver passkey credential id.
-- **Download proof** — JSON bundle for offline verification via
+- **Verify offline** — the drawer prints the exact command to re-prove this one row
+  on your own machine:
+
+  ```bash
+  npx @auto-nomos/audit-verify <eventId>
+  ```
+
+- **Download proof** — JSON bundle for the same offline check via the
   <Link href="/docs/operate/audit-verify-cli">audit-verify CLI</Link>.
+
+<Shot src="audit-decision-detail.png" alt="Audit Decision detail drawer showing Record/Payload JSON, prevHash + hash, and a Verify offline command with Download proof" caption="Every row is independently verifiable. The drawer hands you the verify command and the proof bundle." />
 
 ## Operational dashboards
 
