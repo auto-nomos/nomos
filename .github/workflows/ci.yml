@@ -13,6 +13,10 @@ concurrency:
 env:
   NODE_VERSION: 22.18.0
   PNPM_VERSION: 11.0.8
+  # DB-backed integration tests (e.g. the PDP postgres audit writer) need a
+  # fully-migrated postgres, which this runner doesn't provide. Skip them here;
+  # they run locally against `pnpm dev:up`. See apps/pdp/src/audit/__tests__/.
+  SKIP_DB_TESTS: '1'
 
 jobs:
   ci:
