@@ -43,8 +43,8 @@ The AAD token lives only inside the PDP process for the duration of one upstream
 The fast path: clone, `terraform apply`, paste two outputs into the dashboard.
 
 ```bash
-git clone https://github.com/varendra007/agent-credential-broker.git
-cd agent-credential-broker/infra/terraform/azurerm-nomos-bootstrap
+git clone https://github.com/varendra007/nomos.git
+cd nomos/infra/terraform/azurerm-nomos-bootstrap
 
 cat > terraform.tfvars <<EOF
 nomos_oidc_issuer = "https://id.auto-nomos.com"

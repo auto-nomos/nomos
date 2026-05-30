@@ -5,6 +5,17 @@ Registration + federated identity credentials + a Reader role assignment so
 the Nomos PDP can broker short-lived access tokens for agent requests
 against `management.azure.com`.
 
+> **End-to-end walkthrough with screenshots:**
+> [docs.auto-nomos.com/providers/cloud-azure](https://app.auto-nomos.com/docs/providers/cloud-azure)
+
+## Before you start
+
+- Azure subscription with **Owner** or **User Access Administrator** on the
+  target subscription or resource group.
+- `az login` completed (Terraform reuses the CLI's auth).
+- Terraform 1.5+ with the `azurerm` and `azuread` providers.
+- Your Nomos `customer_id` from `/app/settings/organization`.
+
 ## Usage
 
 ```hcl
@@ -67,6 +78,31 @@ Paste these into the Nomos dashboard at `/app/cloud/connect/azure`:
 - `subscription_id`
 
 `agent_ids_with_credentials` is also emitted for verification.
+
+## Verify
+
+After `terraform apply`:
+
+1. Dashboard → `/app/cloud/connect/azure` → paste outputs → **Test**.
+2. Dashboard mints a no-op assertion, exchanges it via Azure STS, calls
+   `https://management.azure.com/subscriptions/<id>` with the resulting AAD token.
+3. Green check = federation works. Red = check the troubleshooting section below
+   and the `agent_ids_with_credentials` output.
+
+Smoke-test from CLI:
+
+```bash
+# Confirm the federation accepts at least one assertion:
+curl -X POST "https://login.microsoftonline.com/$(terraform output -raw tenant_id)/oauth2/v2.0/token" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "client_id=$(terraform output -raw app_client_id)" \
+  -d "scope=https://management.azure.com/.default" \
+  -d "grant_type=client_credentials" \
+  -d "client_assertion_type=urn:ietf:params:oauth:client-assertion-type:jwt-bearer" \
+  -d "client_assertion=<assertion-jwt-from-nomos-issuer>"
+```
+
+Use the dashboard's one-click test if you don't want to mint assertions manually.
 
 ## How the federation works
 

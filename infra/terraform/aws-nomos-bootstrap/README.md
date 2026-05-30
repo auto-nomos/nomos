@@ -5,11 +5,21 @@ OIDC provider + IAM role with `sts:AssumeRoleWithWebIdentity` trust so the
 Nomos PDP can exchange a fresh ID token for short-lived STS credentials per
 agent request.
 
+> **End-to-end walkthrough with screenshots:**
+> [docs.auto-nomos.com/providers/cloud-aws](https://app.auto-nomos.com/docs/providers/cloud-aws)
+
 > **Preview (2026-05-15):** no public mirror yet. Source this module from a
 > local path that points at `infra/terraform/aws-nomos-bootstrap/` in the
 > Nomos repo, or copy the directory into your own Terraform repo and pin to
 > a commit SHA. The CLI emits a working snippet automatically:
 > `nomos cloud install --aws --customer-id <id> --nomos-oidc-issuer <url>`.
+
+## Before you start
+
+- AWS account with IAM admin access.
+- `aws configure` completed (Terraform reuses CLI auth).
+- Terraform 1.5+ with the `aws` provider.
+- Your Nomos `customer_id` from `/app/settings/organization`.
 
 ## Usage
 
@@ -48,6 +58,23 @@ output "nomos_paste_into_dashboard" {
 2. PDP POSTs to `sts.{region}.amazonaws.com` with `Action=AssumeRoleWithWebIdentity`, `RoleArn=<role-arn>`, `WebIdentityToken=<id-token>`.
 3. STS returns short-lived AccessKey + SecretKey + SessionToken (~1hr).
 4. PDP signs subsequent service calls with SigV4 using the credentials.
+
+## Verify
+
+After `terraform apply`:
+
+1. Dashboard → `/app/cloud/connect/aws` → paste `role_arn` → **Test**.
+2. Dashboard does an `AssumeRoleWithWebIdentity` round trip + a no-op API call.
+3. Green check = federation works.
+
+Smoke-test from CLI:
+
+```bash
+aws sts assume-role-with-web-identity \
+  --role-arn "$(terraform output -raw role_arn)" \
+  --role-session-name nomos-smoke \
+  --web-identity-token "<assertion-jwt-from-nomos-issuer>"
+```
 
 ## Limits
 

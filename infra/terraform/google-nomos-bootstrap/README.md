@@ -4,11 +4,23 @@ Bootstrap a GCP project for Nomos federation. Creates a Workload Identity
 Federation pool + provider, plus a service account the federated identity
 impersonates.
 
+> **End-to-end walkthrough with screenshots:**
+> [docs.auto-nomos.com/providers/cloud-gcp](https://app.auto-nomos.com/docs/providers/cloud-gcp)
+
 > **Preview (2026-05-15):** no public mirror yet. Source this module from a
 > local path that points at `infra/terraform/google-nomos-bootstrap/` in the
 > Nomos repo, or copy the directory into your own Terraform repo and pin to
 > a commit SHA. The CLI emits a working snippet automatically:
 > `nomos cloud install --gcp --customer-id <id> --nomos-oidc-issuer <url>`.
+
+## Before you start
+
+- GCP project with `iam.googleapis.com` enabled.
+- Roles on the project: `roles/iam.workloadIdentityPoolAdmin` + the SA roles you
+  want to grant.
+- `gcloud auth application-default login` completed (Terraform reuses ADC).
+- Terraform 1.5+ with the `google` provider.
+- Your Nomos `customer_id` from `/app/settings/organization`.
 
 ## Usage
 
@@ -48,6 +60,16 @@ output "nomos_paste_into_dashboard" {
 2. PDP POSTs to `sts.googleapis.com:token` for a federated access token.
 3. PDP POSTs to `iamcredentials.googleapis.com:projects/-/serviceAccounts/{sa-email}:generateAccessToken` impersonating the SA.
 4. Returned token is a Bearer for `*.googleapis.com`.
+
+## Verify
+
+After `terraform apply`:
+
+1. Dashboard → `/app/cloud/connect/gcp` → paste `wif_provider` and
+   `service_account_email` → **Test**.
+2. Dashboard exchanges a fresh assertion at `sts.googleapis.com`, impersonates the
+   SA, calls a no-op API.
+3. Green check = federation works.
 
 ## Limits
 

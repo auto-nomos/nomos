@@ -23,8 +23,8 @@ If npm isn't installed, point them to https://nodejs.org.
 
 Ask the user for:
 1. Their **API key** from the Nomos dashboard. (In the dashboard: Apps → pick the App → API keys → Issue new key. The key is shown once; user pastes it here.)
-2. Their **control-plane URL**. Default: `{{controlPlaneUrl}}`
-3. Their **PDP URL**. Default: `{{pdpUrl}}`
+2. Their **control-plane URL**. Default: `https://api.auto-nomos.com`
+3. Their **PDP URL**. Default: `https://pdp.auto-nomos.com`
 
 ## Step 3 — Wire Claude Code
 
@@ -33,8 +33,8 @@ Run, substituting `<API_KEY>`:
 ```sh
 nomos connect-agent claude-code \
   --api-key <API_KEY> \
-  --cp {{controlPlaneUrl}} \
-  --pdp {{pdpUrl}}
+  --cp https://api.auto-nomos.com \
+  --pdp https://pdp.auto-nomos.com
 ```
 
 This writes `~/.claude/skills/credential-broker/SKILL.md` (context doc) **and** patches `~/.claude/settings.json` with the `nomos` MCP server entry so Claude Code loads the correct tools.
@@ -58,4 +58,4 @@ The first time you call a Nomos-protected action, the dashboard's **Pending conn
 Tell the user:
 - Restart Claude Code so the skill is picked up.
 - They can now ask things like *"List my GitHub issues assigned to me"* and Claude will route through Nomos.
-- Audit log: `{{dashboardPublicUrl}}/app/audit`
+- Audit log: `https://app.auto-nomos.com/app/audit`

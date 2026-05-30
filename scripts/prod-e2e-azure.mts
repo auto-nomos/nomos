@@ -37,7 +37,10 @@ const SESSION = req('NOMOS_SESSION_TOKEN');
 const ORG_ID = req('NOMOS_ORG_ID');
 const CLOUD_CONN_ID = req('NOMOS_CLOUD_CONN_ID');
 const AZURE_SUB = req('NOMOS_AZURE_SUB_ID');
-const CONTROL_PLANE = (process.env.CONTROL_PLANE_URL ?? 'https://api.auto-nomos.com').replace(/\/+$/, '');
+const CONTROL_PLANE = (process.env.CONTROL_PLANE_URL ?? 'https://api.auto-nomos.com').replace(
+  /\/+$/,
+  '',
+);
 const PDP = (process.env.PDP_URL ?? 'https://pdp.auto-nomos.com').replace(/\/+$/, '');
 const AGENT_NAME = process.env.E2E_TEST_AGENT_NAME ?? 'e2e-azure-smoke';
 const KEEP = !!process.env.E2E_KEEP_ARTIFACTS;
@@ -65,11 +68,7 @@ function trpcHeaders(): Record<string, string> {
   };
 }
 
-async function trpc<T = unknown>(
-  path: string,
-  method: 'GET' | 'POST',
-  body?: unknown,
-): Promise<T> {
+async function trpc<T = unknown>(path: string, method: 'GET' | 'POST', body?: unknown): Promise<T> {
   // batch=1 input shape: void inputs use meta.values=['undefined'], real
   // inputs send {json: <body>} with no meta.
   const inputPayload =
@@ -224,9 +223,7 @@ async function setup(): Promise<{
       error_code?: string;
     };
     if (!res.ok || !body.ucans?.[0]) {
-      throw new Error(
-        `mint-ucan ${command} failed: ${res.status} ${JSON.stringify(body)}`,
-      );
+      throw new Error(`mint-ucan ${command} failed: ${res.status} ${JSON.stringify(body)}`);
     }
     return { jwt: body.ucans[0].jwt, cid: body.ucans[0].cid };
   }
@@ -252,40 +249,37 @@ async function proxy(
   ucan: string,
   apiCall: { method: 'GET' | 'POST' | 'DELETE'; path: string; query?: Record<string, string> },
 ): Promise<{ status: number; body: unknown }> {
-  const res = await fetch(`${PDP}${command.startsWith('/') ? '/v1/proxy' + command : '/v1/proxy/' + command}`, {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      'x-cb-customer': ORG_ID,
-    },
-    body: JSON.stringify({
-      ucan,
-      request: {
-        ucan,
-        command,
-        resource: { subscription_id: AZURE_SUB },
-        context: { command },
+  const res = await fetch(
+    `${PDP}${command.startsWith('/') ? '/v1/proxy' + command : '/v1/proxy/' + command}`,
+    {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-cb-customer': ORG_ID,
       },
-      apiCall,
-    }),
-  });
+      body: JSON.stringify({
+        ucan,
+        request: {
+          ucan,
+          command,
+          resource: { subscription_id: AZURE_SUB },
+          context: { command },
+        },
+        apiCall,
+      }),
+    },
+  );
   const body = (await res.json()) as unknown;
   return { status: res.status, body };
 }
 
-async function caseAllow(ctx: {
-  allowUcanJwt: string;
-}): Promise<void> {
+async function caseAllow(ctx: { allowUcanJwt: string }): Promise<void> {
   console.log('--- 1. allow path /azure/vm/list ---');
-  const r = await proxy(
-    '/azure/vm/list',
-    ctx.allowUcanJwt,
-    {
-      method: 'GET',
-      path: `/subscriptions/${AZURE_SUB}/resourceGroups`,
-      query: { 'api-version': '2021-04-01' },
-    },
-  );
+  const r = await proxy('/azure/vm/list', ctx.allowUcanJwt, {
+    method: 'GET',
+    path: `/subscriptions/${AZURE_SUB}/resourceGroups`,
+    query: { 'api-version': '2021-04-01' },
+  });
   const body = r.body as {
     allow?: boolean;
     decision?: { allow?: boolean };
@@ -300,7 +294,10 @@ async function caseAllow(ctx: {
     (body.upstream?.body as { value?: unknown[] } | undefined);
   const rgs = Array.isArray(armBody?.value) ? armBody.value : undefined;
   if (r.status === 200 && body.allow === true && rgs) {
-    pass('allow: 200 ARM response', `${rgs.length} resource groups (e.g. ${(rgs[0] as { name?: string })?.name ?? '?'})`);
+    pass(
+      'allow: 200 ARM response',
+      `${rgs.length} resource groups (e.g. ${(rgs[0] as { name?: string })?.name ?? '?'})`,
+    );
   } else if (r.status === 200 && body.decision?.allow === false) {
     fail('allow: ARM 200 expected', `got decision deny: ${JSON.stringify(body).slice(0, 300)}`);
   } else {
@@ -313,60 +310,51 @@ async function caseAllow(ctx: {
 
 async function caseOutOfScope(ctx: { allowUcanJwt: string }): Promise<void> {
   console.log('--- 2. out-of-scope deny (vm/list UCAN -> vm/restart) ---');
-  const r = await proxy(
-    '/azure/vm/restart',
-    ctx.allowUcanJwt,
-    {
-      method: 'POST',
-      path: `/subscriptions/${AZURE_SUB}/providers/Microsoft.Compute/locations/eastus/restartVirtualMachines`,
-      query: { 'api-version': '2023-09-01' },
-    },
-  );
+  const r = await proxy('/azure/vm/restart', ctx.allowUcanJwt, {
+    method: 'POST',
+    path: `/subscriptions/${AZURE_SUB}/providers/Microsoft.Compute/locations/eastus/restartVirtualMachines`,
+    query: { 'api-version': '2023-09-01' },
+  });
   const body = r.body as { decision?: { allow?: boolean; reason?: string }; error_code?: string };
   if (r.status === 403 && body.decision?.allow === false) {
     pass('out-of-scope: 403 deny', `reason=${body.decision.reason}`);
   } else {
-    fail('out-of-scope: expected deny', `status=${r.status} body=${JSON.stringify(body).slice(0, 300)}`);
+    fail(
+      'out-of-scope: expected deny',
+      `status=${r.status} body=${JSON.stringify(body).slice(0, 300)}`,
+    );
   }
 }
 
 async function caseCosigner(ctx: { deleteUcanJwt: string }): Promise<void> {
   console.log('--- 3. cosigner block /azure/vm/delete ---');
-  const r = await proxy(
-    '/azure/vm/delete',
-    ctx.deleteUcanJwt,
-    {
-      method: 'DELETE',
-      path: `/subscriptions/${AZURE_SUB}/resourceGroups/never-exists/providers/Microsoft.Compute/virtualMachines/none`,
-      query: { 'api-version': '2023-09-01' },
-    },
-  );
+  const r = await proxy('/azure/vm/delete', ctx.deleteUcanJwt, {
+    method: 'DELETE',
+    path: `/subscriptions/${AZURE_SUB}/resourceGroups/never-exists/providers/Microsoft.Compute/virtualMachines/none`,
+    query: { 'api-version': '2023-09-01' },
+  });
   const body = r.body as { decision?: { allow?: boolean; reason?: string }; error_code?: string };
   if (r.status === 403 && body.error_code === 'cosigner_required') {
     pass('cosigner: 403 cosigner_required', `reason=${body.decision?.reason}`);
   } else {
-    fail('cosigner: expected 403 cosigner_required', `status=${r.status} body=${JSON.stringify(body).slice(0, 300)}`);
+    fail(
+      'cosigner: expected 403 cosigner_required',
+      `status=${r.status} body=${JSON.stringify(body).slice(0, 300)}`,
+    );
   }
 }
 
-async function caseRevocation(ctx: {
-  allowUcanCid: string;
-  allowUcanJwt: string;
-}): Promise<void> {
+async function caseRevocation(ctx: { allowUcanCid: string; allowUcanJwt: string }): Promise<void> {
   console.log('--- 4. revocation kill ---');
   await trpc('ucans.revoke', 'POST', { cid: ctx.allowUcanCid, reason: 'e2e-test' });
   console.log(`  revoked cid ${ctx.allowUcanCid.slice(0, 16)}...`);
   // Push to PDP webhook + polling sweep at 5s. Wait 1.5s then check.
   await new Promise((r) => setTimeout(r, 1500));
-  const r = await proxy(
-    '/azure/vm/list',
-    ctx.allowUcanJwt,
-    {
-      method: 'GET',
-      path: `/subscriptions/${AZURE_SUB}/resourcegroups`,
-      query: { 'api-version': '2021-04-01' },
-    },
-  );
+  const r = await proxy('/azure/vm/list', ctx.allowUcanJwt, {
+    method: 'GET',
+    path: `/subscriptions/${AZURE_SUB}/resourcegroups`,
+    query: { 'api-version': '2021-04-01' },
+  });
   const body = r.body as { decision?: { allow?: boolean; reason?: string } };
   if (body.decision?.allow === false && /revoke/i.test(body.decision?.reason ?? '')) {
     pass('revocation: deny within ~1.5s', `reason=${body.decision.reason}`);
@@ -377,10 +365,7 @@ async function caseRevocation(ctx: {
   }
 }
 
-async function cleanup(ctx: {
-  agentId: string;
-  policyId: string;
-}): Promise<void> {
+async function cleanup(ctx: { agentId: string; policyId: string }): Promise<void> {
   if (KEEP) {
     console.log('--- Cleanup skipped (E2E_KEEP_ARTIFACTS) ---');
     return;

@@ -56,10 +56,6 @@ const CONTROL_PLANE = (process.env.CONTROL_PLANE_URL ?? 'https://api.auto-nomos.
 const PDP = (process.env.PDP_URL ?? 'https://pdp.auto-nomos.com').replace(/\/+$/, '');
 const AGENT_NAME = process.env.E2E_TEST_AGENT_NAME ?? 'e2e-azure-mutate';
 
-const NSG_NAME = `nomos-sandbox-nsg-${Date.now()}`;
-const NSG_REGION = process.env.NOMOS_AZURE_REGION ?? 'eastus2';
-const ARM_API = '2023-11-01';
-
 function req(name: string): string {
   const v = process.env[name];
   if (!v) {
@@ -82,11 +78,7 @@ function trpcHeaders(): Record<string, string> {
   };
 }
 
-async function trpc<T = unknown>(
-  path: string,
-  method: 'GET' | 'POST',
-  body?: unknown,
-): Promise<T> {
+async function trpc<T = unknown>(path: string, method: 'GET' | 'POST', body?: unknown): Promise<T> {
   const inputPayload =
     body === undefined
       ? { 0: { json: null, meta: { values: ['undefined'] } } }
@@ -139,7 +131,9 @@ async function setup(): Promise<{ agentId: string; apiKey: string; policyId: str
       `sandbox connection bootstrap_status=${sandbox.bootstrapStatus}; run verifyNow first`,
     );
   }
-  console.log(`  sandbox connection ${SANDBOX_CONN_ID} (${sandbox.displayName ?? 'unnamed'}) is verified`);
+  console.log(
+    `  sandbox connection ${SANDBOX_CONN_ID} (${sandbox.displayName ?? 'unnamed'}) is verified`,
+  );
 
   const agents = await trpc<Array<{ id: string; name: string; status: string }>>(
     'agents.list',
@@ -147,13 +141,14 @@ async function setup(): Promise<{ agentId: string; apiKey: string; policyId: str
   );
   let agent = agents.find((a) => a.name === AGENT_NAME);
   if (!agent) {
-    agent = await trpc<{ id: string; name: string; status: string }>(
-      'agents.create',
-      'POST',
-      { name: AGENT_NAME, requireApproval: false },
-    );
+    agent = await trpc<{ id: string; name: string; status: string }>('agents.create', 'POST', {
+      name: AGENT_NAME,
+      requireApproval: false,
+    });
     console.log(`  created agent ${agent.id}`);
-    console.log(`  IMPORTANT: register FIC for this agent on the sandbox App Registration before continuing.`);
+    console.log(
+      `  IMPORTANT: register FIC for this agent on the sandbox App Registration before continuing.`,
+    );
     console.log(`  The dashboard /app/agents/${agent.id} shows the exact az command pre-filled.`);
     process.exit(2);
   }
@@ -168,11 +163,13 @@ async function setup(): Promise<{ agentId: string; apiKey: string; policyId: str
   const policies = await trpc<Array<{ id: string; name: string }>>('policies.list', 'GET');
   const existing = policies.find((p) => p.name === POLICY_NAME);
   const policyId = existing
-    ? (await trpc<{ id: string }>('policies.upsert', 'POST', {
-        id: existing.id,
-        name: POLICY_NAME,
-        cedarText,
-      })).id
+    ? (
+        await trpc<{ id: string }>('policies.upsert', 'POST', {
+          id: existing.id,
+          name: POLICY_NAME,
+          cedarText,
+        })
+      ).id
     : (await trpc<{ id: string }>('policies.upsert', 'POST', { name: POLICY_NAME, cedarText })).id;
   await trpc('policies.assignAgents', 'POST', { policyId, agentIds: [agentId] });
 
@@ -260,7 +257,12 @@ async function caseCreate(ctx: { apiKey: string }): Promise<boolean> {
     body: { tags: { harness: 'prod-azure-mutate', step: 'step1', ts: String(Date.now()) } },
   });
   const b = r.body as { upstream?: { status?: number }; error_code?: string };
-  if (r.status === 200 && b.upstream?.status && b.upstream.status >= 200 && b.upstream.status < 300) {
+  if (
+    r.status === 200 &&
+    b.upstream?.status &&
+    b.upstream.status >= 200 &&
+    b.upstream.status < 300
+  ) {
     pass('patch1: ARM 2xx', `status=${b.upstream.status}`);
     return true;
   }
@@ -278,7 +280,12 @@ async function caseTag(ctx: { apiKey: string }): Promise<void> {
     body: { tags: { harness: 'prod-azure-mutate', step: 'step2', ts: String(Date.now()) } },
   });
   const b = r.body as { upstream?: { status?: number } };
-  if (r.status === 200 && b.upstream?.status && b.upstream.status >= 200 && b.upstream.status < 300) {
+  if (
+    r.status === 200 &&
+    b.upstream?.status &&
+    b.upstream.status >= 200 &&
+    b.upstream.status < 300
+  ) {
     pass('patch2: ARM 2xx', `status=${b.upstream.status}`);
   } else {
     fail('patch2: expected ARM 2xx', `status=${r.status} body=${JSON.stringify(b).slice(0, 1500)}`);
@@ -298,7 +305,10 @@ async function caseDeleteCosignerGate(ctx: { apiKey: string }): Promise<string |
     pass('delete-gate: 403 cosigner_required', b.decision?.reason ?? '?');
     return jwt;
   }
-  fail('delete-gate: expected 403 cosigner_required', `status=${r.status} body=${JSON.stringify(b).slice(0, 300)}`);
+  fail(
+    'delete-gate: expected 403 cosigner_required',
+    `status=${r.status} body=${JSON.stringify(b).slice(0, 300)}`,
+  );
   return null;
 }
 
@@ -338,7 +348,9 @@ async function main(): Promise<void> {
       `\nApprove the destructive request at the stepUpUrl in your dashboard within ${APPROVE_WAIT_SEC}s.`,
     );
     console.log('Approve flow requires a WebAuthn passkey — out-of-scope to automate.');
-    console.log('After approval the broker emits a cosigner UCAN; rerun the delete with cosignerJwt in context.');
+    console.log(
+      'After approval the broker emits a cosigner UCAN; rerun the delete with cosignerJwt in context.',
+    );
     await fallbackCliDelete();
   }
 

@@ -5,14 +5,7 @@ import { trpc } from '../lib/trpc';
 import { formatDate, shortId } from '../lib/utils';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from './ui/card';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from './ui/card';
 import {
   Dialog,
   DialogContent,
@@ -51,10 +44,7 @@ export function PolicyAgentsCard({ policyId }: Props) {
     [mapped.data],
   );
   const candidates = useMemo(
-    () =>
-      (allAgents.data ?? []).filter(
-        (a) => !mappedIds.has(a.id) && a.status !== 'deleted',
-      ),
+    () => (allAgents.data ?? []).filter((a) => !mappedIds.has(a.id) && a.status !== 'deleted'),
     [allAgents.data, mappedIds],
   );
 
@@ -104,9 +94,7 @@ export function PolicyAgentsCard({ policyId }: Props) {
                     <Button
                       size="sm"
                       variant="ghost"
-                      onClick={() =>
-                        unassign.mutate({ agentId: row.agentId, policyId })
-                      }
+                      onClick={() => unassign.mutate({ agentId: row.agentId, policyId })}
                       disabled={unassign.isPending}
                     >
                       Remove
@@ -178,9 +166,7 @@ export function PolicyAgentsCard({ policyId }: Props) {
               Cancel
             </Button>
             <Button
-              onClick={() =>
-                assign.mutate({ policyId, agentIds: Array.from(selected) })
-              }
+              onClick={() => assign.mutate({ policyId, agentIds: Array.from(selected) })}
               disabled={assign.isPending || selected.size === 0}
             >
               {assign.isPending ? 'Mapping…' : `Map ${selected.size || ''}`}

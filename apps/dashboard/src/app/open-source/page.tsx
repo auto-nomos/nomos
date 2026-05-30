@@ -13,16 +13,21 @@ import {
 export const metadata: Metadata = {
   title: 'Open source — Nomos',
   description:
-    'Nomos is going open source. 13 packages live on npm under @auto-nomos/* today; the control-plane and dashboard flip public alongside our 1.0 release under Apache-2.0. Star the repo to be in the first hundred.',
+    'Nomos is open source under Apache-2.0. 13 packages live on npm under @auto-nomos/*, and the full control-plane + dashboard source is public. Read every line, audit how decisions get made, send a PR.',
   alternates: { canonical: '/open-source' },
   openGraph: {
     title: 'Open source — Nomos',
     description:
-      'Nomos is going open source. 13 packages on npm today. Control-plane source flips with 1.0.',
+      'Nomos is open source under Apache-2.0. 13 packages on npm and the full control-plane + dashboard source public.',
   },
 };
 
-const PACKAGES: { name: string; role: string; coverage?: string; status: 'public' | 'soon' }[] = [
+const PACKAGES: {
+  name: string;
+  role: string;
+  coverage?: string;
+  status: 'public' | 'soon' | 'source';
+}[] = [
   { name: '@auto-nomos/core', role: 'PDP decide() engine', coverage: '100%', status: 'public' },
   { name: '@auto-nomos/cedar', role: 'Cedar policy evaluator', coverage: '100%', status: 'public' },
   { name: '@auto-nomos/ucan', role: 'UCAN delegation chains', coverage: '100%', status: 'public' },
@@ -36,8 +41,8 @@ const PACKAGES: { name: string; role: string; coverage?: string; status: 'public
   { name: '@auto-nomos/audit-verify', role: 'Chain verify CLI', status: 'public' },
   { name: '@auto-nomos/cli', role: 'nomos CLI', status: 'public' },
   { name: '@auto-nomos/ucan-cli', role: 'nomos-ucan CLI', status: 'public' },
-  { name: '@auto-nomos/control-plane', role: 'Hono + tRPC server', status: 'soon' },
-  { name: '@auto-nomos/dashboard', role: 'Next.js operator UI', status: 'soon' },
+  { name: '@auto-nomos/control-plane', role: 'Hono + tRPC server', status: 'source' },
+  { name: '@auto-nomos/dashboard', role: 'Next.js operator UI', status: 'source' },
 ];
 
 const MILESTONES: { tag: string; date: string; body: string }[] = [
@@ -54,7 +59,7 @@ const MILESTONES: { tag: string; date: string; body: string }[] = [
   {
     tag: 'v1.0',
     date: 'Targeting Q4 2026',
-    body: 'Control-plane + dashboard source open under Apache-2.0. CONTRIBUTING.md, RFC process, code of conduct, governance doc. Public roadmap on GitHub Projects.',
+    body: 'A stable, semver-guaranteed 1.0 API surface. An RFC process and governance doc on top of the Apache-2.0 source, CONTRIBUTING, and code of conduct already in the repo. Public roadmap on GitHub Projects.',
   },
 ];
 
@@ -68,15 +73,15 @@ export default function OpenSourcePage() {
             <span>Open source · roadmap to 1.0</span>
           </div>
           <h1 className="display mt-7 max-w-[18ch] text-[64px] text-aegis-paper md:text-[88px]">
-            Going <em>open source</em>.
+            <em>Open source</em>.
             <br />
-            On purpose. In order.
+            Read every line.
           </h1>
           <p className="mt-8 max-w-[680px] text-lg leading-relaxed text-aegis-mute">
-            We are publishing Nomos in layers. The crypto, the policy engine, the SDK, and the MCP
-            server are already on npm — anyone can audit how a decision gets made. The control-plane
-            and dashboard source go public with 1.0 under Apache-2.0. Until then, here is exactly
-            what is open, what is coming, and when.
+            Nomos is open under Apache-2.0. The crypto, the policy engine, the SDK, and the MCP
+            server are on npm — and the full control-plane and dashboard source is public too, so
+            anyone can audit exactly how a decision gets made. Here is every package, and where the
+            roadmap goes next.
           </p>
           <div className="mt-10 flex flex-wrap gap-3">
             <a
@@ -146,12 +151,16 @@ export default function OpenSourcePage() {
                     <div className="col-span-2 text-right">
                       <span
                         className={`inline-flex items-center rounded-sm border px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.18em] ${
-                          p.status === 'public'
-                            ? 'border-aegis-signal/40 bg-aegis-signal/10 text-aegis-signal'
-                            : 'border-aegis-amber/40 bg-aegis-amber/10 text-aegis-amber'
+                          p.status === 'soon'
+                            ? 'border-aegis-amber/40 bg-aegis-amber/10 text-aegis-amber'
+                            : 'border-aegis-signal/40 bg-aegis-signal/10 text-aegis-signal'
                         }`}
                       >
-                        {p.status === 'public' ? 'on npm' : 'soon'}
+                        {p.status === 'public'
+                          ? 'on npm'
+                          : p.status === 'source'
+                            ? 'source'
+                            : 'soon'}
                       </span>
                     </div>
                   </li>

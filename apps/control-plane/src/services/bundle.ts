@@ -84,10 +84,7 @@ export async function generateBundle(
       .from(schema.agentPolicies)
       .innerJoin(schema.agents, eq(schema.agentPolicies.agentId, schema.agents.id))
       .where(
-        and(
-          eq(schema.agentPolicies.customerId, customerId),
-          ne(schema.agents.status, 'deleted'),
-        ),
+        and(eq(schema.agentPolicies.customerId, customerId), ne(schema.agents.status, 'deleted')),
       ),
     deps.db
       .select({
@@ -150,9 +147,7 @@ export async function generateBundle(
     did: a.did,
     mode: a.mode as 'static' | 'dynamic',
     status: a.status as 'active' | 'disabled' | 'deleted',
-    connectionApprovedAt: a.connectionApprovedAt
-      ? a.connectionApprovedAt.toISOString()
-      : null,
+    connectionApprovedAt: a.connectionApprovedAt ? a.connectionApprovedAt.toISOString() : null,
   }));
 
   const bundle: BundleBody = {

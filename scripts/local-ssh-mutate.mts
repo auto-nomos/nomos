@@ -31,9 +31,9 @@
  * Exits 0 only if every check passes.
  */
 import {
-  Results,
   mintIntentUcan,
   pdpProxy,
+  Results,
   req,
   setAgentMode,
   setupAgent,
@@ -112,7 +112,9 @@ function sshConstraint(extra: Partial<SshConstraintInput> = {}): Record<string, 
     host: extra.host ?? SSH_HOST,
     port: extra.port ?? SSH_PORT,
     username: extra.username ?? SSH_USER,
-    ...(extra.path_prefix !== undefined ? { path_prefix: extra.path_prefix } : { path_prefix: SANDBOX }),
+    ...(extra.path_prefix !== undefined
+      ? { path_prefix: extra.path_prefix }
+      : { path_prefix: SANDBOX }),
   };
 }
 

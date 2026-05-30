@@ -31,10 +31,10 @@
  */
 import {
   CONTROL_PLANE,
-  PDP,
-  Results,
   mintStaticUcan,
+  PDP,
   pdpProxy,
+  Results,
   req,
   setupAgent,
 } from './lib-prod-harness.mts';
@@ -43,7 +43,6 @@ const SESSION = req('NOMOS_SESSION_TOKEN');
 const ORG_ID = req('NOMOS_ORG_ID');
 const GUILD_ID = req('NOMOS_DISCORD_GUILD_ID');
 const AGENT_NAME = process.env.E2E_DISCORD_AGENT_NAME ?? 'oss-community-setup';
-const APPROVE_WAIT_SEC = Number(process.env.NOMOS_APPROVE_WAIT_SEC ?? '300');
 
 const READS = `[Action::"/discord/channel/list", Action::"/discord/role/list", Action::"/discord/guild/read", Action::"/discord/message/list"]`;
 const WRITES = `[Action::"/discord/channel/create", Action::"/discord/channel/modify", Action::"/discord/role/create", Action::"/discord/message/post", Action::"/discord/invite/create"]`;
@@ -60,13 +59,38 @@ interface ChannelSpec {
 
 const CATEGORIES = ['GENERAL', 'SUPPORT', 'DEV', 'VOICE'] as const;
 const CHANNELS: ChannelSpec[] = [
-  { name: 'welcome', type: 0, parentName: 'GENERAL', topic: 'Start here — community guidelines + introductions.' },
-  { name: 'rules', type: 0, parentName: 'GENERAL', topic: 'Read before you post. Enforced by mods.' },
-  { name: 'announcements', type: 0, parentName: 'GENERAL', topic: 'Release notes + Nomos updates.' },
+  {
+    name: 'welcome',
+    type: 0,
+    parentName: 'GENERAL',
+    topic: 'Start here — community guidelines + introductions.',
+  },
+  {
+    name: 'rules',
+    type: 0,
+    parentName: 'GENERAL',
+    topic: 'Read before you post. Enforced by mods.',
+  },
+  {
+    name: 'announcements',
+    type: 0,
+    parentName: 'GENERAL',
+    topic: 'Release notes + Nomos updates.',
+  },
   { name: 'showcase', type: 0, parentName: 'GENERAL', topic: 'Share what you built with Nomos.' },
   { name: 'help', type: 0, parentName: 'SUPPORT', topic: 'Stuck? Ask here.' },
-  { name: 'bug-reports', type: 0, parentName: 'SUPPORT', topic: 'Reproducible issues. Link to GitHub when relevant.' },
-  { name: 'dev', type: 0, parentName: 'DEV', topic: 'Contributor chat — design, architecture, PR walkthroughs.' },
+  {
+    name: 'bug-reports',
+    type: 0,
+    parentName: 'SUPPORT',
+    topic: 'Reproducible issues. Link to GitHub when relevant.',
+  },
+  {
+    name: 'dev',
+    type: 0,
+    parentName: 'DEV',
+    topic: 'Contributor chat — design, architecture, PR walkthroughs.',
+  },
   { name: 'pull-requests', type: 0, parentName: 'DEV', topic: 'PR notifications + reviews.' },
   { name: 'ci-builds', type: 0, parentName: 'DEV', topic: 'Build + deploy status feed.' },
   { name: 'general-voice', type: 2, parentName: 'VOICE' },
@@ -156,7 +180,8 @@ async function listExistingChannels(apiKey: string): Promise<void> {
     ?.body;
   if (!Array.isArray(list)) return;
   for (const c of list) channelIds[c.name] = c.id;
-  if (list.length > 0) console.log(`  found ${list.length} existing channels — will skip duplicates`);
+  if (list.length > 0)
+    console.log(`  found ${list.length} existing channels — will skip duplicates`);
 }
 
 async function createChannels(apiKey: string, _agentId: string): Promise<void> {
@@ -187,12 +212,16 @@ async function createChannels(apiKey: string, _agentId: string): Promise<void> {
         body: { name: catName, type: 4 },
       },
     });
-    const upstream = (res.body as { upstream?: { status?: number; body?: { id?: string } } })?.upstream?.body;
+    const upstream = (res.body as { upstream?: { status?: number; body?: { id?: string } } })
+      ?.upstream?.body;
     if (res.status === 200 && upstream?.id) {
       channelIds[catName] = upstream.id;
       results.pass(`category ${catName}`, `id=${upstream.id}`);
     } else {
-      results.fail(`category ${catName}`, `status=${res.status} body=${JSON.stringify(res.body).slice(0, 200)}`);
+      results.fail(
+        `category ${catName}`,
+        `status=${res.status} body=${JSON.stringify(res.body).slice(0, 200)}`,
+      );
     }
   }
 
@@ -225,12 +254,16 @@ async function createChannels(apiKey: string, _agentId: string): Promise<void> {
         body,
       },
     });
-    const upstream = (res.body as { upstream?: { status?: number; body?: { id?: string } } })?.upstream?.body;
+    const upstream = (res.body as { upstream?: { status?: number; body?: { id?: string } } })
+      ?.upstream?.body;
     if (res.status === 200 && upstream?.id) {
       channelIds[ch.name] = upstream.id;
       results.pass(`channel #${ch.name}`, `id=${upstream.id}`);
     } else {
-      results.fail(`channel #${ch.name}`, `status=${res.status} body=${JSON.stringify(res.body).slice(0, 200)}`);
+      results.fail(
+        `channel #${ch.name}`,
+        `status=${res.status} body=${JSON.stringify(res.body).slice(0, 200)}`,
+      );
     }
   }
 }
@@ -251,9 +284,11 @@ async function createRoles(apiKey: string, _agentId: string): Promise<void> {
     resource: { guild_id: GUILD_ID },
     apiCall: { method: 'GET', path: `/guilds/${GUILD_ID}/roles` },
   });
-  const existing = (existingRes.body as {
-    upstream?: { body?: Array<{ id: string; name: string }> };
-  })?.upstream?.body;
+  const existing = (
+    existingRes.body as {
+      upstream?: { body?: Array<{ id: string; name: string }> };
+    }
+  )?.upstream?.body;
   if (Array.isArray(existing)) {
     for (const r of existing) roleIds[r.name] = r.id;
   }
@@ -286,12 +321,16 @@ async function createRoles(apiKey: string, _agentId: string): Promise<void> {
         },
       },
     });
-    const upstream = (res.body as { upstream?: { status?: number; body?: { id?: string } } })?.upstream?.body;
+    const upstream = (res.body as { upstream?: { status?: number; body?: { id?: string } } })
+      ?.upstream?.body;
     if (res.status === 200 && upstream?.id) {
       roleIds[role.name] = upstream.id;
       results.pass(`role ${role.name}`, `id=${upstream.id}`);
     } else {
-      results.fail(`role ${role.name}`, `status=${res.status} body=${JSON.stringify(res.body).slice(0, 200)}`);
+      results.fail(
+        `role ${role.name}`,
+        `status=${res.status} body=${JSON.stringify(res.body).slice(0, 200)}`,
+      );
     }
   }
 }
@@ -327,11 +366,15 @@ async function postMessage(
       body: { content },
     },
   });
-  const upstream = (res.body as { upstream?: { status?: number; body?: { id?: string } } })?.upstream?.body;
+  const upstream = (res.body as { upstream?: { status?: number; body?: { id?: string } } })
+    ?.upstream?.body;
   if (res.status === 200 && upstream?.id) {
     results.pass(`post #${channelName}`, `msg=${upstream.id}`);
   } else {
-    results.fail(`post #${channelName}`, `status=${res.status} body=${JSON.stringify(res.body).slice(0, 200)}`);
+    results.fail(
+      `post #${channelName}`,
+      `status=${res.status} body=${JSON.stringify(res.body).slice(0, 200)}`,
+    );
   }
 }
 

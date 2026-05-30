@@ -10,8 +10,8 @@ keywords:
   - cedar
   - ucan
   - policy-decision-point
-home: https://github.com/varendra007/agent-credential-broker
+home: https://github.com/varendra007/nomos
 sources:
-  - https://github.com/varendra007/agent-credential-broker
+  - https://github.com/varendra007/nomos
 maintainers:
   - name: credential-broker

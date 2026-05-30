@@ -12,13 +12,19 @@ import { generateKeyPairSync } from 'node:crypto';
 import type { CloudConnectorId, CloudProvider } from '@auto-nomos/core';
 import { LocalRs256Signer, publicJwkFromPrivatePem, verifyJwtRs256 } from '@auto-nomos/crypto';
 import { Hono } from 'hono';
+import { pino } from 'pino';
 import { describe, expect, it, vi } from 'vitest';
 import type { CloudConnectionRow } from '../cloud/connections.js';
 import { AzureCloudProvider } from '../cloud/providers/azure.js';
+import { loggerMiddleware } from '../middleware/logger.js';
 import { createCloudInternalRoutes } from '../routes/cloud-internal.js';
 
 const ISSUER = 'http://localhost:8788/oidc';
 const SERVICE_TOKEN = 'svc-token';
+// Prod mounts loggerMiddleware globally (server.ts: app.use('*', ...)), so error
+// paths can call getLog(). Tests mount routes on a bare Hono — attach a silent
+// logger so the federation-error path doesn't throw "logger not attached".
+const silentLog = pino({ level: 'silent' });
 
 function fixture(): {
   app: Hono;
@@ -236,6 +242,7 @@ describe('POST /v1/internal/cloud/api-call', () => {
       updatedAt: new Date(),
     };
     const app = new Hono();
+    app.use('*', loggerMiddleware(silentLog));
     app.route(
       '/',
       createCloudInternalRoutes({
@@ -306,6 +313,7 @@ describe('POST /v1/internal/cloud/api-call', () => {
       },
     };
     const app = new Hono();
+    app.use('*', loggerMiddleware(silentLog));
     app.route(
       '/',
       createCloudInternalRoutes({

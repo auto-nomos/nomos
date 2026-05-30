@@ -1,112 +1,138 @@
-# @auto-nomos/sdk
+# `@auto-nomos/sdk`
 
-TypeScript SDK for the Credential Broker authorization layer. Wrap any
-upstream call (GitHub, Slack, Stripe, your own API) in `guard.authorize()` and
-the call only runs if your customer's policy says it can.
+TypeScript client for the Nomos authorization layer. Wrap any agent call in
+`client.authorize()` — only when your Cedar policy says yes does the call run.
 
 > **Default is fail-closed.** PDP unreachable, malformed response, or any
-> non-allow decision returns a deny. Override only if you understand the
-> security trade-off (see _Failure modes_ below).
+> non-allow decision returns a deny. Opening the gate is opt-in only — see
+> [Failure modes](#failure-modes).
 
 ## Install
 
 ```bash
-npm install @auto-nomos/sdk
-# or pnpm / yarn / bun equivalent
+pnpm add @auto-nomos/sdk
+# or: npm i @auto-nomos/sdk / yarn add @auto-nomos/sdk
 ```
 
-## 3-line integration
+Node 22+. Not browser-safe (UCAN minting paths use Node crypto APIs).
+
+## Five-line example
 
 ```ts
-import { createAuthGuard } from '@auto-nomos/sdk';
+import { createIntentClient } from '@auto-nomos/sdk';
 
-const guard = createAuthGuard({ apiKey: process.env.CB_API_KEY!, pdpUrl: process.env.CB_PDP_URL! });
-const decision = await guard.authorize({ ucan, command: '/github/issue/create', resource: { repo: 'acme/billing' }, context: {} });
-if (decision.allow) await octokit.rest.issues.create({ owner: 'acme', repo: 'billing', title });
+const client = createIntentClient({
+  controlPlaneUrl: process.env.NOMOS_CONTROL_URL!,
+  apiKey: process.env.NOMOS_API_KEY!,
+});
+
+const grant = await client.authorize({
+  command: '/github/issue/list',
+  resource: { provider: 'github', owner: 'acme', repo: 'app' },
+  ttlSeconds: 300,
+});
 ```
 
-That's the wedge. Everything below is reference.
+`grant.ucan` is a JWT-shaped delegation. Put it in `Authorization: Bearer …`
+when you call the PDP.
 
-## API
-
-### `createAuthGuard(options) → AuthGuard`
-
-| Option | Type | Default | Notes |
-|---|---|---|---|
-| `apiKey` | `string` | required | Format: `cb_<customerId>_<secret>`. The customer UUID is parsed out and sent as `x-cb-customer`; the full key is sent as `Authorization: Bearer`. |
-| `pdpUrl` | `string` | required | Base URL of the PDP (no trailing slash required). |
-| `failureMode` | `'closed' \| 'open'` | `'closed'` | What to return when the PDP is unreachable. **Leave as `closed` unless you have a written reason.** |
-| `schema` | `string` | `undefined` | Optional schema-pack id; sent as `x-cb-schema`. |
-| `fetchFn` | `typeof fetch` | `globalThis.fetch` | Override for testing or for environments without a global `fetch`. |
-| `retry.maxAttempts` | `number` | `3` | Total attempts (not retries). Retries on 5xx and network errors only. 4xx returns immediately. |
-| `retry.baseDelayMs` | `number` | `100` | Exponential backoff base. Delay between attempt N and N+1 is `base * 2**(N-1)`. |
-
-### `guard.authorize(req) → Promise<AuthorizeDecision>`
+## Real-world example — call GitHub through the PDP
 
 ```ts
-type AuthorizeRequestInput = {
-  ucan: string;                          // JWT minted by the control plane
-  command: string;                       // e.g. '/github/issue/create'
-  resource: Record<string, unknown>;     // shape depends on the schema pack
-  context: Record<string, unknown>;      // ip, time, user attributes — passed to Cedar
-};
+import { createIntentClient } from '@auto-nomos/sdk';
 
-type AuthorizeDecision = {
-  allow: boolean;
-  reason?: string;                       // 'policy_denied' | 'expired' | 'pdp_unreachable' | ...
-  obligations?: Record<string, unknown>;
-  receiptId: string;                     // pass to emitReceipt after the upstream call
-  requiresStepUp?: boolean;
-  stepUpUrl?: string;
-};
+const client = createIntentClient({
+  controlPlaneUrl: process.env.NOMOS_CONTROL_URL!,
+  apiKey: process.env.NOMOS_API_KEY!,
+});
+
+async function listOpenIssues(owner: string, repo: string) {
+  const grant = await client.authorize({
+    command: '/github/issue/list',
+    resource: { provider: 'github', owner, repo },
+    ttlSeconds: 300,
+    purpose: 'triage open issues for the standup',
+  });
+  if (grant.decision !== 'allow') {
+    throw new Error(`Nomos denied: ${grant.reason ?? grant.decision}`);
+  }
+
+  const res = await fetch(
+    `${process.env.NOMOS_PDP_URL}/github/issue/list?owner=${owner}&repo=${repo}&state=open`,
+    { headers: { authorization: `Bearer ${grant.ucan}` } },
+  );
+  if (!res.ok) throw new Error(`PDP error ${res.status}`);
+  return (await res.json()) as { issues: { number: number; title: string }[] };
+}
 ```
 
-Never throws under normal operation — retries are exhausted into a structured
-deny (or allow, if `failureMode: 'open'`). Bad-shape responses return
-`reason: 'pdp_invalid_response'`.
-
-### `guard.emitReceipt(receiptId, input) → Promise<void>`
+## Step-up handling
 
 ```ts
-type ReceiptInput = {
-  outcome: 'success' | 'failure';
-  metadata?: Record<string, unknown>;
-};
+const grant = await client.authorize({ command: '/github/pr/create', /* … */ });
 
-await guard.emitReceipt(decision.receiptId, { outcome: 'success', metadata: { issueId: 7 } });
+if (grant.decision === 'requires_step_up') {
+  await notifyHumanToApprove(grant.approvalEnvelopeId);
+  // wait for webhook / poll, then:
+  const retried = await client.authorize({
+    command: '/github/pr/create',
+    cosignerEnvelopeId: grant.approvalEnvelopeId,
+    /* … */
+  });
+  return retried;
+}
 ```
 
-Throws if the PDP returns non-2xx (caller decides whether to retry or swallow).
-**Receipts are best-effort by design** — a failed receipt must not undo an
-already-completed upstream call. The reference MCP server in `examples/mcp-github`
-wraps `emitReceipt` in `.catch(() => undefined)` for this reason.
+In MCP hosts (Cursor, Claude, Codex) this is handled for you. In a backend agent
+loop, you implement the wait — usually a dashboard webhook.
 
 ## Failure modes
 
-| `failureMode` | When | Returns | Use case |
-|---|---|---|---|
-| `closed` (default) | PDP down, network error, malformed response, persistent 5xx | `{ allow: false, reason: 'pdp_unreachable' }` | **Almost always.** Authorization layer must default safest. |
-| `open` | Same conditions | `{ allow: true, reason: 'pdp_unreachable_failopen' }` | Read-mostly tools where a partial outage shouldn't break the agent. Logging-only commands. Never use for write paths or financial actions. |
+| `failureMode` | Behavior | Use when |
+|---|---|---|
+| `'closed'` (default) | Throws on PDP unreachable / 5xx / malformed | **Almost always.** This is the whole point. |
+| `'open'` | Returns `{ decision: 'allow', reason: 'pdp_unreachable_failopen' }` | Read-mostly flows behind a kill switch. Never for writes. |
 
-The default exists because authorization is a security primitive: silently
+Why fail-closed is the default: authorization is a security primitive. Silently
 allowing requests when the policy engine is unreachable is the worst kind of
-bug — it surfaces only during an incident and lets the wrong people through.
+bug — surfaces only during incidents and lets the wrong people through.
+
+## API surface
+
+| Method | What |
+|---|---|
+| `authorize(req)` | Mint a UCAN for one command. |
+| `intent(req)` | Dynamic-mode constraint envelope without committing to one command. |
+| `revoke(cidOrEnvelopeId)` | Kill an envelope. Push fan-out within ~5s. |
+| `verifyReceipt(receipt)` | Local hash + signature check on an audit receipt. |
+| `forkChild({ parentChain, … })` | Build a child UCAN chain for swarm sub-agents. |
+
+## Constructor options
+
+| Option | Type | Default | Notes |
+|---|---|---|---|
+| `controlPlaneUrl` | `string` | required | `https://control.auto-nomos.com` hosted; self-host URL otherwise. |
+| `apiKey` | `string` | required | Issued from an App detail page. |
+| `failureMode` | `'closed' \| 'open'` | `'closed'` | Read [Failure modes](#failure-modes) before changing. |
+| `fetch` | `typeof fetch` | `globalThis.fetch` | Swap for tracing, retries, mTLS. |
+| `retry.maxAttempts` | `number` | `3` | Retries on 5xx + network errors only. 4xx fails fast. |
+| `retry.baseDelayMs` | `number` | `100` | Exponential backoff base. |
 
 ## Custom transport
 
-`fetchFn` lets you swap in a Node `undici` agent, a Cloudflare Workers fetcher,
-or a test double:
-
 ```ts
 import { fetch } from 'undici';
-const guard = createAuthGuard({ apiKey, pdpUrl, fetchFn: fetch as typeof globalThis.fetch });
+import { createIntentClient } from '@auto-nomos/sdk';
+
+const client = createIntentClient({
+  controlPlaneUrl: process.env.NOMOS_CONTROL_URL!,
+  apiKey: process.env.NOMOS_API_KEY!,
+  fetch: fetch as typeof globalThis.fetch,
+});
 ```
 
-## What's _not_ in here yet
+## Docs
 
-- **OAuth proxy mode.** Sprint 5 adds `guard.proxy(command, request)` so the
-  agent never holds the upstream OAuth token at all.
-- **Step-up flow.** Sprint 9 adds `requiresStepUp` polling.
-- **Rotation of PDP signing key cache.** Sprint 8.
-
-Track in `docs/adr/` and the deferred decisions log of the build plan.
+Live docs: [docs.auto-nomos.com/connect/sdk-typescript](https://app.auto-nomos.com/docs/connect/sdk-typescript)
+Step-up flow: [docs.auto-nomos.com/policies/step-up-approvals](https://app.auto-nomos.com/docs/policies/step-up-approvals)
+Swarm forks: [docs.auto-nomos.com/policies/swarm-delegation](https://app.auto-nomos.com/docs/policies/swarm-delegation)

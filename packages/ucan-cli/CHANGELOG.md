@@ -1,5 +1,13 @@
 # @auto-nomos/ucan-cli
 
+## 0.0.3
+
+### Patch Changes
+
+- Updated dependencies [40bb0ea]
+  - @auto-nomos/shared-types@0.2.0
+  - @auto-nomos/ucan@0.0.4
+
 ## 0.0.2
 
 ### Patch Changes

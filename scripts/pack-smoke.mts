@@ -78,7 +78,9 @@ function smokeInstall(tarball: string): void {
  */
 async function assertPackExtractorCoverage(): Promise<void> {
   shInherit('pnpm --filter @auto-nomos/schema-packs build');
-  const { PACKS } = (await import('@auto-nomos/schema-packs')) as typeof import('@auto-nomos/schema-packs');
+  const { PACKS } = (await import(
+    '@auto-nomos/schema-packs'
+  )) as typeof import('@auto-nomos/schema-packs');
   const NON_PROXY = new Set<string>(['filesystem', 'azure', 'aws', 'gcp']);
   const missing: string[] = [];
   for (const pack of PACKS) {

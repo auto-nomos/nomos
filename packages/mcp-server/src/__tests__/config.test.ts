@@ -36,6 +36,41 @@ describe('loadConfig', () => {
     expect(cfg.integrations).toEqual(['github', 'notion']);
   });
 
+  it('reads NOMOS_* env (canonical names)', () => {
+    const cfg = loadConfig([], {
+      NOMOS_API_KEY: VALID_KEY,
+      NOMOS_PDP_URL: 'https://pdp.test',
+      NOMOS_CONTROL_URL: 'https://api.test',
+      NOMOS_INTEGRATIONS: 'github,linear',
+    } as NodeJS.ProcessEnv);
+    expect(cfg.apiKey).toBe(VALID_KEY);
+    expect(cfg.controlPlaneUrl).toBe('https://api.test');
+    expect(cfg.integrations).toEqual(['github', 'linear']);
+  });
+
+  it('accepts NOMOS_CONTROL_PLANE_URL as a symmetric alias', () => {
+    const cfg = loadConfig([], {
+      NOMOS_API_KEY: VALID_KEY,
+      NOMOS_PDP_URL: 'https://pdp.test',
+      NOMOS_CONTROL_PLANE_URL: 'https://api.test',
+    } as NodeJS.ProcessEnv);
+    expect(cfg.controlPlaneUrl).toBe('https://api.test');
+  });
+
+  it('prefers NOMOS_* over deprecated CB_* when both are set', () => {
+    const cfg = loadConfig([], {
+      NOMOS_API_KEY: VALID_KEY,
+      NOMOS_PDP_URL: 'https://pdp.nomos',
+      NOMOS_CONTROL_URL: 'https://api.nomos',
+      CB_API_KEY: 'cb_99999999-9999-9999-9999-999999999999_legacy',
+      CB_PDP_URL: 'https://pdp.legacy',
+      CB_CONTROL_PLANE_URL: 'https://api.legacy',
+    } as NodeJS.ProcessEnv);
+    expect(cfg.apiKey).toBe(VALID_KEY);
+    expect(cfg.pdpUrl).toBe('https://pdp.nomos');
+    expect(cfg.controlPlaneUrl).toBe('https://api.nomos');
+  });
+
   it('rejects malformed api keys', () => {
     expect(() =>
       loadConfig([], {

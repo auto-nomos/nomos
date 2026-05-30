@@ -1,7 +1,7 @@
 'use client';
 
 import { templatesFor } from '@auto-nomos/schema-packs';
-import { ArrowRight, Check, Copy, Plug, Terminal } from 'lucide-react';
+import { ArrowRight, Check, Copy, Download, Plug, Terminal } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -676,6 +676,34 @@ curl -X POST ${pdpUrl}/v1/proxy/github/user/read \\
     }
   }
 
+  // Build a ready-to-paste MCP client config and download it entirely in the
+  // browser. The plaintext key never round-trips to our server — this is the
+  // one moment it's in hand, so we hand it back as a file the user can drop
+  // straight into Cursor / Claude Desktop.
+  function downloadConfig() {
+    if (!apiKey) return;
+    const config = {
+      mcpServers: {
+        nomos: {
+          command: 'npx',
+          args: ['-y', '@auto-nomos/mcp-server@latest'],
+          env: {
+            NOMOS_API_KEY: apiKey,
+            NOMOS_CONTROL_URL: cpUrl,
+            NOMOS_PDP_URL: pdpUrl,
+          },
+        },
+      },
+    };
+    const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'nomos-mcp.json';
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   return (
     <PanelShell
       eyebrow="step 05 · first call"
@@ -722,14 +750,25 @@ curl -X POST ${pdpUrl}/v1/proxy/github/user/read \\
                 <Terminal className="h-3 w-3" />
                 {apiKeyName ?? 'api-key'} · plaintext shown once
               </div>
-              <button
-                type="button"
-                onClick={copy}
-                className="inline-flex items-center gap-1.5 rounded-sm border border-aegis-line px-2 py-1 font-mono text-[10px] uppercase tracking-[0.16em] text-aegis-paper hover:border-aegis-line-strong"
-              >
-                <Copy className="h-3 w-3" />
-                {copied ? 'copied' : 'copy'}
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={downloadConfig}
+                  title="Download a ready-to-paste MCP config (nomos-mcp.json) — the key stays in your browser"
+                  className="inline-flex items-center gap-1.5 rounded-sm border border-aegis-line px-2 py-1 font-mono text-[10px] uppercase tracking-[0.16em] text-aegis-paper hover:border-aegis-line-strong"
+                >
+                  <Download className="h-3 w-3" />
+                  config
+                </button>
+                <button
+                  type="button"
+                  onClick={copy}
+                  className="inline-flex items-center gap-1.5 rounded-sm border border-aegis-line px-2 py-1 font-mono text-[10px] uppercase tracking-[0.16em] text-aegis-paper hover:border-aegis-line-strong"
+                >
+                  <Copy className="h-3 w-3" />
+                  {copied ? 'copied' : 'copy'}
+                </button>
+              </div>
             </div>
             <pre className="mt-3 overflow-x-auto whitespace-pre text-[12px] leading-relaxed text-aegis-paper">
               {curl}

@@ -14,7 +14,7 @@
  *   SLACK_TEST_CHAN   optional Slack channel id for read+post probe
  */
 
-import { mintStaticUcan, pdpProxy, req, Results, CONTROL_PLANE, PDP } from './lib-prod-harness.mts';
+import { CONTROL_PLANE, mintStaticUcan, PDP, pdpProxy, Results, req } from './lib-prod-harness.mts';
 
 async function probe(
   results: Results,
@@ -36,7 +36,13 @@ async function probe(
   const r = await pdpProxy({ pdp: PDP, orgId, command, ucan, resource, apiCall });
   const b = r.body as {
     allow?: boolean;
-    decision?: { allow: boolean; reason?: string; receiptId?: string; requiresStepUp?: boolean; stepUpId?: string };
+    decision?: {
+      allow: boolean;
+      reason?: string;
+      receiptId?: string;
+      requiresStepUp?: boolean;
+      stepUpId?: string;
+    };
     upstream?: { status: number };
     error_code?: string;
   };
@@ -50,13 +56,19 @@ async function probe(
   } else if (
     expect === 'deny-cosigner' &&
     !allow &&
-    (reason.includes('cosigner') || reason.includes('stepup') || reason.includes('step_up') || b.decision?.requiresStepUp)
+    (reason.includes('cosigner') ||
+      reason.includes('stepup') ||
+      reason.includes('step_up') ||
+      b.decision?.requiresStepUp)
   ) {
     results.pass(label, `step_up triggered${stepUp}`);
   } else if (expect === 'deny' && !allow) {
     results.pass(label, `denied reason=${reason}`);
   } else {
-    results.fail(label, `expected=${expect} allow=${allow} reason=${reason} status=${upstreamStatus}${stepUp}`);
+    results.fail(
+      label,
+      `expected=${expect} allow=${allow} reason=${reason} status=${upstreamStatus}${stepUp}`,
+    );
   }
 }
 
@@ -88,7 +100,11 @@ async function main(): Promise<void> {
       apiKey,
       orgId,
       '/github/issue/list',
-      { method: 'GET', path: `/repos/${owner}/${repo}/issues`, query: { state: 'open', per_page: '3' } },
+      {
+        method: 'GET',
+        path: `/repos/${owner}/${repo}/issues`,
+        query: { state: 'open', per_page: '3' },
+      },
       { repo: githubRepo },
     );
     await probe(

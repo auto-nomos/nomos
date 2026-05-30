@@ -24,7 +24,7 @@ import { PublicShell } from '../components/nomos/public-shell';
  *   6. Audit           every decision signed and chained
  *   7. Stepup          for the calls that matter
  *   8. Mcp             one npx, in your editor
- *   9. OpenSource      coming very soon, star to be there day one
+ *   9. OpenSource      open source under Apache-2.0, read every line
  *  10. Community       build with us
  *  11. Comparison      why not just X?
  *  12. BottomCta       two paths — hosted or self-host
@@ -66,7 +66,7 @@ const FAQ_JSON_LD = {
       name: 'Is Nomos open source?',
       acceptedAnswer: {
         '@type': 'Answer',
-        text: 'Thirteen packages are already published on npm under @auto-nomos/*. The full control-plane and dashboard source go public alongside our 1.0 release under Apache-2.0.',
+        text: 'Yes. Thirteen packages are published on npm under @auto-nomos/*, and the full control-plane and dashboard source is public too — all under Apache-2.0.',
       },
     },
     {

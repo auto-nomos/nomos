@@ -37,6 +37,7 @@ function makeFetch(map: Record<string, () => Response>): {
 describe('PROVIDER_API', () => {
   it('covers all implemented providers', () => {
     expect(Object.keys(PROVIDER_API).sort()).toEqual([
+      'discord',
       'github',
       'google',
       'linear',

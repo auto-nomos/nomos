@@ -61,8 +61,11 @@ infrastructure/docker/ssh-sandbox/
 
 # Python SDK build artefacts
 packages/sdk-python/.venv/
+packages/sdk-python/.venv-dogfood/
+packages/sdk-python/.venv*/
 packages/sdk-python/dist/
 packages/sdk-python/build/
 packages/sdk-python/src/*.egg-info/
 packages/sdk-python/**/__pycache__/
 packages/sdk-python/.pytest_cache/
+.gstack/

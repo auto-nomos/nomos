@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/varendra007/nomos/security/advisories/new
+    about: Report security issues privately — never in a public issue. See SECURITY.md.
+  - name: Question / discussion
+    url: https://github.com/varendra007/nomos/discussions
+    about: Ask questions and discuss ideas with the community.
+  - name: Community Discord
+    url: https://discord.gg/cKkWQV7B
+    about: Chat with the Nomos community in real time.

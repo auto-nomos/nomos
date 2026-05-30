@@ -1,4 +1,7 @@
 #!/usr/bin/env tsx
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 /**
  * Emits per-pack apiCallSchema bindings from packages/adapters/spec/*.yaml.
  *
@@ -11,10 +14,7 @@
  *
  * Output is committed to the repo (no implicit codegen on build).
  */
-import { loadAllAdapters, type Action, type Param } from '@auto-nomos/adapters';
-import { writeFileSync, mkdirSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { type Action, loadAllAdapters, type Param } from '@auto-nomos/adapters';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PKG_ROOT = resolve(__dirname, '..');
@@ -123,16 +123,16 @@ function paramTypeToZod(p: Param): string {
 function renderBodyShape(params: readonly Param[]): string | null {
   const bodyParams = params.filter((p) => (p.in === 'body' || p.in === 'form') && p.required);
   if (bodyParams.length === 0) return null;
-  const fields = bodyParams.map((p) => `    ${JSON.stringify(p.name)}: ${paramTypeToZod(p)},`).join('\n');
+  const fields = bodyParams
+    .map((p) => `    ${JSON.stringify(p.name)}: ${paramTypeToZod(p)},`)
+    .join('\n');
   return `z.object({\n${fields}\n  }).passthrough()`;
 }
 
 function renderQueryShape(params: readonly Param[]): string | null {
   const required = params.filter((p) => p.in === 'query' && p.required);
   if (required.length === 0) return null;
-  const fields = required
-    .map((p) => `    ${JSON.stringify(p.name)}: z.string(),`)
-    .join('\n');
+  const fields = required.map((p) => `    ${JSON.stringify(p.name)}: z.string(),`).join('\n');
   return `z.object({\n${fields}\n  }).catchall(z.string())`;
 }
 
@@ -149,7 +149,9 @@ function renderAction(command: string, action: Action): string {
   // Emit `new RegExp(...)` rather than a literal so forward slashes in the
   // path template don't have to be escaped.
   const reLiteral = `new RegExp(${JSON.stringify(pathRe)})`;
-  const tmplLiteral = JSON.stringify(`apiCall.path does not match action template ${action.http.path}`);
+  const tmplLiteral = JSON.stringify(
+    `apiCall.path does not match action template ${action.http.path}`,
+  );
   return `  ${JSON.stringify(command)}: {
     apiCallSchema: z.object({
       method: z.literal(${JSON.stringify(action.http.method)}),
@@ -161,7 +163,11 @@ ${bodyLine}
   },`;
 }
 
-function renderPack(packId: string, actions: readonly Action[], actionToCommand: Record<string, string>): string {
+function renderPack(
+  packId: string,
+  actions: readonly Action[],
+  actionToCommand: Record<string, string>,
+): string {
   const lines: string[] = [];
   let skipped = 0;
   for (const action of actions) {
@@ -212,7 +218,9 @@ async function main(): Promise<void> {
     const yamlIds = new Set(adapter.actions.map((a) => a.id));
     for (const id of Object.keys(actionToCommand)) {
       if (!yamlIds.has(id)) {
-        throw new Error(`pack ${packId}: actionToCommand has \`${id}\` but ${adapterId}.yaml does not`);
+        throw new Error(
+          `pack ${packId}: actionToCommand has \`${id}\` but ${adapterId}.yaml does not`,
+        );
       }
     }
     const code = renderPack(packId, adapter.actions, actionToCommand);

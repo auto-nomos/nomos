@@ -1,4 +1,6 @@
 #!/usr/bin/env tsx
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 /**
  * Schema-pack ↔ adapter YAML ↔ MCP tool parity check.
  *
@@ -18,8 +20,6 @@
  * Run with: pnpm -F @auto-nomos/schema-packs parity
  */
 import { loadAllAdapters } from '@auto-nomos/adapters';
-import { resolve, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { PACKS } from '../src/index.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -73,8 +73,7 @@ const PACKLESS_ADAPTERS = new Set<string>([
  * Do NOT use this list to silence freshly-introduced orphans — fix them
  * properly (extend the YAML or change the command name to match).
  */
-const KNOWN_ORPHAN_COMMANDS = new Set<string>([
-]);
+const KNOWN_ORPHAN_COMMANDS = new Set<string>([]);
 
 interface Problem {
   pack: string;
