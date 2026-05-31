@@ -1,10 +1,10 @@
 import { ArrowRight, ArrowUpRight, Github, MessageCircle } from 'lucide-react';
 import Link from 'next/link';
-import { DISCORD_INVITE_URL, GITHUB_STAR_URL } from '../../lib/community-links';
+import { DISCORD_INVITE_URL, GITHUB_REPO_URL } from '../../lib/community-links';
 
 /**
  * Band 1 — Hero. One idea: your agent should never hold a key it could leak.
- * Three CTAs in priority order: Start free, Star on GitHub, Join Discord.
+ * Three CTAs in priority order: Start free, View on GitHub, Join Discord.
  * Live-feed panel on the right anchors the abstract claim in real signal.
  */
 export function Hero() {
@@ -24,7 +24,7 @@ export function Hero() {
           <p className="mt-7 max-w-[640px] text-base leading-relaxed text-aegis-mute sm:mt-9 sm:text-lg md:text-xl">
             Scoped permissions, signed actions, replayable audit. Nomos is the control plane between
             your AI agents and the world — every action authorized, every scope narrowed, every
-            decision witnessed. Open source — star us on GitHub.
+            decision witnessed. Open source on GitHub.
           </p>
           <div className="mt-10 flex flex-wrap items-center gap-3">
             <Link
@@ -35,13 +35,13 @@ export function Hero() {
               <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
             </Link>
             <a
-              href={GITHUB_STAR_URL}
+              href={GITHUB_REPO_URL}
               target="_blank"
               rel="noreferrer"
               className="group inline-flex items-center gap-2 rounded-sm border border-aegis-line px-5 py-3 font-mono text-[12px] uppercase tracking-[0.18em] text-aegis-paper transition-colors hover:border-aegis-signal hover:text-aegis-signal"
             >
               <Github className="h-4 w-4" />
-              Star on GitHub
+              View on GitHub
               <ArrowUpRight className="h-3.5 w-3.5 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
             </a>
             <a

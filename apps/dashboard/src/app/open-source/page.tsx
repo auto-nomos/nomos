@@ -1,4 +1,4 @@
-import { ArrowUpRight, Github, Package, Star } from 'lucide-react';
+import { ArrowUpRight, Github, Package } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { PublicShell } from '../../components/nomos/public-shell';
@@ -6,7 +6,6 @@ import {
   GITHUB_CONTRIBUTING_URL,
   GITHUB_RELEASES_URL,
   GITHUB_REPO_URL,
-  GITHUB_STAR_URL,
   NPM_ORG_URL,
 } from '../../lib/community-links';
 
@@ -85,13 +84,13 @@ export default function OpenSourcePage() {
           </p>
           <div className="mt-10 flex flex-wrap gap-3">
             <a
-              href={GITHUB_STAR_URL}
+              href={GITHUB_REPO_URL}
               target="_blank"
               rel="noreferrer"
               className="inline-flex items-center gap-2 rounded-sm bg-aegis-signal px-5 py-3 font-mono text-[12px] uppercase tracking-[0.18em] text-aegis-ink"
             >
-              <Star className="h-4 w-4" />
-              Star on GitHub
+              <Github className="h-4 w-4" />
+              View on GitHub
             </a>
             <a
               href={GITHUB_RELEASES_URL}

@@ -20,7 +20,6 @@ import {
   DISCORD_INVITE_URL,
   GITHUB_DISCUSSIONS_URL,
   GITHUB_REPO_URL,
-  GITHUB_STAR_URL,
   NPM_ORG_URL,
   TWITTER_URL,
 } from '../../lib/community-links';
@@ -101,14 +100,14 @@ function PublicTopbar() {
         </nav>
         <div className="flex items-center gap-2">
           <a
-            href={GITHUB_STAR_URL}
+            href={GITHUB_REPO_URL}
             target="_blank"
             rel="noreferrer"
-            aria-label="Star Nomos on GitHub"
+            aria-label="Nomos on GitHub"
             className="hidden items-center gap-2 rounded-sm border border-aegis-line px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.18em] text-aegis-mute transition-colors hover:border-aegis-line-strong hover:text-aegis-paper md:inline-flex"
           >
             <Github className="h-3.5 w-3.5" />
-            <span className="hidden lg:inline">Star</span>
+            <span className="hidden lg:inline">GitHub</span>
           </a>
           <a
             href={DISCORD_INVITE_URL}
@@ -214,13 +213,13 @@ function MobileNav({
         </div>
         <div className="mx-auto flex max-w-[1280px] flex-wrap items-center gap-2 border-t border-aegis-line px-4 py-4 sm:px-6">
           <a
-            href={GITHUB_STAR_URL}
+            href={GITHUB_REPO_URL}
             target="_blank"
             rel="noreferrer"
             className="inline-flex items-center gap-2 rounded-sm border border-aegis-line px-3 py-2 font-mono text-[11px] uppercase tracking-[0.18em] text-aegis-mute transition-colors hover:border-aegis-line-strong hover:text-aegis-paper"
           >
             <Github className="h-3.5 w-3.5" />
-            Star
+            GitHub
           </a>
           <a
             href={DISCORD_INVITE_URL}
@@ -320,12 +319,12 @@ function PublicFooter() {
             <SocialPill href={TWITTER_URL} icon={TwitterMark} label="Twitter" />
           </div>
           <a
-            href={GITHUB_STAR_URL}
+            href={GITHUB_REPO_URL}
             target="_blank"
             rel="noreferrer"
             className="group inline-flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.18em] text-aegis-mute transition-colors hover:text-aegis-signal"
           >
-            <span>Star to be #1 on day one</span>
+            <span>Browse the repo on GitHub</span>
             <ArrowUpRight className="h-3.5 w-3.5 transition-transform group-hover:-translate-y-px group-hover:translate-x-px" />
           </a>
         </div>

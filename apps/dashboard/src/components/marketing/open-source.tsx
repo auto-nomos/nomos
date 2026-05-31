@@ -1,6 +1,6 @@
-import { ArrowUpRight, Github, Star } from 'lucide-react';
+import { ArrowUpRight, Github } from 'lucide-react';
 import Link from 'next/link';
-import { GITHUB_RELEASES_URL, GITHUB_STAR_URL, NPM_ORG_URL } from '../../lib/community-links';
+import { GITHUB_RELEASES_URL, GITHUB_REPO_URL, NPM_ORG_URL } from '../../lib/community-links';
 
 /**
  * Band 9 — Open source. The repo is public under Apache-2.0: npm packages are
@@ -57,17 +57,17 @@ export function OpenSource() {
               @auto-nomos/*
             </code>
             , and the full control-plane and dashboard source is public too — all under Apache-2.0.
-            Read every line, open an issue, send a PR. Star the repo if Nomos is useful to you.
+            Read every line, open an issue, send a PR.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
             <a
-              href={GITHUB_STAR_URL}
+              href={GITHUB_REPO_URL}
               target="_blank"
               rel="noreferrer"
               className="group inline-flex items-center gap-2 rounded-sm bg-aegis-signal px-5 py-3 font-mono text-[12px] uppercase tracking-[0.18em] text-aegis-ink transition-colors hover:bg-aegis-signal/90"
             >
-              <Star className="h-4 w-4" />
-              Star on GitHub
+              <Github className="h-4 w-4" />
+              View on GitHub
             </a>
             <a
               href={GITHUB_RELEASES_URL}

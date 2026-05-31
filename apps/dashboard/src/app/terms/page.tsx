@@ -7,7 +7,7 @@ export const metadata = {
 };
 
 const EFFECTIVE_DATE = '2026-05-24';
-const CONTACT_EMAIL = 'varendra@auto-nomos.com';
+const CONTACT_EMAIL = 'communications@auto-nomos.com';
 
 export default function TermsPage() {
   return (

@@ -289,8 +289,8 @@ function Reporting() {
           </h2>
           <p className="mt-5 max-w-[560px] text-sm leading-relaxed text-aegis-mute">
             We run coordinated disclosure. Email{' '}
-            <a href="mailto:security@aegis.dev" className="text-aegis-signal hover:underline">
-              security@aegis.dev
+            <a href="mailto:security@auto-nomos.com" className="text-aegis-signal hover:underline">
+              security@auto-nomos.com
             </a>{' '}
             with reproduction steps. We acknowledge in 24 hours, fix critical issues within 7 days,
             publish a CVE if appropriate, and credit you (or keep you anonymous — your call).

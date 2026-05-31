@@ -1,6 +1,6 @@
 import { ArrowRight, ArrowUpRight, Cloud, Server } from 'lucide-react';
 import Link from 'next/link';
-import { GITHUB_STAR_URL } from '../../lib/community-links';
+import { GITHUB_REPO_URL } from '../../lib/community-links';
 
 /**
  * Band 12 — Bottom CTA. One idea: two paths, no friction. Use hosted free
@@ -24,12 +24,12 @@ export function BottomCta() {
             later without a migration.
           </p>
           <a
-            href={GITHUB_STAR_URL}
+            href={GITHUB_REPO_URL}
             target="_blank"
             rel="noreferrer"
             className="mt-8 inline-flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.18em] text-aegis-mute hover:text-aegis-signal"
           >
-            Or just star the repo first
+            Or browse the repo on GitHub first
             <ArrowUpRight className="h-3.5 w-3.5" />
           </a>
         </div>
