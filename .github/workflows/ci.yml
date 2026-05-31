@@ -51,6 +51,12 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
+      - name: Audit extractor coverage
+        run: pnpm audit:extractors
+
+      - name: Audit adapter parity
+        run: pnpm audit:parity
+
       - name: Test (with coverage)
         run: pnpm test
 
